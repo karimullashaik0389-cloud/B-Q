@@ -1,0 +1,112 @@
+<!doctype html><html lang="en-GB"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0F172A"><meta name="robots" content="noindex,nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes"><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%23FF6600%22/%3E%3C/svg%3E"><title>B&amp;Q Dashboards</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;height:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#0F172A;color:#F8FAFC;-webkit-text-size-adjust:100%}
+.wrap{min-height:100%;display:flex;flex-direction:column;justify-content:center;padding:calc(24px + env(safe-area-inset-top)) 22px calc(24px + env(safe-area-inset-bottom));max-width:460px;margin:0 auto}
+.logo{width:56px;height:56px;border-radius:14px;background:#FF6600;color:#fff;font-weight:800;font-size:22px;display:flex;align-items:center;justify-content:center;margin-bottom:18px}
+h1{font-size:26px;margin:0 0 6px}p.sub{margin:0 0 26px;color:#94A3B8;font-size:15px}
+label.f{display:block;font-size:14px;color:#CBD5E1;margin-bottom:8px}
+input[type=password],input[type=text]{width:100%;font-size:17px;padding:15px 14px;border-radius:12px;border:1px solid #334155;background:#1E293B;color:#F8FAFC;outline:none}
+input:focus{border-color:#FF6600}
+.row{display:flex;align-items:center;gap:10px;margin:16px 0 20px;font-size:15px;color:#CBD5E1}
+.row input{width:20px;height:20px;accent-color:#FF6600}
+button{font:inherit;cursor:pointer;border:0;-webkit-tap-highlight-color:transparent}
+.primary{width:100%;padding:16px;border-radius:12px;background:#FF6600;color:#fff;font-size:17px;font-weight:700}
+.primary:disabled{opacity:.6}
+.msg{min-height:22px;margin-top:14px;font-size:15px;color:#FCA5A5}
+.big{display:flex;flex-direction:column;align-items:flex-start;width:100%;padding:22px 20px;margin-bottom:14px;border-radius:16px;background:#F8FAFC;color:#0F172A;text-align:left;border-left:8px solid #FF6600}
+.big b{font-size:21px}.big span{font-size:14px;color:#64748B;margin-top:4px}
+.ghost{background:transparent;color:#94A3B8;border:1px solid #334155;padding:12px 16px;border-radius:12px;font-size:15px;margin-top:8px}
+.hide{display:none!important}
+#viewer{position:fixed;inset:0;background:#F8FAFC;z-index:5}
+#frame{position:absolute;inset:0;width:100%;height:100%;border:0}
+#back{position:fixed;left:0;top:50%;transform:translateY(-50%);z-index:6;background:rgba(15,23,42,.78);color:#fff;width:30px;padding:12px 0;border-radius:0 12px 12px 0;font-size:11px;font-weight:700;line-height:1.1;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+#back b{display:block;font-size:20px}
+#busy{position:fixed;inset:0;z-index:7;background:rgba(15,23,42,.88);display:flex;align-items:center;justify-content:center;font-size:16px;color:#F8FAFC}
+</style></head><body>
+<div class="wrap" id="login">
+ <div class="logo">B&amp;Q</div><h1>Dashboards</h1><p class="sub">Diva Package · private</p>
+ <form id="lf" autocomplete="on">
+  <label class="f" for="pw">Password</label>
+  <input type="password" id="pw" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+  <label class="row"><input type="checkbox" id="rem" checked> Remember me on this device</label>
+  <button class="primary" id="go" type="submit">Unlock</button>
+  <div class="msg" id="msg" role="alert"></div>
+ </form>
+</div>
+<div class="wrap hide" id="menu">
+ <div class="logo">B&amp;Q</div><h1>Choose a dashboard</h1><p class="sub">Use “Load new data” inside a dashboard to refresh it.</p>
+ <button class="big" data-d="sales"><b>Sales (Morning)</b><span>Daily sales, profit, top sellers</span></button>
+ <button class="big" data-d="orders"><b>Orders</b><span>Waiting, late, cancelled, returns</span></button>
+ <button class="ghost" id="lock">🔒 Lock</button>
+</div>
+<div id="viewer" class="hide"><iframe id="frame" title="Dashboard" allow="clipboard-write"></iframe></div>
+<button id="back" class="hide" aria-label="Back to menu"><b>‹</b>Me<br>nu</button>
+<div id="busy" class="hide">Opening…</div>
+<script>
+(function(){
+"use strict";
+var FILES={sales:"sales.enc",orders:"orders.enc"},ITER=600000,LS="bqDashKeys.v1";
+var $=function(i){return document.getElementById(i)};
+var keys={},bufs={},curUrl=null,te=new TextDecoder();
+function b64(u8){var s="";for(var i=0;i<u8.length;i+=8192)s+=String.fromCharCode.apply(null,u8.subarray(i,i+8192));return btoa(s)}
+function unb64(s){var b=atob(s),u=new Uint8Array(b.length);for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u}
+function show(id){["login","menu"].forEach(function(x){$(x).classList.toggle("hide",x!==id)})}
+function busy(on,t){$("busy").textContent=t||"Opening…";$("busy").classList.toggle("hide",!on)}
+function parts(buf){var u=new Uint8Array(buf);
+ if(u.length<48||String.fromCharCode(u[0],u[1],u[2],u[3])!=="BQE1")throw new Error("badfile");
+ return{salt:u.subarray(4,20),iv:u.subarray(20,32),ct:u.subarray(32)}}
+function getBuf(d){if(bufs[d])return Promise.resolve(bufs[d]);
+ return fetch(FILES[d],{cache:"no-cache"}).then(function(r){if(!r.ok)throw new Error("net");return r.arrayBuffer()})
+ .then(function(b){bufs[d]=b;return b})}
+function derive(pw,salt){var c=crypto.subtle;
+ return c.importKey("raw",new TextEncoder().encode(pw),"PBKDF2",false,["deriveKey"]).then(function(base){
+ return c.deriveKey({name:"PBKDF2",hash:"SHA-256",salt:salt,iterations:ITER},base,{name:"AES-GCM",length:256},true,["decrypt"])})}
+function decrypt(key,p){return crypto.subtle.decrypt({name:"AES-GCM",iv:p.iv},key,p.ct)}
+function saveKeys(){var out={},ds=Object.keys(FILES);
+ return Promise.all(ds.map(function(d){return crypto.subtle.exportKey("raw",keys[d].key).then(function(raw){
+  out[d]={salt:b64(keys[d].salt),key:b64(new Uint8Array(raw))}})})).then(function(){localStorage.setItem(LS,JSON.stringify(out))})}
+function loadKeys(){try{var o=JSON.parse(localStorage.getItem(LS)||"null");if(!o)return Promise.resolve(false);
+ return Promise.all(Object.keys(FILES).map(function(d){if(!o[d])throw new Error("x");
+  return crypto.subtle.importKey("raw",unb64(o[d].key),{name:"AES-GCM"},false,["decrypt"]).then(function(k){keys[d]={key:k,salt:unb64(o[d].salt)}})}))
+ .then(function(){return true},function(){localStorage.removeItem(LS);keys={};return false})}catch(e){localStorage.removeItem(LS);return Promise.resolve(false)}}
+function sameSalt(a,b){if(a.length!==b.length)return false;for(var i=0;i<a.length;i++)if(a[i]!==b[i])return false;return true}
+
+$("lf").addEventListener("submit",function(ev){ev.preventDefault();
+ var pw=$("pw").value;if(!pw){$("msg").textContent="Please type the password.";return}
+ $("msg").textContent="";$("go").disabled=true;$("go").textContent="Checking…";
+ var ds=Object.keys(FILES),nk={};
+ Promise.all(ds.map(function(d){return getBuf(d).then(function(b){var p=parts(b);
+  return derive(pw,p.salt).then(function(k){nk[d]={key:k,salt:p.salt.slice()};return decrypt(k,p)})})}))
+ .then(function(){keys=nk;$("pw").value="";
+  return $("rem").checked?saveKeys():(localStorage.removeItem(LS),null)}).then(function(){show("menu")})
+ .catch(function(e){var net=e&&(e.message==="net"||e.name==="TypeError");
+  $("msg").textContent=net?"Couldn’t load the dashboards. Check your connection and try again."
+   :"That password isn’t right — please try again.";$("pw").select()})
+ .then(function(){$("go").disabled=false;$("go").textContent="Unlock"})});
+
+function open(d){busy(true);
+ getBuf(d).then(function(b){var p=parts(b),k=keys[d];
+  if(!k||!sameSalt(k.salt,p.salt))throw new Error("stale");
+  return decrypt(k.key,p)}).then(function(plain){
+  if(curUrl)URL.revokeObjectURL(curUrl);
+  curUrl=URL.createObjectURL(new Blob([te.decode(plain)],{type:"text/html;charset=utf-8"}));
+  $("frame").src=curUrl;$("viewer").classList.remove("hide");$("back").classList.remove("hide");
+  document.title=d==="sales"?"B&Q Sales":"B&Q Orders";busy(false)})
+ .catch(function(e){busy(false);
+  if(e&&e.message==="net"){alert("Couldn’t load the dashboard. Check your connection.");return}
+  lock();$("msg").textContent="Please enter the password again (the dashboards were updated).";})}
+function back(){$("viewer").classList.add("hide");$("back").classList.add("hide");$("frame").src="about:blank";
+ if(curUrl){URL.revokeObjectURL(curUrl);curUrl=null}document.title="B&Q Dashboards";show("menu")}
+function lock(){localStorage.removeItem(LS);keys={};bufs={};back();show("login")}
+document.querySelectorAll("[data-d]").forEach(function(b){b.addEventListener("click",function(){open(b.getAttribute("data-d"))})});
+$("back").addEventListener("click",back);
+$("lock").addEventListener("click",function(){lock();$("msg").textContent="Locked. This device no longer remembers you."});
+if(!window.crypto||!crypto.subtle){$("msg").textContent="This browser can’t unlock the dashboards (needs HTTPS and a modern browser).";$("go").disabled=true}
+else loadKeys().then(function(ok){if(ok)show("menu")});
+})();
+</script>
+</body></html>
