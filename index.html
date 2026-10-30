@@ -25,22 +25,25 @@ button{font:inherit;cursor:pointer;border:0;-webkit-tap-highlight-color:transpar
 #frame{position:absolute;inset:0;width:100%;height:100%;border:0}
 #back{position:fixed;left:0;top:50%;transform:translateY(-50%);z-index:6;background:rgba(15,23,42,.78);color:#fff;width:30px;padding:12px 0;border-radius:0 12px 12px 0;font-size:11px;font-weight:700;line-height:1.1;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.25)}
 #back b{display:block;font-size:20px}
+.hint{color:#94A3B8;font-size:14px;margin:10px 0 0}
 #busy{position:fixed;inset:0;z-index:7;background:rgba(15,23,42,.88);display:flex;align-items:center;justify-content:center;font-size:16px;color:#F8FAFC}
 </style></head><body>
 <div class="wrap" id="login">
- <div class="logo">B&amp;Q</div><h1>Dashboards</h1><p class="sub">Diva Package · private</p>
+ <div class="logo">B&amp;Q</div><h1 id="lh">Dashboards</h1><p class="sub" id="lsub">Diva Package · private</p>
  <form id="lf" autocomplete="on">
-  <label class="f" for="pw">Password</label>
+  <label class="f" for="pw" id="pwl">Password</label>
   <input type="password" id="pw" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" required>
-  <label class="row"><input type="checkbox" id="rem" checked> Remember me on this device</label>
+  <label class="row" id="remrow"><input type="checkbox" id="rem" checked> Remember me on this device</label>
   <button class="primary" id="go" type="submit">Unlock</button>
   <div class="msg" id="msg" role="alert"></div>
+  <p class="hint hide" id="dhint">Saved on this device and protected by your password. The main password works too.</p>
+  <button class="ghost hide" id="forget" type="button">Forget this device</button>
  </form>
 </div>
 <div class="wrap hide" id="menu">
- <div class="logo">B&amp;Q</div><h1>Choose a dashboard</h1><p class="sub">Use “Load new data” inside a dashboard to refresh it.</p>
- <button class="big" data-d="sales"><b>Sales (Morning)</b><span>Daily sales, profit, top sellers</span></button>
- <button class="big" data-d="orders"><b>Orders</b><span>Waiting, late, cancelled, returns</span></button>
+ <div class="logo">B&amp;Q</div><h1>Choose a dashboard</h1><p class="sub">Both open the same app. Switch any time with ‹ Menu on the left.</p>
+ <button class="big" data-d="sales"><b>Sales</b><span>Sales, orders, units and profit · best sellers · calculator</span></button>
+ <button class="big" data-d="orders"><b>Orders</b><span>Every order with profit, incl. cancelled · needs fixing</span></button>
  <button class="ghost" id="lock">🔒 Lock</button>
 </div>
 <div id="viewer" class="hide"><iframe id="frame" title="Dashboard" allow="clipboard-write"></iframe></div>
@@ -49,9 +52,13 @@ button{font:inherit;cursor:pointer;border:0;-webkit-tap-highlight-color:transpar
 <script>
 (function(){
 "use strict";
-var FILES={sales:"sales.enc",orders:"orders.enc"},ITER=600000,LS="bqDashKeys.v1";
+/* B&Q v5 login. Files are AES-GCM encrypted (key = PBKDF2-SHA256, 600k, from the main password).
+   "Remember me" keeps the file keys on this device, but only wrapped (encrypted) with a device password,
+   never in plain form. The device password starts as the password typed at login and can be changed
+   from the app's Settings; that change applies to this device only. */
+var FILES={sales:"sales.enc",orders:"orders.enc"},ITER=600000,LS1="bqDashKeys.v1",LS2="bqDashKeys.v2";
 var $=function(i){return document.getElementById(i)};
-var keys={},bufs={},curUrl=null,te=new TextDecoder();
+var keys={},bufs={},curUrl=null,te=new TextDecoder(),te2=new TextEncoder(),mode="main";
 function b64(u8){var s="";for(var i=0;i<u8.length;i+=8192)s+=String.fromCharCode.apply(null,u8.subarray(i,i+8192));return btoa(s)}
 function unb64(s){var b=atob(s),u=new Uint8Array(b.length);for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u}
 function show(id){["login","menu"].forEach(function(x){$(x).classList.toggle("hide",x!==id)})}
@@ -62,30 +69,56 @@ function parts(buf){var u=new Uint8Array(buf);
 function getBuf(d){if(bufs[d])return Promise.resolve(bufs[d]);
  return fetch(FILES[d],{cache:"no-cache"}).then(function(r){if(!r.ok)throw new Error("net");return r.arrayBuffer()})
  .then(function(b){bufs[d]=b;return b})}
-function derive(pw,salt){var c=crypto.subtle;
- return c.importKey("raw",new TextEncoder().encode(pw),"PBKDF2",false,["deriveKey"]).then(function(base){
- return c.deriveKey({name:"PBKDF2",hash:"SHA-256",salt:salt,iterations:ITER},base,{name:"AES-GCM",length:256},true,["decrypt"])})}
+function kdf(pw,salt,ext,use){var c=crypto.subtle;
+ return c.importKey("raw",te2.encode(pw),"PBKDF2",false,["deriveKey"]).then(function(base){
+ return c.deriveKey({name:"PBKDF2",hash:"SHA-256",salt:salt,iterations:ITER},base,{name:"AES-GCM",length:256},ext,use)})}
 function decrypt(key,p){return crypto.subtle.decrypt({name:"AES-GCM",iv:p.iv},key,p.ct)}
-function saveKeys(){var out={},ds=Object.keys(FILES);
- return Promise.all(ds.map(function(d){return crypto.subtle.exportKey("raw",keys[d].key).then(function(raw){
-  out[d]={salt:b64(keys[d].salt),key:b64(new Uint8Array(raw))}})})).then(function(){localStorage.setItem(LS,JSON.stringify(out))})}
-function loadKeys(){try{var o=JSON.parse(localStorage.getItem(LS)||"null");if(!o)return Promise.resolve(false);
- return Promise.all(Object.keys(FILES).map(function(d){if(!o[d])throw new Error("x");
-  return crypto.subtle.importKey("raw",unb64(o[d].key),{name:"AES-GCM"},false,["decrypt"]).then(function(k){keys[d]={key:k,salt:unb64(o[d].salt)}})}))
- .then(function(){return true},function(){localStorage.removeItem(LS);keys={};return false})}catch(e){localStorage.removeItem(LS);return Promise.resolve(false)}}
 function sameSalt(a,b){if(a.length!==b.length)return false;for(var i=0;i<a.length;i++)if(a[i]!==b[i])return false;return true}
+function stored(){try{var o=JSON.parse(localStorage.getItem(LS2)||"null");return o&&o.v===2&&o.s&&o.iv&&o.ct?o:null}catch(e){return null}}
+function forget(){try{localStorage.removeItem(LS2);localStorage.removeItem(LS1)}catch(e){}}
+/* main password: derive each file key from its own salt and prove it by decrypting the file */
+function tryMain(pw){var nk={};
+ return Promise.all(Object.keys(FILES).map(function(d){return getBuf(d).then(function(b){var p=parts(b);
+  return kdf(pw,p.salt,true,["decrypt"]).then(function(k){nk[d]={key:k,salt:p.salt.slice()};return decrypt(k,p)})})}))
+ .then(function(){return nk})}
+/* wrap the file keys with a device password and keep only the wrapped copy */
+function wrapStore(pw,ks){var inner={},ds=Object.keys(FILES),salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));
+ return Promise.all(ds.map(function(d){return crypto.subtle.exportKey("raw",ks[d].key).then(function(raw){inner[d]={salt:b64(ks[d].salt),key:b64(new Uint8Array(raw))}})}))
+ .then(function(){return kdf(pw,salt,false,["encrypt"])})
+ .then(function(wk){return crypto.subtle.encrypt({name:"AES-GCM",iv:iv},wk,te2.encode(JSON.stringify(inner)))})
+ .then(function(ct){inner=null;localStorage.removeItem(LS1);localStorage.setItem(LS2,JSON.stringify({v:2,s:b64(salt),iv:b64(iv),ct:b64(new Uint8Array(ct))}))})}
+function unwrap(pw){var o=stored();if(!o)return Promise.reject(new Error("none"));
+ return kdf(pw,unb64(o.s),false,["decrypt"]).then(function(wk){return crypto.subtle.decrypt({name:"AES-GCM",iv:unb64(o.iv)},wk,unb64(o.ct))})
+ .then(function(plain){var inner=JSON.parse(te.decode(plain)),nk={};
+  return Promise.all(Object.keys(FILES).map(function(d){if(!inner[d])throw new Error("x");
+   return crypto.subtle.importKey("raw",unb64(inner[d].key),{name:"AES-GCM"},true,["decrypt"]).then(function(k){nk[d]={key:k,salt:unb64(inner[d].salt)}})}))
+  .then(function(){return nk})})}
+/* are the saved keys still for the files on the site? */
+function fresh(nk){return Promise.all(Object.keys(FILES).map(function(d){return getBuf(d).then(function(b){return sameSalt(nk[d].salt,parts(b).salt)})}))
+ .then(function(r){return r.every(Boolean)})}
+function setMode(m,msg){mode=m;var dev=m==="device";
+ $("lh").textContent=dev?"Welcome back":"Dashboards";
+ $("pwl").textContent=dev?"Password for this device":"Password";
+ $("remrow").classList.toggle("hide",dev);$("dhint").classList.toggle("hide",!dev);$("forget").classList.toggle("hide",!dev);
+ $("msg").textContent=msg||"";show("login")}
+function fail(e,txt){var net=e&&(e.message==="net"||e.name==="TypeError");
+ $("msg").textContent=net?"Couldn’t load the dashboards. Check your connection and try again.":txt;$("pw").select()}
 
 $("lf").addEventListener("submit",function(ev){ev.preventDefault();
  var pw=$("pw").value;if(!pw){$("msg").textContent="Please type the password.";return}
  $("msg").textContent="";$("go").disabled=true;$("go").textContent="Checking…";
- var ds=Object.keys(FILES),nk={};
- Promise.all(ds.map(function(d){return getBuf(d).then(function(b){var p=parts(b);
-  return derive(pw,p.salt).then(function(k){nk[d]={key:k,salt:p.salt.slice()};return decrypt(k,p)})})}))
- .then(function(){keys=nk;$("pw").value="";
-  return $("rem").checked?saveKeys():(localStorage.removeItem(LS),null)}).then(function(){show("menu")})
- .catch(function(e){var net=e&&(e.message==="net"||e.name==="TypeError");
-  $("msg").textContent=net?"Couldn’t load the dashboards. Check your connection and try again."
-   :"That password isn’t right — please try again.";$("pw").select()})
+ var p;
+ if(mode==="device"){
+  p=unwrap(pw).then(function(nk){return fresh(nk).then(function(ok){if(ok)return nk;throw new Error("stale")})})
+   .catch(function(e){if(e&&e.message==="net")throw e;var stale=e&&e.message==="stale";
+    return tryMain(pw).then(function(nk){return wrapStore(pw,nk).then(function(){return nk})},function(e2){
+     if(e2&&(e2.message==="net"||e2.name==="TypeError"))throw e2;
+     if(stale){forget();setMode("main");throw new Error("stale2")}throw e2})});
+ }else{
+  p=tryMain(pw).then(function(nk){return($("rem").checked?wrapStore(pw,nk):Promise.resolve(forget())).then(function(){return nk})});
+ }
+ p.then(function(nk){keys=nk;$("pw").value="";$("msg").textContent="";show("menu")})
+ .catch(function(e){fail(e,e&&e.message==="stale2"?"The dashboards were updated, so this device’s saved login has expired. Please type the main password.":"That password isn’t right — please try again.")})
  .then(function(){$("go").disabled=false;$("go").textContent="Unlock"})});
 
 function open(d){busy(true);
@@ -94,19 +127,33 @@ function open(d){busy(true);
   return decrypt(k.key,p)}).then(function(plain){
   if(curUrl)URL.revokeObjectURL(curUrl);
   curUrl=URL.createObjectURL(new Blob([te.decode(plain)],{type:"text/html;charset=utf-8"}));
-  $("frame").src=curUrl;$("viewer").classList.remove("hide");$("back").classList.remove("hide");
+  $("frame").src=curUrl;$("viewer").classList.remove("hide");
   document.title=d==="sales"?"B&Q Sales":"B&Q Orders";busy(false)})
  .catch(function(e){busy(false);
   if(e&&e.message==="net"){alert("Couldn’t load the dashboard. Check your connection.");return}
-  lock();$("msg").textContent="Please enter the password again (the dashboards were updated).";})}
-function back(){$("viewer").classList.add("hide");$("back").classList.add("hide");$("frame").src="about:blank";
- if(curUrl){URL.revokeObjectURL(curUrl);curUrl=null}document.title="B&Q Dashboards";show("menu")}
-function lock(){localStorage.removeItem(LS);keys={};bufs={};back();show("login")}
+  lock("Please enter the main password again (the dashboards were updated).")})}
+function back(){$("viewer").classList.add("hide");$("frame").src="about:blank";
+ if(curUrl){URL.revokeObjectURL(curUrl);curUrl=null}document.title="B&Q Dashboards"}
+function lock(msg){forget();keys={};bufs={};back();setMode("main",msg||"")}
+/* messages from the app inside the frame */
+window.addEventListener("message",function(e){var f=$("frame");
+ if(!f||e.source!==f.contentWindow||!e.data||typeof e.data.bq!=="string")return;
+ if(location.origin!=="null"&&e.origin!==location.origin)return;
+ var m=e.data,reply=function(o){o.re=m.id;try{e.source.postMessage(o,location.origin!=="null"?location.origin:"*")}catch(x){}};
+ if(m.bq==="hello"){reply({ok:true,remembered:!!stored()});return}
+ if(m.bq==="lock"){reply({ok:true});lock("Locked. This device no longer remembers you.");return}
+ if(m.bq==="rewrap"){var o=String(m.old||""),n=String(m.nw||"");
+  if(n.length<8){reply({ok:false,err:"New password needs at least 8 characters"});return}
+  var chk=stored()?unwrap(o).catch(function(){return tryMain(o)}):tryMain(o);
+  chk.then(function(nk){return wrapStore(n,nk)},function(){throw new Error("wrong")})
+  .then(function(){reply({ok:true})},function(err){reply({ok:false,err:err&&err.message==="wrong"?"wrong":"error"})});
+ }});
 document.querySelectorAll("[data-d]").forEach(function(b){b.addEventListener("click",function(){open(b.getAttribute("data-d"))})});
-$("back").addEventListener("click",back);
-$("lock").addEventListener("click",function(){lock();$("msg").textContent="Locked. This device no longer remembers you."});
+$("lock").addEventListener("click",function(){lock("Locked. This device no longer remembers you.")});
+$("forget").addEventListener("click",function(){forget();setMode("main","This device has forgotten the saved login.")});
 if(!window.crypto||!crypto.subtle){$("msg").textContent="This browser can’t unlock the dashboards (needs HTTPS and a modern browser).";$("go").disabled=true}
-else loadKeys().then(function(ok){if(ok)show("menu")});
+else{var had1=false;try{had1=!!localStorage.getItem(LS1);localStorage.removeItem(LS1)}catch(e){}
+ if(stored())setMode("device");else setMode("main",had1?"For extra safety, please type the password once more. Saved logins are now protected by your password.":"");}
 })();
 </script>
 </body></html>
