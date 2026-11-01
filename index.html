@@ -18,7 +18,7 @@ button{font:inherit;cursor:pointer;border:0;-webkit-tap-highlight-color:transpar
 .primary:disabled{opacity:.6}
 .msg{min-height:22px;margin-top:14px;font-size:15px;color:#FCA5A5}
 .big{display:flex;flex-direction:column;align-items:flex-start;width:100%;padding:22px 20px;margin-bottom:14px;border-radius:16px;background:#F8FAFC;color:#0F172A;text-align:left;border-left:8px solid #FF6600}
-.big b{font-size:21px}.big span{font-size:14px;color:#64748B;margin-top:4px}
+a.big{text-decoration:none;-webkit-tap-highlight-color:transparent}.big b{font-size:21px}.big span{font-size:14px;color:#64748B;margin-top:4px}
 .ghost{background:transparent;color:#94A3B8;border:1px solid #334155;padding:12px 16px;border-radius:12px;font-size:15px;margin-top:8px}
 .hide{display:none!important}
 #viewer{position:fixed;inset:0;background:#F8FAFC;z-index:5}
@@ -44,6 +44,7 @@ button{font:inherit;cursor:pointer;border:0;-webkit-tap-highlight-color:transpar
  <div class="logo">B&amp;Q</div><h1>Choose a dashboard</h1><p class="sub">Both open the same app. Switch any time with ‹ Menu on the left.</p>
  <button class="big" data-d="sales"><b>Sales</b><span>Sales, orders, units and profit · best sellers · calculator</span></button>
  <button class="big" data-d="orders"><b>Orders</b><span>Every order with profit, incl. cancelled · needs fixing</span></button>
+ <a class="big" id="listings" href="listings/"><b>Listings</b><span>Create and fix B&amp;Q listings · templates · download files</span></a>
  <button class="ghost" id="lock">🔒 Lock</button>
 </div>
 <div id="viewer" class="hide"><iframe id="frame" title="Dashboard" allow="clipboard-write"></iframe></div>
