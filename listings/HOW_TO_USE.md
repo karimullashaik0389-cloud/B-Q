@@ -1,6 +1,6 @@
 # B&Q Listings – how to use (step by step)
 
-Tool version 3.5.12. Read this once, top to bottom. Every step is numbered. You only need a mouse/finger and your product names.
+Tool version 3.5.13. Read this once, top to bottom. Every step is numbered. You only need a mouse/finger and your product names.
 
 **What the tool does:** you give it SKU, EAN and product name. It writes the B&Q title (121–124 characters), 8 bullets, a 150+ word description and the key feature. It also fills the category and attributes, then gives you **one B&Q file per category**. Then **you** import those files on the B&Q portal yourself.
 
@@ -114,7 +114,24 @@ At the top of Fill gaps and Check a line says **What to do next**, e.g. *Confirm
    - from your **All variant.xlsx** if you loaded it (blank if the SKU is not in it);
    - otherwise products with the same name in a category that allows variants get one group;
    - blank where B&Q does not allow variants.
-6. Click **Next →**.
+6. **Add variant (new in 3.5.13)** – to make a new colour, size or measurement of a product without retyping it:
+   1. On the product card, click **+ Add variant**.
+   2. Choose what is different: **Colour**, **Size** or **Measurements**.
+   3. Type the value of this product (for example *Large*, only asked the first time), the value of the new one (for example *Medium*), and the new SKU. The tool refuses an empty value, a value already used in the group, a SKU with spaces, and a SKU already in your list or already live on B&Q.
+   4. **Variant Group code:** all products in the group share one code. It starts as the base SKU; you can change it in the form or later on any card of the group (it changes for all of them).
+   5. Click **Create variant**. A new card appears under the product, marked *Variant of …*. It copies the category, answers and fields, but **not** the EAN, photos, weight or size – type its **own EAN** (box on the card), weight and photo. It is held back until you do.
+   6. The value goes in each title (written for you) and in the template's **Colour / Colour group / Size** column where the category has one (drop-down values must match the list; the card says where the value goes). Measurements like *60 x 40 x 10 cm* also fill the size boxes.
+   7. If the category **doesn't allow variants** on B&Q, the form says so clearly. You can still make the new product: it is then a separate product with **no** group code.
+7. **Pack (new in 3.5.13)** – tick **Pack** (*several items sold as one listing*) at the top of *You add these* on the card and type how many are in the pack (N). Then:
+   - the boxes change to **Whole pack total weight** and **Shipping package length / width / height** – type the totals of the whole pack as it is shipped (the separate Packed size boxes are hidden);
+   - the file gets those totals, **Pack type = Pack** and **Pack quantity = N** (and **Number of pieces = N** where the template has it);
+   - the title gets **Pack of N**;
+   - postage: B&Q's templates have no postage column – the only weight sent is the whole-pack total weight, so use the shipped weight there.
+8. **Mixed pack (new in 3.5.13)** – inside Pack, tick **Mixed pack** (*items of different sizes*). For each item type a label (e.g. *M*), how many, L × W × H in cm and, if you know it, the weight; **+ Add item** adds a line. Then:
+   - bullet 2 and the end of the description get a line such as *Pack of 3: 1 x M (40 x 30 x 10cm), 2 x S (30 x 20 x 10cm)*;
+   - the file still uses the **whole-pack totals** from the boxes above;
+   - if you leave those totals empty, the tool fills them for you – size from the **largest item**, weight as the **sum of the item weights** (only when every item has a weight) – and marks them **Medium – please check** on the card and in *Please check* on Check. Type the real totals if you know them.
+9. Click **Next →**.
 
 ### 5. Check and download
 1. Each card shows the title with its length (must be **121–124**), the **8 bullets**, the description word count (**150+**) and the **Key feature** (max **30** characters). Green = OK, red = fix.

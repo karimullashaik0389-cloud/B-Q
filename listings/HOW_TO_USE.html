@@ -3,8 +3,8 @@ main{max-width:820px;margin:0 auto;padding:18px 16px 60px}
 .top{display:flex;align-items:center;gap:10px;margin:4px 0 14px}.logo{background:#FF6600;color:#fff;font-weight:800;border-radius:9px;padding:8px 9px;font-size:14px}
 h1{font-size:26px;margin:6px 0 10px}h2{font-size:21px;margin:28px 0 8px;color:#FF8A3D}h3{font-size:18px;margin:18px 0 6px}
 p,li{color:#E2E8F0}li{margin:5px 0}strong{color:#fff}a{color:#FF8A3D}code{background:#1E293B;color:#FDE68A;padding:1px 5px;border-radius:5px}
-blockquote{margin:12px 0;padding:10px 14px;background:#1E293B;border-left:4px solid #FF6600;border-radius:8px}hr{border:0;border-top:1px solid #334155;margin:24px 0}</style></head><body><main><div class="top"><span class="logo">B&amp;Q</span><b>Listings – how to use (v3.5.12)</b></div><h1>B&amp;Q Listings – how to use (step by step)</h1>
-<p>Tool version 3.5.12. Read this once, top to bottom. Every step is numbered. You only need a mouse/finger and your product names.</p>
+blockquote{margin:12px 0;padding:10px 14px;background:#1E293B;border-left:4px solid #FF6600;border-radius:8px}hr{border:0;border-top:1px solid #334155;margin:24px 0}</style></head><body><main><div class="top"><span class="logo">B&amp;Q</span><b>Listings – how to use (v3.5.13)</b></div><h1>B&amp;Q Listings – how to use (step by step)</h1>
+<p>Tool version 3.5.13. Read this once, top to bottom. Every step is numbered. You only need a mouse/finger and your product names.</p>
 <p><strong>What the tool does:</strong> you give it SKU, EAN and product name. It writes the B&amp;Q title (121–124 characters), 8 bullets, a 150+ word description and the key feature. It also fills the category and attributes, then gives you <strong>one B&amp;Q file per category</strong>. Then <strong>you</strong> import those files on the B&amp;Q portal yourself.</p>
 <p><strong>What it never does:</strong> it never changes anything on B&amp;Q, never uploads your photos anywhere and never fills price, stock, lead time or logistic class. Those go in your own price/stock file.</p>
 <hr />
@@ -120,6 +120,27 @@ blockquote{margin:12px 0;padding:10px 14px;background:#1E293B;border-left:4px so
 <li>from your <strong>All variant.xlsx</strong> if you loaded it (blank if the SKU is not in it);</li>
 <li>otherwise products with the same name in a category that allows variants get one group;</li>
 <li>blank where B&amp;Q does not allow variants.</li>
+</ul>
+</li>
+<li><strong>Add variant (new in 3.5.13)</strong> – to make a new colour, size or measurement of a product without retyping it:</li>
+<li>On the product card, click <strong>+ Add variant</strong>.</li>
+<li>Choose what is different: <strong>Colour</strong>, <strong>Size</strong> or <strong>Measurements</strong>.</li>
+<li>Type the value of this product (for example <em>Large</em>, only asked the first time), the value of the new one (for example <em>Medium</em>), and the new SKU. The tool refuses an empty value, a value already used in the group, a SKU with spaces, and a SKU already in your list or already live on B&amp;Q.</li>
+<li><strong>Variant Group code:</strong> all products in the group share one code. It starts as the base SKU; you can change it in the form or later on any card of the group (it changes for all of them).</li>
+<li>Click <strong>Create variant</strong>. A new card appears under the product, marked <em>Variant of …</em>. It copies the category, answers and fields, but <strong>not</strong> the EAN, photos, weight or size – type its <strong>own EAN</strong> (box on the card), weight and photo. It is held back until you do.</li>
+<li>The value goes in each title (written for you) and in the template's <strong>Colour / Colour group / Size</strong> column where the category has one (drop-down values must match the list; the card says where the value goes). Measurements like <em>60 x 40 x 10 cm</em> also fill the size boxes.</li>
+<li>If the category <strong>doesn't allow variants</strong> on B&amp;Q, the form says so clearly. You can still make the new product: it is then a separate product with <strong>no</strong> group code.</li>
+<li><strong>Pack (new in 3.5.13)</strong> – tick <strong>Pack</strong> (<em>several items sold as one listing</em>) at the top of <em>You add these</em> on the card and type how many are in the pack (N). Then:<ul>
+<li>the boxes change to <strong>Whole pack total weight</strong> and <strong>Shipping package length / width / height</strong> – type the totals of the whole pack as it is shipped (the separate Packed size boxes are hidden);</li>
+<li>the file gets those totals, <strong>Pack type = Pack</strong> and <strong>Pack quantity = N</strong> (and <strong>Number of pieces = N</strong> where the template has it);</li>
+<li>the title gets <strong>Pack of N</strong>;</li>
+<li>postage: B&amp;Q's templates have no postage column – the only weight sent is the whole-pack total weight, so use the shipped weight there.</li>
+</ul>
+</li>
+<li><strong>Mixed pack (new in 3.5.13)</strong> – inside Pack, tick <strong>Mixed pack</strong> (<em>items of different sizes</em>). For each item type a label (e.g. <em>M</em>), how many, L × W × H in cm and, if you know it, the weight; <strong>+ Add item</strong> adds a line. Then:<ul>
+<li>bullet 2 and the end of the description get a line such as <em>Pack of 3: 1 x M (40 x 30 x 10cm), 2 x S (30 x 20 x 10cm)</em>;</li>
+<li>the file still uses the <strong>whole-pack totals</strong> from the boxes above;</li>
+<li>if you leave those totals empty, the tool fills them for you – size from the <strong>largest item</strong>, weight as the <strong>sum of the item weights</strong> (only when every item has a weight) – and marks them <strong>Medium – please check</strong> on the card and in <em>Please check</em> on Check. Type the real totals if you know them.</li>
 </ul>
 </li>
 <li>Click <strong>Next →</strong>.</li>
