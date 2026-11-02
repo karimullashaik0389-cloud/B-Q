@@ -1,6 +1,6 @@
 # B&Q Listings – how to use (step by step)
 
-Tool version 3.5.11. Read this once, top to bottom. Every step is numbered. You only need a mouse/finger and your product names.
+Tool version 3.5.12. Read this once, top to bottom. Every step is numbered. You only need a mouse/finger and your product names.
 
 **What the tool does:** you give it SKU, EAN and product name. It writes the B&Q title (121–124 characters), 8 bullets, a 150+ word description and the key feature. It also fills the category and attributes, then gives you **one B&Q file per category**. Then **you** import those files on the B&Q portal yourself.
 
@@ -47,7 +47,8 @@ The orange **Home** button (house icon, top left, on every screen) opens the mai
 2. For many products (20–30 or more at a time): in Excel, select the three columns (SKU, EAN, Name), press **Ctrl + C**, then in the tool click **Paste from Excel**, press **Ctrl + V** and click **Add these rows**.
 3. Or drop your Excel or CSV file (columns SKU, EAN, Product name) on the grey box. You need SKU, EAN and Product name. **Optional columns: Main photo link, Other photo links** – web links only (https://), no photo files. Put all other links in one cell (separated by spaces, commas or Alt+Enter lines). A single **Image links** column also works (first link = main photo). No photo columns? Add the links later on Fill gaps.
 4. **Red rows = the same SKU typed twice.** Both rows go red and **Next is blocked** until you fix one. This stops duplicate SKUs reaching B&Q.
-5. **Amber = the same EAN on two different SKUs.** This is only a warning. Check it is meant (e.g. pack sizes), then carry on.
+5. **Amber = the same EAN on two different SKUs.** B&Q needs one EAN per product – each size, colour and pack has its own barcode. You can carry on to Sort, but both products are held back (*Needs: EAN – a different EAN … is also typed for …*) and not downloaded until one EAN is corrected.
+   - **Empty EAN** (new products): the row is red and Next says *EAN missing on N rows. Every new product – each size, colour and pack – needs its own EAN.*
 6. Finished with a list and already imported on B&Q? Click **Start a new list**. It only clears the list in the tool. Files you downloaded are not touched.
 7. Click **Next →**.
 
@@ -61,7 +62,30 @@ The tool checks each EAN against your B&Q export and files.
 3. Click **Next →**.
 
 ### 4. Fill gaps
-1. Each product card shows the category the tool picked. Click **Looks right**, or **Change** to pick another.
+At the top of Fill gaps and Check a line says **What to do next**, e.g. *Confirm the category for 3 products…* or *Everything is ready – tap “Download all files”…*.
+
+**Confirm category (new in 3.5.12) – the tool never uses a guessed category by itself.**
+- Every **new** product, and every **live** product where the tool thinks B&Q has the wrong category, waits for you. Its card shows only the **Confirm category** box until you answer: the tool’s guess with how sure it is (**High confidence**, or **Please check – Medium/Low confidence**, or **Suggested change – please check**), the **top 3 other matches**, and a search over **all B&Q categories**.
+- Tap **Use this category** (or one of the other matches, or search and tap one). Only then are the boxes, title, bullets and description filled for that category.
+- **Category check list** (top of Fill gaps and Check): *Category check – N to confirm*. One line per product with the guess and confidence. Filter **All / High / Medium / Low**, tap **Use** or **Change** on a line, or **Confirm all shown (N)** to accept every guess in the current filter (e.g. tap **High**, check the list, then **Confirm all shown**).
+- Until every product is confirmed, **Download is blocked**: the bottom button says **Needs: confirm category (N)** and the Check screen shows a red *Needs: confirm category* box with **Go to Category check**.
+- **Live products that stay in their B&Q category need nothing** – no confirm step.
+- Changing a category later (**Change category** on Fill gaps or Check) re-opens the confirm step for that product.
+- **Category without an upload template:** a few B&Q categories are marked “DO NOT USE” by B&Q and have no upload template (e.g. *Play Sand*). The card says so (*B&Q has this product in X … but B&Q gives no upload template for that category*). Choose the nearest category from the guess or the search, or ask your B&Q contact.
+
+**Warnings that stop repeat mistakes** (amber, on Fill gaps and Check):
+- **Pack size** – e.g. *Pack size is 4 but the name says 6* – tap **Use 6**, or fix the name.
+- **Weight units** – *5000 kg looks like grams* (tap **Use 5 kg**) or *0.4 g looks like kilograms* (tap **Use 400 g**).
+- **Category you picked by hand doesn’t match the name** – *Check the category: nothing in the name … matches Hose Pipes*. If it is right, ignore it.
+- Already there: the same SKU twice (Add blocks Next), an EAN already used on B&Q by another SKU, your offer SKU vs B&Q’s product SKU (Sort), and a missing weight (*Needs: weight*).
+
+1. Each product card shows the category. Click **Looks right**, or **Change category** to pick another.
+   - **Change the category yourself** (if the tool or B&Q has the wrong one) – works for new and live products:
+     1. On the product card, tap **Change category** next to the category (on Check, tap **Change category** under the card – it takes you back here). If the card says **Please check category**, the button is in that note; in a *It looks like …* note, **Pick another** does the same.
+     2. Tap one of the **Best matches**, or type part of a name in **Search all B&Q categories**, e.g. `christmas headwear` or `dog bed`. Every word you type must be in the name, so type more to narrow the list. Each line shows the full path, e.g. *Home / Christmas / Christmas Headwear*.
+     3. Tap the right one. The card now uses that category's B&Q template: the required boxes are checked again, values that category does not allow are cleared, and the product type is picked from the name if it can be (otherwise it says **Needs: choose product type**).
+     4. The card says *Category chosen by you: X (B&Q had Y)*. The download puts the product in that category's file. For a live product, B&Q (Mirakl) may keep showing the old Master category until B&Q's catalogue team updates it.
+     5. Changed your mind? Tap **Change category** again; **Keep it** closes the list without changing anything.
 2. Click **Next to fill** to jump straight to the next empty box. Only the boxes B&Q *requires* are asked. Usually that is the **weight** and anything the name doesn't say.
 3. Grey/amber "close guess" values are suggestions. Read them, and change them if they are wrong.
 4. **Photos are web links only.** B&Q's import only takes web links, so there is no photo upload and no photo preview in the tool.
@@ -79,7 +103,7 @@ The tool checks each EAN against your B&Q export and files.
      - The file sends B&Q's own photo links back in the same places (`image_main_1`, `image_secondary_1` to `8`, gaps stay gaps), because an empty photo cell in a B&Q upload wipes that photo. Links you paste in the Update boxes replace them.
      - If your B&Q export has no photo links for a live product, the line says *Photos already on B&Q – kept.* Nothing is required and nothing is changed. If you remove every photo with ×, B&Q needs a main photo again.
      - Its other B&Q values come from the same export too: category, weight, brand, pack, product type, guarantee and the rest. They are filled in (marked *B&Q export*) and written back unchanged, so a title/description-only fix isn't held back for them and the upload doesn't blank them.
-     - **Brand:** if B&Q's export says *True Gift* / *True Gifts* (any spelling) as the brand or manufacturer name, the file writes **OVOVO** (it is on B&Q's brand list in the 2 Nov 2026 export), otherwise SuperGift.com. *True Gift* and any brand name are taken out of the title, bullets, description and key feature.
+     - **Brand:** every file – fix and new – writes **OVOVO** as the brand (it is on B&Q's brand list in the 2 Nov 2026 export). A live product that B&Q has as *SuperGift.com*, *SuperGift* or *True Gift(s)* (any spelling) goes out as OVOVO; another brand B&Q already has for it is kept. The GPSR manufacturer name is written back as B&Q has it (only *True Gift(s)* there becomes OVOVO, as before). New in 3.5.12: the *Acquisition brand* list inside all 67 B&Q templates is refreshed from that export, so OVOVO is in the brand drop-down when you open a downloaded file in Excel. No brand name (OVOVO, SuperGift, True Gift) is ever put in the title, bullets, description or key feature – it is taken out of B&Q's live text too.
      - **Text is finished for you.** The title, bullets, description and key feature already on B&Q are kept, and anything missing or below the rules is added automatically, marked **Written automatically**. The title is cleaned (no brand, repeated words, capitals or trailing commas) and lengthened to 121–124 characters with real search words; bullets are topped up to 8; the description is extended to 150+ words; an empty key feature gets one (max 30 characters). The card lists what was added.
      - If you then edit a field below the rules, the card says exactly what to do, for example *Title is 111 characters – add 10 more, or press Auto-fix this product.* The **Auto-fix this product** button (on the card and in the box at the top) fills every gap at once and keeps what you typed.
      - The box at the top says what is left for you, for example *1 product needs a main photo link – everything else was filled in for you.* Normally that is only a main photo for a product with no photo on B&Q, or a weight B&Q doesn't have.
@@ -133,7 +157,7 @@ The tool never imports, deletes or changes anything on B&Q.
 3. Offline: download the ZIP again and replace your `C:\BQ` folder.
 4. Your saved list, Gemini key and settings stay in the browser. They are not in the files, so replacing files does not delete them.
 5. Check the version under **Settings › Help**.
-6. **Fresher B&Q data** (photos, live text and values of your live products): the tool shows the date of its built-in data at the top (*B&Q data: 2 Nov 2026*). A newer B&Q product export is built in by your helper with `python3 work/v3510/refresh_bq_data.py <export.xlsx>` then `cd src && python3 build.py && python3 make_final.py`, and published as a new version.
+6. **Fresher B&Q data** (photos, live text and values of your live products): the tool shows the date of its built-in data at the top (*B&Q data: 2 Nov 2026*). A newer B&Q product export is built in by your helper with `python3 work/v3510/refresh_bq_data.py <export.xlsx>` then `cd src && python3 build.py && python3 make_final.py` (this also refreshes the brand list in every template from the export's *ReferenceData* sheet), and published as a new version.
 
 ## F. If something goes wrong
 1. A red box "Sorry – that didn't work" appears: nothing was sent anywhere. Try again. If it repeats, take a screenshot and send it.

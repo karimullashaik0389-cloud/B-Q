@@ -3,8 +3,8 @@ main{max-width:820px;margin:0 auto;padding:18px 16px 60px}
 .top{display:flex;align-items:center;gap:10px;margin:4px 0 14px}.logo{background:#FF6600;color:#fff;font-weight:800;border-radius:9px;padding:8px 9px;font-size:14px}
 h1{font-size:26px;margin:6px 0 10px}h2{font-size:21px;margin:28px 0 8px;color:#FF8A3D}h3{font-size:18px;margin:18px 0 6px}
 p,li{color:#E2E8F0}li{margin:5px 0}strong{color:#fff}a{color:#FF8A3D}code{background:#1E293B;color:#FDE68A;padding:1px 5px;border-radius:5px}
-blockquote{margin:12px 0;padding:10px 14px;background:#1E293B;border-left:4px solid #FF6600;border-radius:8px}hr{border:0;border-top:1px solid #334155;margin:24px 0}</style></head><body><main><div class="top"><span class="logo">B&amp;Q</span><b>Listings – how to use (v3.5.11)</b></div><h1>B&amp;Q Listings – how to use (step by step)</h1>
-<p>Tool version 3.5.11. Read this once, top to bottom. Every step is numbered. You only need a mouse/finger and your product names.</p>
+blockquote{margin:12px 0;padding:10px 14px;background:#1E293B;border-left:4px solid #FF6600;border-radius:8px}hr{border:0;border-top:1px solid #334155;margin:24px 0}</style></head><body><main><div class="top"><span class="logo">B&amp;Q</span><b>Listings – how to use (v3.5.12)</b></div><h1>B&amp;Q Listings – how to use (step by step)</h1>
+<p>Tool version 3.5.12. Read this once, top to bottom. Every step is numbered. You only need a mouse/finger and your product names.</p>
 <p><strong>What the tool does:</strong> you give it SKU, EAN and product name. It writes the B&amp;Q title (121–124 characters), 8 bullets, a 150+ word description and the key feature. It also fills the category and attributes, then gives you <strong>one B&amp;Q file per category</strong>. Then <strong>you</strong> import those files on the B&amp;Q portal yourself.</p>
 <p><strong>What it never does:</strong> it never changes anything on B&amp;Q, never uploads your photos anywhere and never fills price, stock, lead time or logistic class. Those go in your own price/stock file.</p>
 <hr />
@@ -50,7 +50,10 @@ blockquote{margin:12px 0;padding:10px 14px;background:#1E293B;border-left:4px so
 <li>For many products (20–30 or more at a time): in Excel, select the three columns (SKU, EAN, Name), press <strong>Ctrl + C</strong>, then in the tool click <strong>Paste from Excel</strong>, press <strong>Ctrl + V</strong> and click <strong>Add these rows</strong>.</li>
 <li>Or drop your Excel or CSV file (columns SKU, EAN, Product name) on the grey box. You need SKU, EAN and Product name. <strong>Optional columns: Main photo link, Other photo links</strong> – web links only (https://), no photo files. Put all other links in one cell (separated by spaces, commas or Alt+Enter lines). A single <strong>Image links</strong> column also works (first link = main photo). No photo columns? Add the links later on Fill gaps.</li>
 <li><strong>Red rows = the same SKU typed twice.</strong> Both rows go red and <strong>Next is blocked</strong> until you fix one. This stops duplicate SKUs reaching B&amp;Q.</li>
-<li><strong>Amber = the same EAN on two different SKUs.</strong> This is only a warning. Check it is meant (e.g. pack sizes), then carry on.</li>
+<li><strong>Amber = the same EAN on two different SKUs.</strong> B&amp;Q needs one EAN per product – each size, colour and pack has its own barcode. You can carry on to Sort, but both products are held back (<em>Needs: EAN – a different EAN … is also typed for …</em>) and not downloaded until one EAN is corrected.<ul>
+<li><strong>Empty EAN</strong> (new products): the row is red and Next says <em>EAN missing on N rows. Every new product – each size, colour and pack – needs its own EAN.</em></li>
+</ul>
+</li>
 <li>Finished with a list and already imported on B&amp;Q? Click <strong>Start a new list</strong>. It only clears the list in the tool. Files you downloaded are not touched.</li>
 <li>Click <strong>Next →</strong>.</li>
 </ol>
@@ -63,8 +66,30 @@ blockquote{margin:12px 0;padding:10px 14px;background:#1E293B;border-left:4px so
     - <strong>"Please check category"</strong> (amber): the live product looks like it is in the wrong B&amp;Q category (e.g. Santa hats in Bunting). Tap <strong>Change to …</strong> (e.g. Christmas Headwear) or <strong>Keep …</strong>. Changing category on B&amp;Q (Mirakl) means using that category's template – the download does this for you.
 3. Click <strong>Next →</strong>.</p>
 <h3>4. Fill gaps</h3>
+<p>At the top of Fill gaps and Check a line says <strong>What to do next</strong>, e.g. <em>Confirm the category for 3 products…</em> or <em>Everything is ready – tap “Download all files”…</em>.</p>
+<p><strong>Confirm category (new in 3.5.12) – the tool never uses a guessed category by itself.</strong>
+- Every <strong>new</strong> product, and every <strong>live</strong> product where the tool thinks B&amp;Q has the wrong category, waits for you. Its card shows only the <strong>Confirm category</strong> box until you answer: the tool’s guess with how sure it is (<strong>High confidence</strong>, or <strong>Please check – Medium/Low confidence</strong>, or <strong>Suggested change – please check</strong>), the <strong>top 3 other matches</strong>, and a search over <strong>all B&amp;Q categories</strong>.
+- Tap <strong>Use this category</strong> (or one of the other matches, or search and tap one). Only then are the boxes, title, bullets and description filled for that category.
+- <strong>Category check list</strong> (top of Fill gaps and Check): <em>Category check – N to confirm</em>. One line per product with the guess and confidence. Filter <strong>All / High / Medium / Low</strong>, tap <strong>Use</strong> or <strong>Change</strong> on a line, or <strong>Confirm all shown (N)</strong> to accept every guess in the current filter (e.g. tap <strong>High</strong>, check the list, then <strong>Confirm all shown</strong>).
+- Until every product is confirmed, <strong>Download is blocked</strong>: the bottom button says <strong>Needs: confirm category (N)</strong> and the Check screen shows a red <em>Needs: confirm category</em> box with <strong>Go to Category check</strong>.
+- <strong>Live products that stay in their B&amp;Q category need nothing</strong> – no confirm step.
+- Changing a category later (<strong>Change category</strong> on Fill gaps or Check) re-opens the confirm step for that product.
+- <strong>Category without an upload template:</strong> a few B&amp;Q categories are marked “DO NOT USE” by B&amp;Q and have no upload template (e.g. <em>Play Sand</em>). The card says so (<em>B&amp;Q has this product in X … but B&amp;Q gives no upload template for that category</em>). Choose the nearest category from the guess or the search, or ask your B&amp;Q contact.</p>
+<p><strong>Warnings that stop repeat mistakes</strong> (amber, on Fill gaps and Check):
+- <strong>Pack size</strong> – e.g. <em>Pack size is 4 but the name says 6</em> – tap <strong>Use 6</strong>, or fix the name.
+- <strong>Weight units</strong> – <em>5000 kg looks like grams</em> (tap <strong>Use 5 kg</strong>) or <em>0.4 g looks like kilograms</em> (tap <strong>Use 400 g</strong>).
+- <strong>Category you picked by hand doesn’t match the name</strong> – <em>Check the category: nothing in the name … matches Hose Pipes</em>. If it is right, ignore it.
+- Already there: the same SKU twice (Add blocks Next), an EAN already used on B&amp;Q by another SKU, your offer SKU vs B&amp;Q’s product SKU (Sort), and a missing weight (<em>Needs: weight</em>).</p>
 <ol>
-<li>Each product card shows the category the tool picked. Click <strong>Looks right</strong>, or <strong>Change</strong> to pick another.</li>
+<li>Each product card shows the category. Click <strong>Looks right</strong>, or <strong>Change category</strong> to pick another.<ul>
+<li><strong>Change the category yourself</strong> (if the tool or B&amp;Q has the wrong one) – works for new and live products:
+ 1. On the product card, tap <strong>Change category</strong> next to the category (on Check, tap <strong>Change category</strong> under the card – it takes you back here). If the card says <strong>Please check category</strong>, the button is in that note; in a <em>It looks like …</em> note, <strong>Pick another</strong> does the same.
+ 2. Tap one of the <strong>Best matches</strong>, or type part of a name in <strong>Search all B&amp;Q categories</strong>, e.g. <code>christmas headwear</code> or <code>dog bed</code>. Every word you type must be in the name, so type more to narrow the list. Each line shows the full path, e.g. <em>Home / Christmas / Christmas Headwear</em>.
+ 3. Tap the right one. The card now uses that category's B&amp;Q template: the required boxes are checked again, values that category does not allow are cleared, and the product type is picked from the name if it can be (otherwise it says <strong>Needs: choose product type</strong>).
+ 4. The card says <em>Category chosen by you: X (B&amp;Q had Y)</em>. The download puts the product in that category's file. For a live product, B&amp;Q (Mirakl) may keep showing the old Master category until B&amp;Q's catalogue team updates it.
+ 5. Changed your mind? Tap <strong>Change category</strong> again; <strong>Keep it</strong> closes the list without changing anything.</li>
+</ul>
+</li>
 <li>Click <strong>Next to fill</strong> to jump straight to the next empty box. Only the boxes B&amp;Q <em>requires</em> are asked. Usually that is the <strong>weight</strong> and anything the name doesn't say.</li>
 <li>Grey/amber "close guess" values are suggestions. Read them, and change them if they are wrong.</li>
 <li><strong>Photos are web links only.</strong> B&amp;Q's import only takes web links, so there is no photo upload and no photo preview in the tool.<ul>
@@ -82,7 +107,7 @@ blockquote{margin:12px 0;padding:10px 14px;background:#1E293B;border-left:4px so
 <li>The file sends B&amp;Q's own photo links back in the same places (<code>image_main_1</code>, <code>image_secondary_1</code> to <code>8</code>, gaps stay gaps), because an empty photo cell in a B&amp;Q upload wipes that photo. Links you paste in the Update boxes replace them.</li>
 <li>If your B&amp;Q export has no photo links for a live product, the line says <em>Photos already on B&amp;Q – kept.</em> Nothing is required and nothing is changed. If you remove every photo with ×, B&amp;Q needs a main photo again.</li>
 <li>Its other B&amp;Q values come from the same export too: category, weight, brand, pack, product type, guarantee and the rest. They are filled in (marked <em>B&amp;Q export</em>) and written back unchanged, so a title/description-only fix isn't held back for them and the upload doesn't blank them.</li>
-<li><strong>Brand:</strong> if B&amp;Q's export says <em>True Gift</em> / <em>True Gifts</em> (any spelling) as the brand or manufacturer name, the file writes <strong>OVOVO</strong> (it is on B&amp;Q's brand list in the 2 Nov 2026 export), otherwise SuperGift.com. <em>True Gift</em> and any brand name are taken out of the title, bullets, description and key feature.</li>
+<li><strong>Brand:</strong> every file – fix and new – writes <strong>OVOVO</strong> as the brand (it is on B&amp;Q's brand list in the 2 Nov 2026 export). A live product that B&amp;Q has as <em>SuperGift.com</em>, <em>SuperGift</em> or <em>True Gift(s)</em> (any spelling) goes out as OVOVO; another brand B&amp;Q already has for it is kept. The GPSR manufacturer name is written back as B&amp;Q has it (only <em>True Gift(s)</em> there becomes OVOVO, as before). New in 3.5.12: the <em>Acquisition brand</em> list inside all 67 B&amp;Q templates is refreshed from that export, so OVOVO is in the brand drop-down when you open a downloaded file in Excel. No brand name (OVOVO, SuperGift, True Gift) is ever put in the title, bullets, description or key feature – it is taken out of B&amp;Q's live text too.</li>
 <li><strong>Text is finished for you.</strong> The title, bullets, description and key feature already on B&amp;Q are kept, and anything missing or below the rules is added automatically, marked <strong>Written automatically</strong>. The title is cleaned (no brand, repeated words, capitals or trailing commas) and lengthened to 121–124 characters with real search words; bullets are topped up to 8; the description is extended to 150+ words; an empty key feature gets one (max 30 characters). The card lists what was added.</li>
 <li>If you then edit a field below the rules, the card says exactly what to do, for example <em>Title is 111 characters – add 10 more, or press Auto-fix this product.</em> The <strong>Auto-fix this product</strong> button (on the card and in the box at the top) fills every gap at once and keeps what you typed.</li>
 <li>The box at the top says what is left for you, for example <em>1 product needs a main photo link – everything else was filled in for you.</em> Normally that is only a main photo for a product with no photo on B&amp;Q, or a weight B&amp;Q doesn't have.</li>
@@ -146,7 +171,7 @@ blockquote{margin:12px 0;padding:10px 14px;background:#1E293B;border-left:4px so
 <li>Offline: download the ZIP again and replace your <code>C:\BQ</code> folder.</li>
 <li>Your saved list, Gemini key and settings stay in the browser. They are not in the files, so replacing files does not delete them.</li>
 <li>Check the version under <strong>Settings › Help</strong>.</li>
-<li><strong>Fresher B&amp;Q data</strong> (photos, live text and values of your live products): the tool shows the date of its built-in data at the top (<em>B&amp;Q data: 2 Nov 2026</em>). A newer B&amp;Q product export is built in by your helper with <code>python3 work/v3510/refresh_bq_data.py &lt;export.xlsx&gt;</code> then <code>cd src &amp;&amp; python3 build.py &amp;&amp; python3 make_final.py</code>, and published as a new version.</li>
+<li><strong>Fresher B&amp;Q data</strong> (photos, live text and values of your live products): the tool shows the date of its built-in data at the top (<em>B&amp;Q data: 2 Nov 2026</em>). A newer B&amp;Q product export is built in by your helper with <code>python3 work/v3510/refresh_bq_data.py &lt;export.xlsx&gt;</code> then <code>cd src &amp;&amp; python3 build.py &amp;&amp; python3 make_final.py</code> (this also refreshes the brand list in every template from the export's <em>ReferenceData</em> sheet), and published as a new version.</li>
 </ol>
 <h2>F. If something goes wrong</h2>
 <ol>
