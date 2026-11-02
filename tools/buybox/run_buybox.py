@@ -150,11 +150,19 @@ def session():
 class Blocked(Exception): pass
 refusals = {'n': 0}; rlock = threading.Lock()
 
-def get(url, pace, tries=4):
+NO_CACHE = {'Cache-Control': 'no-cache', 'Pragma': 'no-cache'}
+def bust(url):
+    """Fresh page every time: add _ts=<epoch ms> (replacing an old _ts) so no cache can serve an old price."""
+    from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
+    u = urlsplit(url); q = [(k, v) for k, v in parse_qsl(u.query, keep_blank_values=True) if k != '_ts']
+    q.append(('_ts', str(int(time.time() * 1000))))
+    return urlunsplit((u.scheme, u.netloc, u.path, urlencode(q), u.fragment))
+
+def get(url, pace, tries=4, fresh=False):
     r = err = None
     for k in range(tries):
         pace.wait()
-        try: r = session().get(url, timeout=25); err = None
+        try: r = session().get(bust(url) if fresh else url, timeout=25, headers=NO_CACHE); err = None
         except Exception as e: r, err = None, e
         if r is not None and r.status_code not in (403, 429, 500, 502, 503, 504):
             with rlock: refusals['n'] = 0
@@ -194,13 +202,13 @@ def lookup(code, known, pace):
         link = BeautifulSoup(r.text, 'html.parser').find('a', href=lambda h: h and '_BQ.prd' in h)
         if not link: return dict(url='', seller='', price='', reviews='', status='Not found on diy.com')
         href = link['href']; url = his.normalize_product_url(href if href.startswith('http') else 'https://www.diy.com' + href)
-    r, e = get(url, pace)
+    r, e = get(url, pace, fresh=True); fetched = now()
     if how == 'known link' and r is not None and r.status_code in (404, 410):
         return lookup(code, None, pace)
-    if r is None: return dict(url=url, seller='', price='', reviews='', status='page failed: %s' % type(e).__name__)
-    if r.status_code != 200: return dict(url=url, seller='', price='', reviews='', status='HTTP %d on product page' % r.status_code)
+    if r is None: return dict(url=url, seller='', price='', reviews='', status='page failed: %s' % type(e).__name__, fetched=fetched)
+    if r.status_code != 200: return dict(url=url, seller='', price='', reviews='', status='HTTP %d on product page' % r.status_code, fetched=fetched)
     s, p, rv, st = parse_product(r.text)
-    return dict(url=url, seller=s, price=p, reviews=rv, status=st)
+    return dict(url=url, seller=s, price=p, reviews=rv, status=st, fetched=fetched)
 
 # ---------- main ----------
 def main():
@@ -252,7 +260,8 @@ def main():
         win = '' if not d or not d.get('seller') else ('Yes' if d['seller'].strip().lower().startswith(OURS) else 'No')
         out.append(dict(ean=r['ean'], sku=r['sku'], variant=r['variant'] or vmap.get(r['sku'], '') or vmap.get(r['ean'], ''), url=d['url'] if d else '',
                         seller=d['seller'] if d else '', price=bp, our_price=r['our_price'], winning=win,
-                        reviews=d['reviews'] if d else '', status=d['status'] if d else 'not checked (%s)' % (stop['why'] or 'stopped')))
+                        reviews=d['reviews'] if d else '', status=d['status'] if d else 'not checked (%s)' % (stop['why'] or 'stopped'),
+                        fetched=(d.get('fetched') or '') if d else ''))
     checked = sum(1 for r in out if not r['status'].startswith('not checked'))
     status = 'complete' if checked == len(out) else ('blocked' if (stop['why'] or '').startswith('blocked') else 'partial')
     run = dict(runner=a.runner, started=started, finished=now(), status=status, stop_reason=stop['why'] or '',
