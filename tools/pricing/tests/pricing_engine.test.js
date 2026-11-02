@@ -82,6 +82,21 @@ t('decide: no-competitor UK and 100+ step never over 80% after rounding', () => 
     const a = { cost: c, mult: 1.5, post: 1.75, collab: 0 }, p0 = B.priceFor(a, .75), s = D({ cost: c, price: p0, bb: p0, seller: 'Diva Packages', sales: 150 }, { raise100: true });
     if (typeof s.raw === 'number') assert.ok(B.calc(a, s.raw).pc <= .8 + 1e-9, 'step ' + c + ' ' + s.raw);
     const fl = D({ cost: c, price: 999, bb: 1, sales: 0 }); if (typeof fl.floor === 'number') assert.ok(B.calc(a, fl.floor).pc >= B.floorOf(false, 0, c).f - 1e-9 || B.floorOf(false, 0, c).f === .8); } });
+
+t('optional penny trims: cap-only, <=5p and <=5% -> kept (no upload) unless switched on', () => {
+  const a = { cost: 2, mult: 1.5, post: 1.75, collab: 0 }, cap = B.priceMax(a, .8), r2 = x => Math.round(x * 100) / 100;
+  [null, r2(cap + 1)].forEach(bb => [.01, .03, .05].forEach(d => {
+    const o = D({ cost: 2, price: r2(cap + d), bb: bb, seller: bb ? 'Rival' : '', sales: 0 });
+    assert.strictEqual(o.status, B.TRIM); assert.ok(o.trim && !o.upload && o.finalp === r2(cap + d));
+    const on = D({ cost: 2, price: r2(cap + d), bb: bb, seller: bb ? 'Rival' : '', sales: 0 }, { pennyTrims: true });
+    assert.ok(on.trim && on.upload && on.finalp === cap); assert.ok(B.calc(a, on.finalp).pc <= .8 + 1e-9); }));
+  assert.ok(D({ cost: 2, price: r2(cap + .06), bb: null, sales: 0 }).upload, '6p is a real change');
+  const s1 = D({ cost: 2, price: r2(cap + .03), bb: r2(cap + 1), seller: 'Rival', sales: 3 }); assert.ok(s1.trim && !s1.upload, 'UK sold capped');
+  const chase = D({ cost: 2, price: r2(cap - .02), bb: r2(cap - .02), seller: 'Rival', sales: 0 }); assert.ok(!chase.trim && chase.upload, 'buy box chase is never a trim');
+  const cheap = { cost: .1, mult: 1.5, post: 0, collab: 0 }, cc = B.priceMax(cheap, .8); // ~£0.27: 5% of price < 5p
+  const o2 = D({ cost: .1, price: r2(cc + .02), bb: null, sales: 0, pc: 0.0001, w: 10 }); if (r2(cc + .02) * .05 < .02) assert.ok(!o2.trim, '5% rule');
+  assert.ok(!D({ cost: 2, price: 30, bb: null, sup: 'Ashian Homeware co.,Ltd', sales: 0 }).trim, 'never China');
+});
 console.log('pricing engine: ' + n + ' tests passed');
 // sales30: same rule as the Sales tab (not cancelled, newest order day - 29 days)
 (() => { const D0 = Date.UTC(2026, 10, 2, 10) / 6e4, d = 1440;

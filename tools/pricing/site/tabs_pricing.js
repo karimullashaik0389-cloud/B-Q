@@ -18,8 +18,8 @@ var CSS='.pz-t td,.pz-t th{padding:7px 8px}.pz-t th{cursor:pointer;user-select:n
  '.pz-sum .sc{cursor:pointer}.pz-sum .sc.on{outline:3px solid #0F172A}.pz-tg{display:flex;align-items:center;gap:8px;font-size:15px;margin:6px 0}.pz-tg input{width:20px;height:20px;accent-color:#FF6600}'+
  '.pz-big{font-size:17px;padding:14px 18px}.chip.pst{background:#FECACA;color:#7F1D1D}.pz-c1{position:sticky;left:0;background:#fff;z-index:1}';
 var st=null;
-var FILTERS=[["","All rows"],["up","Will change (in upload)"],["mtl","Margin too low"],["raise","Raise – held for review"],["chk","Check postage"],["rev","Need your review"],["blk","Blocked (loss / under 50%)"],["win","Winning – kept"],["dup","Duplicate SKU"],["your","Your prices"]];
-function inF(o,f){switch(f){case"up":return o.upload;case"mtl":return o.status==="Margin too low";case"raise":return /^Raise/.test(o.status);case"chk":return !!o.check;
+var FILTERS=[["","All rows"],["up","Will change (in upload)"],["mtl","Margin too low"],["raise","Raise – held for review"],["trim","Optional penny trims"],["chk","Check postage"],["rev","Need your review"],["blk","Blocked (loss / under 50%)"],["win","Winning – kept"],["dup","Duplicate SKU"],["your","Your prices"]];
+function inF(o,f){switch(f){case"up":return o.upload;case"mtl":return o.status==="Margin too low";case"raise":return /^Raise/.test(o.status);case"trim":return !!o.trim;case"chk":return !!o.check;
  case"rev":return o.status==="NEED YOUR REVIEW";case"blk":return /blocked/.test(o.why);case"win":return o.win;case"dup":return !!o.dup;case"your":return o.your!=null;default:return true}}
 function chip(o){var s=o.status,c="",t=typeof s==="number"?"New price":s;
  if(o.upload){c="keep";t=o.your!=null?"Your price – in upload":"Will change"}
@@ -30,20 +30,22 @@ var COLS=[["sku","SKU"],["title","Product"],["cost","Cost"],["price","Price now"
 function sv(o,k){if(k==="st")return chip(o).replace(/<[^>]+>/g,"");if(k==="title"||k==="sku"||k==="rule")return String(o[k]||"").toLowerCase();var v=o[k];return v==null||v===""?-Infinity:+v}
 function render(body){
  if(!document.getElementById("pz-css")){var s=document.createElement("style");s.id="pz-css";s.textContent=CSS;document.head.appendChild(s)}
- st={doc:null,bbDoc:null,src:"pub",file:"",aoa:null,accessDate:"",your:ls(LSY,{}),opt:ls(LSO,{raise100:false,checkPost:false}),q:"",f:"up",sort:{k:"",d:1},n:PAGE};
+ st={doc:null,bbDoc:null,src:"pub",file:"",aoa:null,accessDate:"",your:ls(LSY,{}),opt:ls(LSO,{raise100:false,checkPost:false,pennyTrims:false}),q:"",f:"up",sort:{k:"",d:1},n:PAGE};
  body.innerHTML='<div class="src" id="pzsrc">Loading the prices…</div><div class="sumg pz-sum" id="pzsum"></div>'+
   '<div class="box"><button class="btn o pz-big" type="button" id="pzdl" disabled>⬇ Download B&amp;Q upload</button> <span class="note" id="pzdln"></span>'+
   '<p class="note">The file has only the SKUs whose price changes, in the B&amp;Q template (sheet “Data”). Every row is checked again: profit above £0 and at least 50% on cost. Nothing is sent to B&amp;Q – you import it yourself.</p>'+
   '<label class="pz-tg"><input type="checkbox" id="pzr100"> Include 100+ sales raises (+10%, max 80%)</label>'+
-  '<label class="pz-tg"><input type="checkbox" id="pzpost"> Include “Check postage” rows (multi-packs, over 30 kg)</label></div>'+
+  '<label class="pz-tg"><input type="checkbox" id="pzpost"> Include “Check postage” rows (multi-packs, over 30 kg)</label>'+
+  '<label class="pz-tg"><input type="checkbox" id="pztrim"> Include optional penny trims (≤5p down to the 80% cap)</label></div>'+
   '<div class="ctl"><input type="search" id="pzq" placeholder="Search SKU, EAN, product or seller" autocomplete="off" autocapitalize="off" spellcheck="false">'+
   '<select id="pzf" aria-label="Filter">'+FILTERS.map(function(f){return '<option value="'+f[0]+'">'+esc(f[1])+'</option>'}).join("")+'</select>'+
   '<button class="btn l" type="button" id="pzxl" disabled>⬇ This table (Excel)</button></div><div class="cnt" id="pzcnt"></div><div id="pztab"></div>'+
   '<h2>Use a newer Access file (optional)</h2><div class="box"><p class="note">Pick the Access export (sheet B&amp;QBB3). It is read only on this device – it is not uploaded anywhere. The newest buy box run is still used.</p>'+
   '<label class="btn l" for="pzfile">Choose Access .xlsx</label><input type="file" id="pzfile" class="hide" accept=".xlsx,.xls,.xlsm"> <button class="btn l hide" type="button" id="pzpub">Back to the published data</button><div class="note" id="pzfmsg"></div></div>';
- $("pzr100").checked=!!st.opt.raise100;$("pzpost").checked=!!st.opt.checkPost;
+ $("pzr100").checked=!!st.opt.raise100;$("pzpost").checked=!!st.opt.checkPost;$("pztrim").checked=!!st.opt.pennyTrims;
  $("pzr100").onchange=function(){st.opt.raise100=this.checked;lss(LSO,st.opt);compute();draw()};
  $("pzpost").onchange=function(){st.opt.checkPost=this.checked;lss(LSO,st.opt);compute();draw()};
+ $("pztrim").onchange=function(){st.opt.pennyTrims=this.checked;lss(LSO,st.opt);compute();draw()};
  $("pzq").oninput=function(){st.q=this.value;st.n=PAGE;draw()};
  $("pzf").value=st.f;$("pzf").onchange=function(){st.f=this.value;st.n=PAGE;draw()};
  $("pzfile").onchange=function(){if(this.files[0])pick(this.files[0]);this.value=""};

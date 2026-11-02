@@ -107,7 +107,7 @@ def calc(r, w):
         'AF': w(f'IF(AND(ISNUMBER(W{r}),{win},U{r}=1.5,R{r}>=100),IF(G{r}<0.8-0.000000001,MIN(ROUNDUP(ROUND((W{r}+D{r}*MIN(0.8,G{r}+0.1))/0.85,6),2),ROUNDDOWN(ROUND((W{r}+D{r}*0.8)/0.85,6),2)),""),"")'),
         'AA': w(f'IF(NOT(ISNUMBER(W{r})),"NEED YOUR REVIEW",IF({win},IF(AND(ISNUMBER(AF{r}),AF{r}>E{r}),AF{r},"Already winning"),IF(U{r}=2,IF(NOT(ISNUMBER(H{r})),O{r},IF({bb1}<O{r},"Margin too low",IF(R{r}<1,O{r},{bb1}))),IF(R{r}>=1,IF(NOT(ISNUMBER(H{r})),"No competitor – kept",IF({bb1}<O{r},"Margin too low",MIN(Q{r},{bb1}))),IF(NOT(ISNUMBER(H{r})),Q{r},IF({bb1}<O{r},"Margin too low",MIN(Q{r},{bb1})))))))'),
         'S': w(f'IF(NOT(ISNUMBER(W{r})),"NEED YOUR REVIEW – "&IF(AND(ISNUMBER(D{r}),D{r}>0),"no postage or weight","no cost"),IF({win},IF(AND(ISNUMBER(AF{r}),AF{r}>E{r}),"1 Winning, 100+ sales – raise 10% (max 80%)","1 Already winning – kept"),IF(U{r}=2,IF(NOT(ISNUMBER(H{r})),"4 China – no competitor, 100%",IF({bb1}<O{r},"4 China – margin too low, kept",IF(R{r}<1,"4 China – 0 sales, 100%","4 China – 1p under BB"))),IF(R{r}>=1,IF(NOT(ISNUMBER(H{r})),"2 UK sold – no competitor, kept",IF({bb1}<O{r},"2 UK sold – margin too low, kept",IF({bb1}>Q{r},"2 UK sold – capped at 80%","2 UK sold – 1p under BB"))),IF(NOT(ISNUMBER(H{r})),"3 UK 0 sales – no competitor, 80%",IF({bb1}<O{r},"3 UK 0 sales – margin too low, kept",IF({bb1}>Q{r},"3 UK 0 sales – capped at 80%","3 UK 0 sales – 1p under BB")))))))'),
-        'J': w(f'IF(NOT(ISNUMBER(W{r})),"NEED YOUR REVIEW",IF(ISNUMBER(L{r}),IF(ROUND(L{r},2)=ROUND(E{r},2),"Your price",IF(ROUND({exact("L"+str(r))},2)<=0,"Loss – blocked",IF({exact("L"+str(r))}/D{r}<0.5-0.000000001,"Under 50% – blocked","Your price"))),IF(ISNUMBER(AA{r}),IF(ROUND({exact("AA"+str(r))},2)<=0,"Loss – blocked",IF(ROUND(AA{r},2)>ROUND(E{r},2),IF(ISNUMBER(AF{r}),"Raise 10% – held for review","Raise – held for review"),AA{r})),AA{r})))'),
+        'J': w(f'IF(NOT(ISNUMBER(W{r})),"NEED YOUR REVIEW",IF(ISNUMBER(L{r}),IF(ROUND(L{r},2)=ROUND(E{r},2),"Your price",IF(ROUND({exact("L"+str(r))},2)<=0,"Loss – blocked",IF({exact("L"+str(r))}/D{r}<0.5-0.000000001,"Under 50% – blocked","Your price"))),IF(ISNUMBER(AA{r}),IF(ROUND({exact("AA"+str(r))},2)<=0,"Loss – blocked",IF(ROUND(AA{r},2)>ROUND(E{r},2),IF(ISNUMBER(AF{r}),"Raise 10% – held for review","Raise – held for review"),IF(AND(U{r}<>2,NOT({win}),ISNUMBER(Q{r}),ROUND(AA{r},2)=ROUND(Q{r},2),IF(ISNUMBER(H{r}),{bb1}>Q{r},TRUE),ROUND(E{r}-AA{r},2)>0,ROUND(E{r}-AA{r},2)<=0.05+0.000000001,ROUND(E{r}-AA{r},2)<=0.05*E{r}+0.000000001),"Optional penny trim – kept",AA{r}))),AA{r})))'),
         'Y': w(f'IF(ISNUMBER(L{r}),L{r},IF(ISNUMBER(J{r}),J{r},E{r}))'),
         'M': w(f'IF(ISNUMBER(W{r}),ROUND({exact("Y"+str(r))},2),"NEED YOUR REVIEW")'),
         'N': w(f'IF(ISNUMBER(W{r}),{exact("Y"+str(r))}/D{r},"NEED YOUR REVIEW")'),
@@ -206,6 +206,16 @@ def build(stage, TMP):
         for rr in range(2, H.max_row + 1):
             for c in 'FG': H[f'{c}{rr}'].number_format = '0.0%'
             for c in 'DEHIL': H[f'{c}{rr}'].number_format = '£#,##0.00'
+        T2 = wb.create_sheet('Opt. penny trims (not uploaded)')
+        T2.append(['Selling SKU', 'Description', 'Supplier', 'Current price (kept)', 'Price at 80% cap (rounded down)', 'Trim £', 'Profit % now', 'Profit % at cap', '30-day sales', 'Buy box price', 'Buy box seller', 'Rule'])
+        for x in rows:
+            if x.get('trim') and not x.get('dup'):
+                T2.append([x['sku'], x['title'], x['sup'], x['price'], x['raw'], round(x['price'] - x['raw'], 2), x.get('pc'), x.get('rawPc'), x['sales'], x.get('bb'), x.get('seller'), x['rule']])
+        for c in T2[1]: c.fill = hf; c.font = Font(bold=True, color='FFFFFF'); c.alignment = Alignment(wrap_text=True, vertical='center')
+        for i, wd in enumerate([18, 45, 18, 12, 14, 8, 10, 10, 9, 11, 20, 34]): T2.column_dimensions[openpyxl.utils.get_column_letter(i + 1)].width = wd
+        for rr in range(2, T2.max_row + 1):
+            for c in 'GH': T2[f'{c}{rr}'].number_format = '0.0%'
+            for c in 'DEFJ': T2[f'{c}{rr}'].number_format = '£#,##0.00'
         N = wb.create_sheet('Notes')
         for t in NOTES: N.append([t])
         N.column_dimensions['A'].width = 150
@@ -222,6 +232,7 @@ NOTES = [
  'Postage uses OUR rules only (above). The £1.85 / £2.35 / £5.16 bands in the old master copy are deliberately NOT used – so postage can differ from that file on purpose.',
  'Rounding: a price set by the 80%% cap is rounded DOWN to the penny (never over 80%%). A floor price is rounded UP (never under the floor). If floor and cap are both 80%% (cost under £1, no sales) and no penny gives exactly 80%%, the cap wins (just under 80%%).',
  'Held raises tab: every price RISE the rules suggest. They are NOT in the upload. Copy a price into Your price if you want it.',
+ 'Optional penny trims: when the current price is only up to 5p (and up to 5%% of the price) above the 80%% cap price, and nothing else changes (no buy box chase, no floor fix), the current price is KEPT – no upload row. These %d SKUs are listed in the tab "Opt. penny trims (not uploaded)" (Excel allows 31 characters in a tab name). The dashboard Pricing tab has a switch (off by default) to include them. New prices we set still round down, so never over 80%%.' % sum(1 for x in rows if x.get('trim') and not x.get('dup')),
  'Rules: 1 Winning the buy box – keep (UK with 100+ B&Q 30-day sales: a +10%% step up to 80%% is shown but HELD for review). 2 UK sold: 1p under buy box, floor 50%%, max 80%%. 3 UK no sales: floor by cost (<£1 80%%, <£5 70%%, <£10 60%%, else 50%%), max 80%%. 4 China (Ashian): 1p under buy box, floor 100%%.',
  'Buy box 1p under is below the floor = "Margin too low" – price kept, never raised to the floor. A rule price above the current price = "Raise – held for review" (not in the upload).',
  'Safety: a changed price must have profit above £0 AND at least 50%% profit on cost, or it is blocked. Check postage rows (multi-pack or over 30kg) and duplicate SKUs are NOT in the upload until checked.',

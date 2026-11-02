@@ -63,6 +63,13 @@
   }
   /* ONE row -> price decision. r = {sku,title,ean,cost,price,bb,seller,sup,pc,w,sales,collab,url,your}
      opt = {raise100: include 100+ sales raises in the upload, checkPost: include 'Check postage' rows in the upload} */
+  /* Optional penny trim: UK price set by the 80% CAP only (no buy box chase, no floor fix) and the current price is
+     at most 5p (and at most 5% of price) above that cap price -> keep current price unless opt.pennyTrims. */
+  var TRIM = 'Optional penny trim – kept', TRIM_P = 0.05, TRIM_PCT = 0.05;
+  function isTrim(o, raw, cur, bb1) {
+    if (o.china || o.win || o.ceil == null || raw !== o.ceil || !(bb1 == null || bb1 > o.ceil)) return false;
+    var d = rnd(cur - raw, 2); return d > 0 && d <= TRIM_P + 1e-9 && d <= TRIM_PCT * cur + 1e-9;
+  }
   function decide(r, opt) {
     opt = opt || {};
     var cost = num(r.cost), price = num(r.price), bb = num(r.bb), sales = num(r.sales) || 0, your = num(r.your);
@@ -113,7 +120,8 @@
       o.rawProfit = Rc.profit; o.rawPc = Rc.pc;
       if (Rc.profit <= 0) o.status = 'Loss – blocked';
       else if (rnd(raw, 2) > rnd(cur, 2) && !(step && opt.raise100)) o.status = step ? 'Raise 10% – held for review' : 'Raise – held for review';
-      else o.status = raw;
+      else if (isTrim(o, raw, cur, bb1) && !opt.pennyTrims) { o.trim = true; o.status = TRIM; }
+      else { if (isTrim(o, raw, cur, bb1)) o.trim = true; o.status = raw; }
     } else o.status = raw;
     o.newp = typeof o.status === 'number' ? o.status : null;
     o.finalp = your != null ? your : (o.newp != null ? o.newp : cur);
@@ -199,5 +207,5 @@
   }
   return { FEE: FEE, sales30: sales30, bbMap: bbMap, ukTime: ukTime, fromAccess: fromAccess, eanOf: eanOf, HDR: HDR, ASHIAN: ASHIAN, OTHER: OTHER, UK_MAX: UK_MAX, SAFE_MIN: SAFE_MIN, RAISE_AT: RAISE_AT, BANDS: BANDS, OVER: OVER,
     num: num, rnd: rnd, ceil2: ceil2, band: band, postage: postage, postageSrc: postageSrc, isChina: isChina, multOf: multOf, fixedCost: fixedCost,
-    calc: calc, priceFor: priceFor, priceMax: priceMax, floorPrice: floorPrice, floor2: floor2, floorOf: floorOf, packN: packN, checkPost: checkPost, decide: decide, decideAll: decideAll, VERSION: 'bq_price v2 2026-11-02' };
+    TRIM: TRIM, calc: calc, priceFor: priceFor, priceMax: priceMax, floorPrice: floorPrice, floor2: floor2, floorOf: floorOf, packN: packN, checkPost: checkPost, decide: decide, decideAll: decideAll, VERSION: 'bq_price v3 2026-11-02' };
 });

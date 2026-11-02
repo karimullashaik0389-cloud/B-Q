@@ -20,6 +20,7 @@ If it says the buy box run is **not complete**, some SKUs use the Access buy box
 - **Will change (in upload)** – these go in the upload file.
 - **Margin too low** – the buy box is too cheap for us. We keep our price. No change.
 - **Raise – held for review** – the rules say we can go up. We do NOT go up unless you say so. All of them are listed in the **Held raises** tab of the Excel file (SKU, current price, proposed price, profit % now vs proposed, 30-day sales, why held). They are never in the upload.
+- **Optional penny trim – kept** – our price is only up to 5p (and up to 5% of the price) above the 80% cap price, and nothing else would change (no buy box to chase, no floor to fix). We keep the current price, so there is no upload row. They are listed in the Excel tab **Opt. penny trims (not uploaded)**. Use the filter "Optional penny trims" to see them.
 - **Check postage** – multipacks (like "3x ...") and items over 30kg. Check the postage first.
 - **Need your review** – no cost, no postage/weight, or £0 price. Fix the data in Access.
 - **Blocked (loss / under 50%)** – the price would make a loss or be under 50%. It is never uploaded.
@@ -45,6 +46,7 @@ If it says the buy box run is **not complete**, some SKUs use the Access buy box
 ## 6. Two switches
 - **Include 100+ sales raises (+10%, max 80%)** – adds the +10% raises to the upload.
 - **Include “Check postage” rows** – adds multipacks / over 30kg rows. Only tick after you checked postage.
+- **Include optional penny trims** (off by default) – adds the penny trims to the upload, so those prices come down to the 80% cap.
 
 ## 7. Download
 - **Download B&Q upload** – the file for B&Q. Same layout as the master template. Only changed SKUs. No duplicates. No loss.
