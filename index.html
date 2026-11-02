@@ -279,13 +279,14 @@ function csv(rows,cols){var e=function(v){v=v==null?"":String(v);return /[",\n\r
 function dups(){return getJSON("duplicates.enc").then(function(doc){
  var D=doc.data,S=D.summary||{},old=doc.source==="29oct",st={tab:"delete",q:"",act:"",sales:"",dec:"",size:"",n:PAGE};
  var lists={delete:D.delete_list||[],fix:D.fix_list||[],check:D.check_list||[]};
+ var nchk=lists.check.filter(function(o){return o.decision==="Check"}).length||lists.check.length;
  var cards=old?[["Groups",S.groups],["Offers in groups",S.offers_in_groups],["Candidates to delete",S.delete],["Keep",S.keep_no_fix],["Groups of 2",S.groups_of_2],["Groups of 3",S.groups_of_3],["Groups of 4+",S.groups_of_4_plus]]
   :[["Groups",S.groups],["Offers in groups",S.offers_in_groups],["Delete (verified)",S.delete],["Keep – fix",S.keep_fix],["Check",S.check],["Keep – no fix",S.keep_no_fix],["Groups of 2",S.groups_of_2],["Groups of 3",S.groups_of_3],["Groups of 4+",S.groups_of_4_plus],["New since 29 Oct",S.new_groups]];
  var h=(old?'<div class="src warn" id="dsrc"><b>From 29 Oct list</b> – the new duplicate check has not finished yet, so this shows the 29 Oct list. "Candidates to delete" were <b>not</b> live-checked: check before deleting.</div>'
   :'<div class="src" id="dsrc"><b>Duplicate check of '+esc(D.run_date)+'</b>'+(D.order_range&&D.order_range[0]?' · sales from '+esc(D.order_range[0])+' to '+esc(D.order_range[1]):"")+(S.live_checked?' · B&amp;Q pages checked live':"")+' · built '+esc(doc.source_time)+' UK</div>')+
   '<div class="sumg" id="dsum">'+cards.filter(function(c){return c[1]!==undefined&&c[1]!==""}).map(function(c){return '<div class="sc"><b>'+num(c[1])+'</b><span>'+esc(c[0])+'</span></div>'}).join("")+'</div>'+
   ((D.notes||[]).length?'<div class="box note">'+D.notes.map(esc).join("<br>")+'</div>':"")+
-  '<div class="seg" id="dseg">'+[["delete",(old?"Candidates to delete":"Delete")+" ("+lists.delete.length+")"],["fix","Fix ("+lists.fix.length+")"],["check","Check ("+lists.check.length+")"],["groups","All groups ("+(D.groups||[]).length+")"]]
+  '<div class="seg" id="dseg">'+[["delete",(old?"Candidates to delete":"Delete")+" ("+lists.delete.length+")"],["fix","Fix ("+lists.fix.length+")"],["check","Check ("+nchk+")"],["groups","All groups ("+(D.groups||[]).length+")"]]
    .map(function(t){return '<button type="button" data-t="'+t[0]+'">'+esc(t[1])+'</button>'}).join("")+'</div>'+
   '<div class="ctl"><input type="search" id="dq" placeholder="Search SKU, EAN or name" autocomplete="off" autocapitalize="off" spellcheck="false">'+
   '<select id="dact" aria-label="Active"><option value="">Active + inactive</option><option>Active</option><option>Inactive</option></select>'+
@@ -309,7 +310,7 @@ function dups(){return getJSON("duplicates.enc").then(function(doc){
     (g.vs_29_oct&&!old?' · <span class="mut">'+esc(g.vs_29_oct)+'</span>':"")+(g.keep_both?' · <span class="chip keep">keep both</span>':"")+(g.note?'<div><b>Note:</b> '+esc(g.note)+'</div>':"")+'</div>'+
     (g.offers||[]).map(function(o){return '<div class="of">'+offerHTML(o,"group")+'</div>'}).join("")+'</div>'})}
   else{out=lists[st.tab].filter(f);out.slice(0,st.n).forEach(function(o){html+='<div class="it">'+offerHTML(o,st.tab)+'</div>'})}
-  $("dcnt").textContent=out.length?"Showing "+Math.min(st.n,out.length)+" of "+out.length+(st.tab==="groups"?" groups":" offers"):"";
+  $("dcnt").textContent=out.length?"Showing "+Math.min(st.n,out.length)+" of "+out.length+(st.tab==="groups"?" groups":" offers")+(st.tab==="check"&&nchk<lists.check.length?" · "+nchk+" marked Check, the others are the rest of the same groups, shown to compare":""):"";
   if(!out.length)html='<div class="box note">'+(q||st.act||st.sales||st.dec||st.size?"Nothing matches – clear the search or filters.":st.tab==="fix"?"No listings to fix in this list.":st.tab==="check"?"Nothing to check in this list.":"Nothing in this list.")+'</div>';
   if(out.length>st.n)html+='<button class="more" type="button" id="dmore">Show more ('+(out.length-st.n)+' left)</button>';
   $("dlist").innerHTML=html;var m=$("dmore");if(m)m.onclick=function(){st.n+=PAGE*2;draw()}}
