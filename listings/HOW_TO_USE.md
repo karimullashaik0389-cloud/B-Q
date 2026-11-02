@@ -1,6 +1,6 @@
 # B&Q Listings – how to use (step by step)
 
-Tool version 3.5.7. Read this once, top to bottom. Every step is numbered. You only need a mouse/finger and your product names.
+Tool version 3.5.8. Read this once, top to bottom. Every step is numbered. You only need a mouse/finger and your product names.
 
 **What the tool does:** you give it SKU, EAN and product name. It writes the B&Q title (121–124 characters), 8 bullets, a 150+ word description and the key feature. It also fills the category and attributes, then gives you **one B&Q file per category**. Then **you** import those files on the B&Q portal yourself.
 
@@ -43,7 +43,7 @@ Along the top you see the steps **Add › Sort › Fill gaps › Check**. Every 
 ### 2. Add
 1. Type one product per row: **SKU**, **EAN**, **Product name**. Use **+ Add a row** for more.
 2. For many products (20–30 or more at a time): in Excel, select the three columns (SKU, EAN, Name), press **Ctrl + C**, then in the tool click **Paste from Excel**, press **Ctrl + V** and click **Add these rows**.
-3. Or drop your Excel or CSV file (columns SKU, EAN, Product name) on the grey box. The Add step takes only SKU, EAN and Product name – photos come later, as web links on Fill gaps.
+3. Or drop your Excel or CSV file (columns SKU, EAN, Product name) on the grey box. You need SKU, EAN and Product name. **Optional columns: Main photo link, Other photo links** – web links only (https://), no photo files. Put all other links in one cell (separated by spaces, commas or Alt+Enter lines). A single **Image links** column also works (first link = main photo). No photo columns? Add the links later on Fill gaps.
 4. **Red rows = the same SKU typed twice.** Both rows go red and **Next is blocked** until you fix one. This stops duplicate SKUs reaching B&Q.
 5. **Amber = the same EAN on two different SKUs.** This is only a warning. Check it is meant (e.g. pack sizes), then carry on.
 6. Finished with a list and already imported on B&Q? Click **Start a new list**. It only clears the list in the tool. Files you downloaded are not touched.
@@ -69,7 +69,7 @@ The tool checks each EAN against your B&Q export and files.
      - **Update main photo:** paste one link to replace your main photo (`image_main_1` only). You'll see *Main photo replaced.*
      - **Update other photos:** paste all other photo links at once (up to 8) to replace your existing extra photos (`image_secondary_1` to `8`). You'll see, for example, *Replaced 4 extra photos with 6 new.* Links you don't paste are dropped. To keep them and add more, click **Copy the current links into the box** first.
      - Each box has its own **Undo**, which brings back what was there before. If nothing in what you pasted can be used, nothing is replaced.
-   - **Optional, for many products:** your Excel/CSV file on Add can also have the columns **Main photo link** and **Other photo links** (all other links in one cell). They fill the two boxes for you.
+   - **Optional, for many products:** your Excel/CSV file on Add can also have the columns **Main photo link** and **Other photo links** (all other links in one cell; up to 8 are used). Those products arrive with the photos set, so they show **We have photos: …** and the Update boxes. A link the tool can’t use (e.g. http:// instead of https://) is shown in red and left out – fix it in the box.
    - **Tip:** use a photo host you control. On freeimage.host / iili.io, leave **Don't autodelete** selected (the default). Free hosts don't promise to keep files, so links can stop working. The tool never uploads photos for you.
 5. **Variant Group ID** is filled automatically:
    - from your **All variant.xlsx** if you loaded it (blank if the SKU is not in it);
