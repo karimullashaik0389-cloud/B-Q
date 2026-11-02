@@ -1,6 +1,6 @@
 # B&Q Listings – how to use (step by step)
 
-Tool version 3.5.8. Read this once, top to bottom. Every step is numbered. You only need a mouse/finger and your product names.
+Tool version 3.5.9. Read this once, top to bottom. Every step is numbered. You only need a mouse/finger and your product names.
 
 **What the tool does:** you give it SKU, EAN and product name. It writes the B&Q title (121–124 characters), 8 bullets, a 150+ word description and the key feature. It also fills the category and attributes, then gives you **one B&Q file per category**. Then **you** import those files on the B&Q portal yourself.
 
@@ -36,6 +36,8 @@ Tool version 3.5.8. Read this once, top to bottom. Every step is numbered. You o
 
 Along the top you see the steps **Add › Sort › Fill gaps › Check**. Every screen has **Back** at the top **and** at the bottom. Going back never loses what you typed.
 
+The orange **Home** button (house icon, top left, on every screen) opens the main B&Q dashboard with the six cards. Your work is saved on this device first, so when you open Listings again you carry on where you left off. If it can't be saved (for example a private window), the tool asks before leaving. The square-grid button next to the gear goes back to this tool's own start screen (New listings / Fix existing).
+
 ### 1. Start screen
 1. Choose **New listings** (products not on B&Q yet) or **Fix existing** (products already live that you want to improve).
 2. New here? The small link **How to use – step by step** opens this guide.
@@ -69,6 +71,12 @@ The tool checks each EAN against your B&Q export and files.
      - **Update main photo:** paste one link to replace your main photo (`image_main_1` only). You'll see *Main photo replaced.*
      - **Update other photos:** paste all other photo links at once (up to 8) to replace your existing extra photos (`image_secondary_1` to `8`). You'll see, for example, *Replaced 4 extra photos with 6 new.* Links you don't paste are dropped. To keep them and add more, click **Copy the current links into the box** first.
      - Each box has its own **Undo**, which brings back what was there before. If nothing in what you pasted can be used, nothing is replaced.
+   - **Product already live on B&Q (Fix existing):** the tool reads the photos B&Q already has from your B&Q product export (built in). You see no preview, just the count line, for example *We have photos – Photos on B&Q: 5 of 9, main photo: yes. You can add 4 more.* and the two boxes **Update main photo** and **Update other photos**.
+     - It never asks for a main photo for a live product and never holds it back for photos. To change only the title, bullets or description: edit them, then download – the photos stay as they are.
+     - The file sends B&Q's own photo links back in the same places (`image_main_1`, `image_secondary_1` to `8`, gaps stay gaps), because an empty photo cell in a B&Q upload wipes that photo. Links you paste in the Update boxes replace them.
+     - If your B&Q export has no photo links for a live product, the line says *Photos already on B&Q – kept.* Nothing is required and nothing is changed. If you remove every photo with ×, B&Q needs a main photo again.
+     - Its other B&Q values come from the same export too: category, weight, brand, pack, product type, guarantee and the rest. They are filled in (marked *B&Q export*) and written back unchanged, so a title/description-only fix isn't held back for them and the upload doesn't blank them.
+     - The built-in list is from the B&Q export of 26 Oct 2026. If you changed photos in the B&Q portal after that, paste the current links in the Update boxes.
    - **Optional, for many products:** your Excel/CSV file on Add can also have the columns **Main photo link** and **Other photo links** (all other links in one cell; up to 8 are used). Those products arrive with the photos set, so they show **We have photos: …** and the Update boxes. A link the tool can’t use (e.g. http:// instead of https://) is shown in red and left out – fix it in the box.
    - **Tip:** use a photo host you control. On freeimage.host / iili.io, leave **Don't autodelete** selected (the default). Free hosts don't promise to keep files, so links can stop working. The tool never uploads photos for you.
 5. **Variant Group ID** is filled automatically:

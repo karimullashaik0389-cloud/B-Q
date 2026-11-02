@@ -3,8 +3,8 @@ main{max-width:820px;margin:0 auto;padding:18px 16px 60px}
 .top{display:flex;align-items:center;gap:10px;margin:4px 0 14px}.logo{background:#FF6600;color:#fff;font-weight:800;border-radius:9px;padding:8px 9px;font-size:14px}
 h1{font-size:26px;margin:6px 0 10px}h2{font-size:21px;margin:28px 0 8px;color:#FF8A3D}h3{font-size:18px;margin:18px 0 6px}
 p,li{color:#E2E8F0}li{margin:5px 0}strong{color:#fff}a{color:#FF8A3D}code{background:#1E293B;color:#FDE68A;padding:1px 5px;border-radius:5px}
-blockquote{margin:12px 0;padding:10px 14px;background:#1E293B;border-left:4px solid #FF6600;border-radius:8px}hr{border:0;border-top:1px solid #334155;margin:24px 0}</style></head><body><main><div class="top"><span class="logo">B&amp;Q</span><b>Listings – how to use (v3.5.8)</b></div><h1>B&amp;Q Listings – how to use (step by step)</h1>
-<p>Tool version 3.5.8. Read this once, top to bottom. Every step is numbered. You only need a mouse/finger and your product names.</p>
+blockquote{margin:12px 0;padding:10px 14px;background:#1E293B;border-left:4px solid #FF6600;border-radius:8px}hr{border:0;border-top:1px solid #334155;margin:24px 0}</style></head><body><main><div class="top"><span class="logo">B&amp;Q</span><b>Listings – how to use (v3.5.9)</b></div><h1>B&amp;Q Listings – how to use (step by step)</h1>
+<p>Tool version 3.5.9. Read this once, top to bottom. Every step is numbered. You only need a mouse/finger and your product names.</p>
 <p><strong>What the tool does:</strong> you give it SKU, EAN and product name. It writes the B&amp;Q title (121–124 characters), 8 bullets, a 150+ word description and the key feature. It also fills the category and attributes, then gives you <strong>one B&amp;Q file per category</strong>. Then <strong>you</strong> import those files on the B&amp;Q portal yourself.</p>
 <p><strong>What it never does:</strong> it never changes anything on B&amp;Q, never uploads your photos anywhere and never fills price, stock, lead time or logistic class. Those go in your own price/stock file.</p>
 <hr />
@@ -38,6 +38,7 @@ blockquote{margin:12px 0;padding:10px 14px;background:#1E293B;border-left:4px so
 <hr />
 <h2>B. The screens (in order)</h2>
 <p>Along the top you see the steps <strong>Add › Sort › Fill gaps › Check</strong>. Every screen has <strong>Back</strong> at the top <strong>and</strong> at the bottom. Going back never loses what you typed.</p>
+<p>The orange <strong>Home</strong> button (house icon, top left, on every screen) opens the main B&amp;Q dashboard with the six cards. Your work is saved on this device first, so when you open Listings again you carry on where you left off. If it can't be saved (for example a private window), the tool asks before leaving. The square-grid button next to the gear goes back to this tool's own start screen (New listings / Fix existing).</p>
 <h3>1. Start screen</h3>
 <ol>
 <li>Choose <strong>New listings</strong> (products not on B&amp;Q yet) or <strong>Fix existing</strong> (products already live that you want to improve).</li>
@@ -73,6 +74,12 @@ blockquote{margin:12px 0;padding:10px 14px;background:#1E293B;border-left:4px so
 <li><strong>Update main photo:</strong> paste one link to replace your main photo (<code>image_main_1</code> only). You'll see <em>Main photo replaced.</em></li>
 <li><strong>Update other photos:</strong> paste all other photo links at once (up to 8) to replace your existing extra photos (<code>image_secondary_1</code> to <code>8</code>). You'll see, for example, <em>Replaced 4 extra photos with 6 new.</em> Links you don't paste are dropped. To keep them and add more, click <strong>Copy the current links into the box</strong> first.</li>
 <li>Each box has its own <strong>Undo</strong>, which brings back what was there before. If nothing in what you pasted can be used, nothing is replaced.</li>
+<li><strong>Product already live on B&amp;Q (Fix existing):</strong> the tool reads the photos B&amp;Q already has from your B&amp;Q product export (built in). You see no preview, just the count line, for example <em>We have photos – Photos on B&amp;Q: 5 of 9, main photo: yes. You can add 4 more.</em> and the two boxes <strong>Update main photo</strong> and <strong>Update other photos</strong>.</li>
+<li>It never asks for a main photo for a live product and never holds it back for photos. To change only the title, bullets or description: edit them, then download – the photos stay as they are.</li>
+<li>The file sends B&amp;Q's own photo links back in the same places (<code>image_main_1</code>, <code>image_secondary_1</code> to <code>8</code>, gaps stay gaps), because an empty photo cell in a B&amp;Q upload wipes that photo. Links you paste in the Update boxes replace them.</li>
+<li>If your B&amp;Q export has no photo links for a live product, the line says <em>Photos already on B&amp;Q – kept.</em> Nothing is required and nothing is changed. If you remove every photo with ×, B&amp;Q needs a main photo again.</li>
+<li>Its other B&amp;Q values come from the same export too: category, weight, brand, pack, product type, guarantee and the rest. They are filled in (marked <em>B&amp;Q export</em>) and written back unchanged, so a title/description-only fix isn't held back for them and the upload doesn't blank them.</li>
+<li>The built-in list is from the B&amp;Q export of 26 Oct 2026. If you changed photos in the B&amp;Q portal after that, paste the current links in the Update boxes.</li>
 <li><strong>Optional, for many products:</strong> your Excel/CSV file on Add can also have the columns <strong>Main photo link</strong> and <strong>Other photo links</strong> (all other links in one cell; up to 8 are used). Those products arrive with the photos set, so they show <strong>We have photos: …</strong> and the Update boxes. A link the tool can’t use (e.g. http:// instead of https://) is shown in red and left out – fix it in the box.</li>
 <li><strong>Tip:</strong> use a photo host you control. On freeimage.host / iili.io, leave <strong>Don't autodelete</strong> selected (the default). Free hosts don't promise to keep files, so links can stop working. The tool never uploads photos for you.</li>
 </ul>
