@@ -2,7 +2,7 @@
 const fs=require('fs'),vm=require('vm');
 const OLD=process.argv[2],NEW=process.argv[3],BQP=require(process.env.BQP_PATH||'/workspace/bq/pricing_tab/bq_price.js');
 function block(file){const s=fs.readFileSync(file,'utf8');const i=s.indexOf('var PRICE=')>=0?s.lastIndexOf('/*',s.indexOf('var PRICE=')):0;
- const j=s.indexOf('\n',s.indexOf('function postage(pc,w){'));const f=s.match(/function isChina\(k\)\{.*?\}\n/)[0]+s.match(/function floorOf\(k\)\{[\s\S]*?\n(?=L\.forEach)/)[0];
+ const j=s.indexOf('\n',s.indexOf('function postInfo(')>=0?s.indexOf('function postInfo('):s.indexOf('function postage(pc,w'));const f=s.match(/function isChina\(k\)\{.*?\}\n/)[0]+s.match(/function floorOf\(k\)\{[\s\S]*?\n(?=L\.forEach)/)[0];
  const ctx={window:{BQP},U30:{}};vm.createContext(ctx);vm.runInContext(s.slice(i,j)+'\n'+f,ctx);return ctx}
 const A=block(OLD),B=block(NEW);let n=0,bad=0,max=0;
 function bs(b){return b?b.p+'|'+b.lab:'null'}

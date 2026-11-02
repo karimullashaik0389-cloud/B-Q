@@ -9,5 +9,6 @@ def run(payload):
         return json.load(open(o))['out']
 def calc(items): return run({'op': 'calc', 'items': items})
 def postage(items): return run({'op': 'postage', 'items': items})
+def post_info(items): return run({'op': 'postInfo', 'items': items})
 def decide_all(rows, opt=None): return run({'op': 'decideAll', 'rows': rows, 'opt': opt or {}})
 def from_access(aoa, ov=None, opt=None): return run({'op': 'fromAccess', 'aoa': aoa, 'ov': ov or {}, 'opt': opt or {}})

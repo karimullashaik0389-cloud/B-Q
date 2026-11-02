@@ -82,7 +82,7 @@ json.dump({'access': os.path.basename(acc), 'access_date': acc_date, 'bb_meta': 
 
 # ---------- Excel: four tabs (+ Check postage, Notes) ----------
 P_COLS = ['Variant ID', 'Variant code', 'Variant description', 'Total 30Days Sales', 'Free stock quantity', 'Main supplier name', 'Manufacturers part number', 'B&Q_INV.price', 'B&Q_BB.price', 'seller',
-          'Estimated cost', 'product-id', 'product_url', 'Postage Cost', 'Weight', 'Reviews', 'sku', 'B n Q 30Days', 'Collab fee', 'Price source', 'Buy box source', 'Sales source', 'Access B n Q 30Days (not used)']
+          'Estimated cost', 'product-id', 'product_url', 'Postage Cost', 'Weight', 'Reviews', 'sku', 'B n Q 30Days', 'Collab fee', 'Price source', 'Buy box source', 'Sales source', 'Access B n Q 30Days (not used)', 'Postage (rules)', 'Postage rule']
 hf = PatternFill('solid', fgColor='1F3864'); gh = PatternFill('solid', start_color='FF548235', end_color='FF548235')
 gf = PatternFill('solid', start_color='FFE2EFDA', end_color='FFE2EFDA'); yf = PatternFill('solid', fgColor='FFF2CC')
 bf = PatternFill('solid', start_color='FFDDEBF7', end_color='FFDDEBF7'); bh = PatternFill('solid', start_color='FF2F75B5', end_color='FF2F75B5')
@@ -117,7 +117,7 @@ def style(ws, last):
     for i, (c, wd) in enumerate(zip(cols, widths)):
         L = L_(i + 1); h = ws[f'{L}1']; h.value = c; h.fill = hf; h.font = Font(bold=True, color='FFFFFF'); h.alignment = Alignment(wrap_text=True, vertical='center', horizontal='center')
         ws.column_dimensions[L].width = wd
-    for c, t, wd in (('AD', 'Check postage', 22), ('AE', 'Duplicate SKU', 13)):
+    for c, t, wd in (('AD', 'Check postage', 22), ('AE', 'Duplicate SKU', 13), ('AG', 'Postage rule', 28)):
         ws[f'{c}1'] = t; ws[f'{c}1'].fill = hf; ws[f'{c}1'].font = Font(bold=True, color='FFFFFF'); ws[f'{c}1'].alignment = Alignment(wrap_text=True, vertical='center', horizontal='center'); ws.column_dimensions[c].width = wd
     for c in 'EFG': ws[f'{c}1'].fill = gh
     ws['K1'].fill = bh; ws['L1'].fill = PatternFill('solid', fgColor='BF8F00')
@@ -129,7 +129,7 @@ def style(ws, last):
         for c in 'EFG': ws[f'{c}{r}'].fill = gf
         ws[f'K{r}'].fill = bf; ws[f'L{r}'].fill = yf
     for c in ['U', 'V', 'W', 'X', 'Y', 'Z', 'AA', 'AB', 'AC', 'AF']: ws.column_dimensions[c].hidden = True
-    ws.freeze_panes = 'C2'; ws.auto_filter.ref = f'A1:AE{last}'
+    ws.freeze_panes = 'C2'; ws.auto_filter.ref = f'A1:AG{last}'
     ws.conditional_formatting.add(f'A2:T{last}', FormulaRule(formula=['AND(ISNUMBER($F2),$F2<=0)'], fill=red))
     ws.conditional_formatting.add(f'AD2:AD{last}', FormulaRule(formula=['LEN($AD2)>0'], fill=red))
 def build(stage, TMP):
@@ -139,6 +139,11 @@ def build(stage, TMP):
     pr = {id(x): x for x in prep['rows']}
     # Paste Here = Access rows with the price / buy box overlays applied (sources in the last 2 columns)
     k = 0
+    # postage resolved by the shared engine (special fixed rules, H123/H063/H077 DPD tiers, Access, weight) -> Pricing K reads it
+    data = [row for row in aoa[1:] if not all(v in (None, '') for v in row)]
+    gi = lambda row, c: row[hdr.index(c)] if c in hdr and hdr.index(c) < len(row) else None
+    PI = engine.post_info([{'pc': gi(row, 'Postage Cost'), 'w': gi(row, 'Weight'), 'title': gi(row, 'Variant description'),
+                            'code': [str(gi(row, 'sku') or '').strip(), str(gi(row, 'Variant code') or '').strip()]} for row in data])
     for row in aoa[1:]:
         if all(v in (None, '') for v in row): continue
         x = prep['rows'][k]; k += 1
@@ -148,10 +153,11 @@ def build(stage, TMP):
         d['Price source'] = x['srcPrice']; d['Buy box source'] = x['srcBB']
         if x.get('srcSales'): d['Access B n Q 30Days (not used)'] = d.get('B n Q 30Days'); d['B n Q 30Days'] = x['sales']; d['Sales source'] = x['srcSales']
         else: d['Sales source'] = 'Access B n Q 30Days'
+        d['Postage (rules)'] = PI[k - 1]['p']; d['Postage rule'] = PI[k - 1]['src']
         P.append([d.get(c) for c in P_COLS])
     for c in P[1]: c.font = Font(bold=True)
     Pr = wb.create_sheet('Pricing')
-    need = {'sku': 1, 'Variant description': 2, 'Estimated cost': 3, 'B&Q_INV.price': 4, 'B&Q_BB.price': 5, 'seller': 6, 'Main supplier name': 7, 'Weight': 8, 'Postage Cost': 9, 'B n Q 30Days': 10, 'product-id': 11, 'product_url': 12, 'Collab fee': 13}
+    need = {'sku': 1, 'Variant description': 2, 'Estimated cost': 3, 'B&Q_INV.price': 4, 'B&Q_BB.price': 5, 'seller': 6, 'Main supplier name': 7, 'Weight': 8, 'Postage Cost': 9, 'B n Q 30Days': 10, 'product-id': 11, 'product_url': 12, 'Collab fee': 13, 'Postage (rules)': 14, 'Postage rule': 15}
     for name, i in need.items(): Pr[f'AC{i}'] = f'=MATCH("{name}",\'Paste Here\'!$1:$1,0)'; Pr[f'AB{i}'] = name
     G = lambda c: f"INDEX('Paste Here'!$A:$AZ,ROW(),$AC${need[c]})"
     V = lambda c: f'IFERROR(VALUE(SUBSTITUTE({G(c)}&"","£","")),0)'
@@ -166,7 +172,9 @@ def build(stage, TMP):
              'AD': w(f'IF(OR(IFERROR(--LEFT(B{r},SEARCH("x",B{r})-1)>1,FALSE),{V("Weight")}>30000),"Check postage","")'),
              'AE': w(f'IF(COUNTIF($A$2:A{r},A{r})>1,"Duplicate SKU","")')}
         wt = V("Weight"); pc = V("Postage Cost")
-        f['K'] = w(f'IF({pc}>0,{pc},IF({wt}<=0,"NEED YOUR REVIEW",IF({wt}<=2000,1.75,IF({wt}<=15200,2.3,IF({wt}<=20000,8,IF({wt}<=25000,9,IF({wt}<=30000,10.5,15)))))))')
+        pr_ = V("Postage (rules)")
+        f['AG'] = w(f'{G("Postage rule")}&""')
+        f['K'] = w(f'IF({pr_}>0,{pr_},IF({pc}>0,{pc},IF({wt}<=0,"NEED YOUR REVIEW",IF({wt}<=2000,1.75,IF({wt}<=15200,2.3,IF({wt}<=20000,8,IF({wt}<=25000,9,IF({wt}<=30000,10.5,15))))))))')
         f.update(calc(r, w))
         for kk, v in f.items(): Pr[f'{kk}{r}'] = v
     style(Pr, A.rows)
@@ -177,7 +185,7 @@ def build(stage, TMP):
             r = i + 2
             vals = {'A': x['sku'], 'B': x['title'], 'C': x['ean'], 'D': x['cost'] if x['cost'] is not None else '', 'E': x['price'], 'H': x['bb'] if x['bb'] is not None else 'No competitor',
                     'I': x['seller'], 'K': x['post'] if x['post'] is not None else 'NEED YOUR REVIEW', 'R': x['sales'], 'T': x['url'], 'U': x['mult'], 'X': x['collab'],
-                    'AD': 'Check postage: ' + x['check'] if x['check'] else '', 'AE': 'Duplicate SKU' if x.get('dup') else ''}
+                    'AD': 'Check postage: ' + x['check'] if x['check'] else '', 'AE': 'Duplicate SKU' if x.get('dup') else '', 'AG': x.get('postSrc') or ''}
             for kk, v in vals.items(): T[f'{kk}{r}'] = v
             for kk, v in calc(r, lambda q: '=' + q).items(): T[f'{kk}{r}'] = v
         last = len(rows) + 1; style(T, last)
@@ -190,9 +198,9 @@ def build(stage, TMP):
     for c in list(U[1]) + list(U[2]): c.font = Font(bold=True)
     U.column_dimensions['A'].width = 20
     if stage == 2:
-        C = wb.create_sheet('Check postage'); C.append(['Selling SKU', 'Description', 'Weight (g)', 'Postage used', 'Why', 'Rule price (not uploaded until checked)'])
+        C = wb.create_sheet('Check postage'); C.append(['Selling SKU', 'Description', 'Weight (g)', 'Postage used', 'Postage rule', 'Why', 'Rule price (not uploaded until checked)'])
         for x in rows:
-            if x['check']: C.append([x['sku'], x['title'], next((rr[hdr.index('Weight')] for rr in [None] if False), None) if False else None, x['post'], x['check'], x['newp']])
+            if x['check']: C.append([x['sku'], x['title'], x.get('w'), x['post'], x.get('postSrc') or '', x['check'], x['newp']])
         H = wb.create_sheet('Held raises')
         H.append(['Selling SKU', 'Description', 'Supplier', 'Current price', 'Proposed price (NOT uploaded)', 'Profit % now', 'Profit % at proposed', 'Profit £ now', 'Profit £ at proposed',
                   '30-day sales', 'Sales source', 'Buy box price', 'Buy box seller', 'Why held', 'Rule'])
@@ -228,7 +236,8 @@ NOTES = [
  'B&Q Pricing %s – built %s UK from %s%s.' % (A.date, datetime.datetime.now().strftime('%d %b %Y %H:%M'), os.path.basename(acc), (' + ' + bb_label) if bb_label else ''),
  'One shared engine (bq_price.js) makes every number here, on the dashboard Pricing tab and on Sales/Orders. Excel formulas repeat the same maths so you can change Your price / Postage.',
  'Total cost = cost + company cost (Ashian Homeware: 1 x cost, others 0.5 x cost) + 15%% of price + postage + collab fee (blank = 0).  Profit = price − total cost.  Profit %% = profit ÷ estimated cost.',
- 'Postage = Access Postage Cost if filled, else weight: up to 2000g £1.75, 15200g £2.30, 20000g £8, 25000g £9, 30000g £10.50, above £15. Blank weight and postage = NEED YOUR REVIEW.',
+ 'Postage order: 1) what you type in Postage (type here); 2) SPECIAL fixed postage: Xmas tree 8ft £3.30, 10ft £4.30; pet bed XL/XXL £3.30; high back stool 2x £3.30, 3x+ £8; fabric folding chair 2x £4.30, 3x+ £8; standard folding chair 2x £3.30, 3x+ £8; suitcase 20in £3.30, 24/28in £8, suitcase sets £8; tarpaulin 10x15m £3.30, 12x15m £3.30, 15x20m £8; baby high chair £3.30; guitar £3.30; BBQ table £3.30; 3-tier airer £3.30; 9L air fryer £4.30; 240L wheelie bins £27.',
+ 'Postage order (cont.): 3) description ending in code H123 / H063 / H077 (CH077 etc. do NOT count) over 15.2kg: DPD £14 (to 20kg), £15 (to 25kg), £17 (to 30kg); 4) Access Postage Cost if filled; 5) weight: up to 2000g £1.75, 15200g £2.30, 20000g £8, 25000g £9, 30000g £10.50, above £15 (flagged). A multi-pack ships as ONE parcel. Blank weight and postage = NEED YOUR REVIEW. The rule used is in the Postage rule column.',
  'Postage uses OUR rules only (above). The £1.85 / £2.35 / £5.16 bands in the old master copy are deliberately NOT used – so postage can differ from that file on purpose.',
  'Rounding: a price set by the 80%% cap is rounded DOWN to the penny (never over 80%%). A floor price is rounded UP (never under the floor). If floor and cap are both 80%% (cost under £1, no sales) and no penny gives exactly 80%%, the cap wins (just under 80%%).',
  'Held raises tab: every price RISE the rules suggest. They are NOT in the upload. Copy a price into Your price if you want it.',

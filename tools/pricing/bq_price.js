@@ -3,7 +3,9 @@
    Maths (Diva Master File + Karimulla's rules):
      total cost = cost + company cost (cost x1 Ashian Homeware, x0.5 others) + 15% of price + postage + collab fee (blank = 0)
      profit = price - total cost      profit % = profit / estimated cost
-     postage = Access 'Postage Cost' if > 0, else weight band: <=2000g 1.75, <=15200g 2.30, <=20000g 8, <=25000g 9, <=30000g 10.50, else 15
+     postage (in this order): 1 your typed postage; 2 special fixed rules (Karimulla's seniors' list, 26 Oct + 2 Nov 2026 notes, see SPECIAL);
+       3 description code H123/H063/H077 over 15.2kg: DPD 14 (<=20kg) / 15 (<=25kg) / 17 (<=30kg); 4 Access 'Postage Cost' if > 0;
+       5 weight band on the (total pack) weight: <=2000g 1.75, <=15200g 2.30, <=20000g 8, <=25000g 9, <=30000g 10.50, else 15. A multi-pack is ONE parcel.
    No data and no keys in this file. */
 (function (root, f) { var m = f(); if (typeof module === 'object' && module.exports) module.exports = m; else root.BQP = m; })(this, function () {
   'use strict';
@@ -25,9 +27,56 @@
   function ceil2(x) { return Math.ceil(Number((r6(x) * 100).toFixed(6))) / 100; }
   function floor2(x) { return Math.floor(Number((r6(x) * 100).toFixed(6))) / 100; }
   function band(w) { w = num(w); if (!(w > 0)) return null; for (var i = 0; i < BANDS.length; i++) if (w <= BANDS[i][0]) return { p: BANDS[i][1], lab: BANDS[i][2] }; return { p: OVER[0], lab: OVER[1] }; }
-  /* postage: Access 'Postage Cost' if > 0, else weight band, else null (needs review) */
-  function postage(pc, w) { var p = num(pc); if (p != null && p > 0) return p; var b = band(w); return b ? b.p : null; }
-  function postageSrc(pc, w) { var p = num(pc); if (p != null && p > 0) return 'Access postage'; var b = band(w); return b ? 'Weight band ' + b.lab : 'No postage or weight'; }
+  /* SPECIAL fixed postage (before Access / weight). Matched on the Variant description text (+ SKU / variant code prefix).
+     Source: Karimulla's handwritten note 2 Nov 2026 (KEEP/special_postage_note_2026-11-02.jpg) and the seniors' list
+     implemented 26 Oct 2026 (china_products_2026-10-26/work/pricing/build_v3.py). Fixed amounts are never multiplied by pack qty. */
+  var SPECIAL = { petXL: ['Pet bed XL/XXL', 3.3], hbs2: ['High back stool X2', 3.3], hbs3: ['High back stool X3+', 8], fab2: ['Fabric folding chair X2', 4.3], fab3: ['Fabric folding chair X3+', 8],
+    std2: ['Standard folding chair X2', 3.3], std3: ['Standard folding chair X3+', 8], suit20: ['Suitcase small 20in', 3.3], suitL: ['Suitcase 24in/28in', 8], suitSet: ['Suitcase set (large rate)', 8],
+    tree8: ['Xmas tree 8ft', 3.3], tree10: ['Xmas tree 10ft', 4.3], tar1015: ['Tarpaulin 10x15m', 3.3], tar1215: ['Tarpaulin 12x15m', 3.3], tar1520: ['Tarpaulin 15x20m', 8],
+    baby: ['Baby high chair', 3.3], guitar: ['Guitar', 3.3], bbq: ['BBQ table', 3.3], airer: ['3-tier clothes airer', 3.3], fryer: ['9L air fryer', 4.3], bin: ['Wheelie bin 240L', 27] };
+  var HEAVY = [[20000, 14, '15-20kg'], [25000, 15, '20-25kg'], [30000, 17, '25-30kg']], HEAVY_FROM = 15200;
+  function codes(c) { return (Array.isArray(c) ? c : [c]).filter(function (x) { return x != null && x !== ''; }).map(function (x) { return String(x).trim().toUpperCase(); }); }
+  function pre(cs, re) { for (var i = 0; i < cs.length; i++) if (re.test(cs[i])) return true; return false; }
+  function specialRule(title, code) {
+    var t = title == null ? '' : String(title), l = t.toLowerCase(), cs = codes(code), n = packN(t) || 1, m;
+    var pk = function (two, three) { return n >= 3 ? three : n === 2 ? two : null; };
+    if (pre(cs, /^240-(BLK|BRW|GRE)-BIN/) || /^\s*240\s*l\s+(wheelie\s+)?bin\b/i.test(t)) return 'bin';
+    if ((m = l.match(/\b(?:xmas|christmas)\s+tree\s+(\d+)\s*(?:ft|feet|foot)\b/)) || (m = cs.join(' ').match(/(?:^|\s)XMA-TRE-[A-Z]+-(\d+)FT/))) return m[1] === '8' ? 'tree8' : m[1] === '10' ? 'tree10' : null;
+    if (/\b(?:pet|dog)\s+bed\b/.test(l) && /\b(?:xxl|xl|xlg)\b/.test(l)) return 'petXL';
+    if (/high\s+back\s+stool/.test(l) || pre(cs, /^HOM074/)) return pk('hbs2', 'hbs3');
+    if (/fabric\s+folding\s+chair/.test(l) || pre(cs, /^(FAB-FOL|HOM041)/)) return pk('fab2', 'fab3');
+    if (/standard\s+folding\s+chair/.test(l) || pre(cs, /^HOM04[23]/)) return pk('std2', 'std3');
+    if (/suitcase|luggage/.test(l)) {
+      if (/\bset\b|\b\d+\s*pc\b|\d\s*\+\s*\d/.test(l)) return 'suitSet';
+      var sz = [], re = /\b(\d{2})\s*(?:-|\s)?\s*(?:inch|in\b|["”])/g, q; while ((q = re.exec(l))) sz.push(q[1]);
+      if (!sz.length) { var cj = cs.join(' '); if (/-20I-/.test(cj)) sz.push('20'); if (/-24I-/.test(cj)) sz.push('24'); if (/-28I-/.test(cj)) sz.push('28'); }
+      if (sz.length && sz.every(function (x) { return x === '20'; })) return 'suit20';
+      if (sz.some(function (x) { return x === '24' || x === '28'; })) return 'suitL';
+      return null;
+    }
+    if (/tarpaulin|\btarp\b/.test(l) && (m = l.match(/(\d+)\s*m?\s*x\s*(\d+)\s*m\b/))) { var a = Math.min(+m[1], +m[2]), b = Math.max(+m[1], +m[2]);
+      return a === 10 && b === 15 ? 'tar1015' : a === 12 && b === 15 ? 'tar1215' : a === 15 && b === 20 ? 'tar1520' : null; }
+    if (/baby\s+high\s+chair/.test(l) || pre(cs, /^BAB-HIG/)) return 'baby';
+    if (pre(cs, /^GUI-TAR/)) return 'guitar';
+    if (pre(cs, /^SIL-BBQ-TAB/)) return 'bbq';
+    if (/airer/.test(l) && /3[\s-]*tier/.test(l)) return 'airer';
+    if (pre(cs, /^DUL-9L-AFY/)) return 'fryer';
+    return null;
+  }
+  /* H123 / H063 / H077 = the code after the last '-' of the description (e.g. '... - 888436 - H077'; CH077 does NOT match) */
+  function heavyCode(title) { var m = String(title == null ? '' : title).match(/(?:^|-)\s*(H123|H063|H077)\s*$/i); return m ? m[1].toUpperCase() : null; }
+  /* full postage decision: {p, src, kind} ; ov = typed postage (wins over everything) */
+  function postInfo(pc, w, title, code, ov) {
+    var o = num(ov); if (o != null && o >= 0 && ov !== '') return { p: o, src: 'Your postage', kind: 'your' };
+    var k = specialRule(title, code); if (k) return { p: SPECIAL[k][1], src: 'Special: ' + SPECIAL[k][0], kind: 'special', rule: k };
+    var h = heavyCode(title), wt = num(w);
+    if (h && wt > HEAVY_FROM && wt <= HEAVY[HEAVY.length - 1][0]) for (var i = 0; i < HEAVY.length; i++) if (wt <= HEAVY[i][0]) return { p: HEAVY[i][1], src: 'DPD ' + h + ' ' + HEAVY[i][2], kind: 'heavy' };
+    var p = num(pc); if (p != null && p > 0) return { p: p, src: 'Access postage' + (h ? ' (' + h + ')' : ''), kind: 'access' };
+    var b = band(w); return b ? { p: b.p, src: (b.p >= 8 && b.p <= 10.5 ? 'DPD ' : 'Weight band ') + b.lab + (packN(title) ? ' (pack weight, one parcel)' : ''), kind: 'band' } : { p: null, src: 'No postage or weight', kind: 'none' };
+  }
+  /* postage: (pc, w) = Access / weight only (old callers); (pc, w, title, code[, typed]) = all rules incl. special */
+  function postage(pc, w, title, code, ov) { return postInfo(pc, w, title, code, ov).p; }
+  function postageSrc(pc, w, title, code, ov) { return postInfo(pc, w, title, code, ov).src; }
   function isChina(sup) { return /ashian/i.test(sup || ''); }
   function multOf(sup) { return isChina(sup) ? ASHIAN : OTHER; }
   /* costs that do not depend on price: cost x mult + postage + collab */
@@ -73,10 +122,10 @@
   function decide(r, opt) {
     opt = opt || {};
     var cost = num(r.cost), price = num(r.price), bb = num(r.bb), sales = num(r.sales) || 0, your = num(r.your);
-    var china = isChina(r.sup), mult = china ? ASHIAN : OTHER, post = postage(r.pc, r.w), seller = (r.seller == null ? '' : String(r.seller)).trim();
+    var china = isChina(r.sup), mult = china ? ASHIAN : OTHER, PI = postInfo(r.pc, r.w, r.title, [r.sku, r.variant], r.postYour), post = PI.p, seller = (r.seller == null ? '' : String(r.seller)).trim();
     if (!(bb > 0)) bb = null;
     var o = { sku: r.sku, title: r.title || '', ean: r.ean || '', cost: cost, price: price == null ? 0 : price, priceBlank: price == null, bb: bb, seller: bb == null && !seller ? 'No competitor' : seller, sales: sales,
-      china: china, mult: mult, post: post, postSrc: postageSrc(r.pc, r.w), collab: num(r.collab) || 0, url: r.url || '', check: checkPost(r.title, r.w), your: your,
+      china: china, mult: mult, post: post, postSrc: PI.src, postKind: PI.kind, collab: num(r.collab) || 0, url: r.url || '', check: checkPost(r.title, r.w), your: your,
       srcPrice: r.srcPrice || '', srcBB: r.srcBB || '', srcSales: r.srcSales || 'Access B n Q 30Days', salesAccess: r.salesAccess == null ? null : num(r.salesAccess), sup: r.sup || '', w: num(r.w), variant: r.variant || '',
       win: /diva package/i.test(seller), status: '', rule: '', newp: null, finalp: null, upload: false, why: '' };
     var cur = o.price;
@@ -206,6 +255,6 @@
     return { map: m, n: n, from: t0, to: t1, label: n ? 'Buy box run ' + (t0 ? ukTime(t0) + '–' + ukTime(t1) + ' UK' : '') : '' };
   }
   return { FEE: FEE, sales30: sales30, bbMap: bbMap, ukTime: ukTime, fromAccess: fromAccess, eanOf: eanOf, HDR: HDR, ASHIAN: ASHIAN, OTHER: OTHER, UK_MAX: UK_MAX, SAFE_MIN: SAFE_MIN, RAISE_AT: RAISE_AT, BANDS: BANDS, OVER: OVER,
-    num: num, rnd: rnd, ceil2: ceil2, band: band, postage: postage, postageSrc: postageSrc, isChina: isChina, multOf: multOf, fixedCost: fixedCost,
-    TRIM: TRIM, calc: calc, priceFor: priceFor, priceMax: priceMax, floorPrice: floorPrice, floor2: floor2, floorOf: floorOf, packN: packN, checkPost: checkPost, decide: decide, decideAll: decideAll, VERSION: 'bq_price v3 2026-11-02' };
+    num: num, rnd: rnd, ceil2: ceil2, band: band, postage: postage, postageSrc: postageSrc, postInfo: postInfo, specialRule: specialRule, heavyCode: heavyCode, SPECIAL: SPECIAL, HEAVY: HEAVY, isChina: isChina, multOf: multOf, fixedCost: fixedCost,
+    TRIM: TRIM, calc: calc, priceFor: priceFor, priceMax: priceMax, floorPrice: floorPrice, floor2: floor2, floorOf: floorOf, packN: packN, checkPost: checkPost, decide: decide, decideAll: decideAll, VERSION: 'bq_price v4 2026-11-02 special postage' };
 });

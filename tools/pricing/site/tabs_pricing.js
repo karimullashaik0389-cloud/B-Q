@@ -86,7 +86,7 @@ function draw(){if(!st||!st.res)return;var R=st.res.rows,C=counts(),q=st.q.trim(
    '<td class="n">'+money(o.cost)+'</td><td class="n">'+(o.priceBlank?'<span class="bad">blank</span>':money(o.price))+'</td><td class="n'+(o.profit!=null&&o.profit<=0?' bad':'')+'">'+money(o.profit)+'</td><td class="n">'+pct(o.pc)+'</td>'+
    '<td>'+(o.bb!=null?money(o.bb):'<span class="mut">–</span>')+'<br><span class="mut">'+esc(o.seller)+'</span></td>'+
    '<td class="n"><b>'+money(o.finalp)+'</b></td><td class="n'+(o.fprofit!=null&&o.fprofit<=0?' bad':'')+'">'+money(o.fprofit)+'</td><td class="n">'+pct(o.fpc)+'</td>'+
-   '<td class="n">'+money(o.floor)+'<br><span class="mut">'+pct(o.floorPct)+'</span></td><td class="n">'+n0(o.sales)+'</td><td>'+chip(o)+'</td><td class="mut" style="white-space:normal;min-width:160px">'+esc(o.rule)+'<br>'+esc(o.postSrc||"")+'</td>'+
+   '<td class="n">'+money(o.floor)+'<br><span class="mut">'+pct(o.floorPct)+'</span></td><td class="n">'+n0(o.sales)+'</td><td>'+chip(o)+'</td><td class="mut" style="white-space:normal;min-width:160px">'+esc(o.rule)+'<br>Postage '+(o.post!=null?money(o.post):'—')+' · '+esc(o.postSrc||"")+'</td>'+
    '<td><input type="text" inputmode="decimal" data-s="'+esc(o.sku)+'" value="'+(o.your!=null?o.your.toFixed(2):"")+'" class="'+(o.your!=null?"set":"")+'" aria-label="Your price for '+esc(o.sku)+'" placeholder="£"'+(o.dup?" disabled":"")+'></td></tr>'}).join("")+'</tbody></table></div>';
  if(!out.length)h='<div class="box note">Nothing here. Try “All rows” or clear the search.</div>';
  if(out.length>st.n)h+='<button class="more" type="button" id="pzmore">Show more ('+(out.length-st.n)+' left)</button>';
