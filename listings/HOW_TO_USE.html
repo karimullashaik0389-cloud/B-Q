@@ -1,0 +1,131 @@
+<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><title>B&amp;Q Listings – how to use</title><style>body{margin:0;background:#0F172A;color:#F8FAFC;font:16px/1.6 -apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+main{max-width:820px;margin:0 auto;padding:18px 16px 60px}
+.top{display:flex;align-items:center;gap:10px;margin:4px 0 14px}.logo{background:#FF6600;color:#fff;font-weight:800;border-radius:9px;padding:8px 9px;font-size:14px}
+h1{font-size:26px;margin:6px 0 10px}h2{font-size:21px;margin:28px 0 8px;color:#FF8A3D}h3{font-size:18px;margin:18px 0 6px}
+p,li{color:#E2E8F0}li{margin:5px 0}strong{color:#fff}a{color:#FF8A3D}code{background:#1E293B;color:#FDE68A;padding:1px 5px;border-radius:5px}
+blockquote{margin:12px 0;padding:10px 14px;background:#1E293B;border-left:4px solid #FF6600;border-radius:8px}hr{border:0;border-top:1px solid #334155;margin:24px 0}</style></head><body><main><div class="top"><span class="logo">B&amp;Q</span><b>Listings – how to use (v3.5.6)</b></div><h1>B&amp;Q Listings – how to use (step by step)</h1>
+<p>Tool version 3.5.6. Read this once, top to bottom. Every step is numbered. You only need a mouse/finger and your product names.</p>
+<p><strong>What the tool does:</strong> you give it SKU, EAN and product name. It writes the B&amp;Q title (121–124 characters), 8 bullets, a 150+ word description and the key feature. It also fills the category and attributes, then gives you <strong>one B&amp;Q file per category</strong>. Then <strong>you</strong> import those files on the B&amp;Q portal yourself.</p>
+<p><strong>What it never does:</strong> it never changes anything on B&amp;Q, never uploads your photos anywhere and never fills price, stock, lead time or logistic class. Those go in your own price/stock file.</p>
+<hr />
+<h2>A. Open the tool</h2>
+<h3>On Windows (normal way – website)</h3>
+<ol>
+<li>Open <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong>.</li>
+<li>Go to <strong>https://karimullashaik0389-cloud.github.io/B-Q/listings/</strong></li>
+<li>Bookmark it (press <strong>Ctrl + D</strong>) so next time it is one click.</li>
+</ol>
+<h3>On Windows (offline, no internet needed for the tool itself)</h3>
+<ol>
+<li>On the GitHub page of the <strong>B-Q</strong> repo, click the green <strong>Code</strong> button › <strong>Download ZIP</strong>.</li>
+<li>Right-click the ZIP › <strong>Extract All…</strong> › choose a simple place, e.g. <code>C:\BQ</code>. <strong>Keep the folders as they are</strong> (<code>listings</code>, <code>listings\templates</code>, <code>downloads</code>).</li>
+<li>Open the <code>downloads</code> folder and double-click <strong>Start_BQ_Listings.bat</strong>.<ul>
+<li>It opens the tool in Chrome (or Edge if Chrome isn't installed) in its own window. That window can read the B&amp;Q templates from the <code>listings\templates</code> folder.</li>
+<li>If Windows shows "Windows protected your PC", click <strong>More info</strong> › <strong>Run anyway</strong> (the .bat only opens your browser).</li>
+</ul>
+</li>
+<li>If you open the HTML file some other way (double-clicking it), the tool still works. At the last step it will ask you to <strong>Choose template</strong> once per category from <code>listings\templates</code>.</li>
+</ol>
+<h3>On iPhone</h3>
+<ol>
+<li>Open <strong>Safari</strong>.</li>
+<li>Go to <strong>https://karimullashaik0389-cloud.github.io/B-Q/listings/phone/</strong></li>
+<li>Tap <strong>Share</strong> (square with arrow) › <strong>Add to Home Screen</strong> › <strong>Add</strong>. From now on, open it from the orange icon.</li>
+</ol>
+<blockquote>
+<p>Your list is saved on the device you use. If you close the page and open it again, you see "Carried on where you left off – N products". The phone and the computer do <strong>not</strong> share lists.</p>
+</blockquote>
+<hr />
+<h2>B. The screens (in order)</h2>
+<p>Along the top you see the steps <strong>Add › Sort › Fill gaps › Check</strong>. Every screen has <strong>Back</strong> at the top <strong>and</strong> at the bottom. Going back never loses what you typed.</p>
+<h3>1. Start screen</h3>
+<ol>
+<li>Choose <strong>New listings</strong> (products not on B&amp;Q yet) or <strong>Fix existing</strong> (products already live that you want to improve).</li>
+<li>New here? The small link <strong>How to use – step by step</strong> opens this guide.</li>
+</ol>
+<h3>2. Add</h3>
+<ol>
+<li>Type one product per row: <strong>SKU</strong>, <strong>EAN</strong>, <strong>Product name</strong>. Use <strong>+ Add a row</strong> for more.</li>
+<li>For many products (20–30 or more at a time): in Excel, select the three columns (SKU, EAN, Name), press <strong>Ctrl + C</strong>, then in the tool click <strong>Paste from Excel</strong>, press <strong>Ctrl + V</strong> and click <strong>Add these rows</strong>.</li>
+<li>Or drop an Excel/CSV sheet, photos or a ZIP on the grey box. Name photos by SKU: <code>SKU_1.jpg</code> (main photo), <code>SKU_2.jpg</code>…</li>
+<li><strong>Red rows = the same SKU typed twice.</strong> Both rows go red and <strong>Next is blocked</strong> until you fix one. This stops duplicate SKUs reaching B&amp;Q.</li>
+<li><strong>Amber = the same EAN on two different SKUs.</strong> This is only a warning. Check it is meant (e.g. pack sizes), then carry on.</li>
+<li>Finished with a list and already imported on B&amp;Q? Click <strong>Start a new list</strong>. It only clears the list in the tool. Files you downloaded are not touched.</li>
+<li>Click <strong>Next →</strong>.</li>
+</ol>
+<h3>3. Sort</h3>
+<p>The tool checks each EAN against your B&amp;Q export and files.
+1. <strong>Already on B&amp;Q – move to Fix existing</strong> / <strong>Not on B&amp;Q yet – move to New listings</strong>: click the move button if it is right.
+2. A wrong check digit is shown in red with a button <strong>Use correct check digit</strong>.
+3. Click <strong>Next →</strong>.</p>
+<h3>4. Fill gaps</h3>
+<ol>
+<li>Each product card shows the category the tool picked. Click <strong>Looks right</strong>, or <strong>Change</strong> to pick another.</li>
+<li>Click <strong>Next to fill</strong> to jump straight to the next empty box. Only the boxes B&amp;Q <em>requires</em> are asked. Usually that is the <strong>weight</strong> and anything the name doesn't say.</li>
+<li>Grey/amber "close guess" values are suggestions. Read them, and change them if they are wrong.</li>
+<li><strong>Photos:</strong> B&amp;Q needs a <strong>web link</strong> (starting <code>https://</code>) for every photo.<ul>
+<li>Photos already on B&amp;Q keep their links.</li>
+<li>A photo you dropped from your computer is only on this device. Paste its web link (from your own photo host) in the box under the photo, or add it in the file before you import. The tool never uploads photos for you.</li>
+</ul>
+</li>
+<li><strong>Variant Group ID</strong> is filled automatically:<ul>
+<li>from your <strong>All variant.xlsx</strong> if you loaded it (blank if the SKU is not in it);</li>
+<li>otherwise products with the same name in a category that allows variants get one group;</li>
+<li>blank where B&amp;Q does not allow variants.</li>
+</ul>
+</li>
+<li>Click <strong>Next →</strong>.</li>
+</ol>
+<h3>5. Check and download</h3>
+<ol>
+<li>Each card shows the title with its length (must be <strong>121–124</strong>), the <strong>8 bullets</strong>, the description word count (<strong>150+</strong>) and the <strong>Key feature</strong> (max <strong>30</strong> characters). Green = OK, red = fix.</li>
+<li>You can edit any text directly. The counters update as you type.</li>
+<li>The box at the top lists anything still missing. Click a chip to jump to it.</li>
+<li><strong>Fix existing only – "Are you using a new EAN for B&amp;Q?"</strong> appears on a card when the EAN you typed differs from the one B&amp;Q has for that SKU.<ul>
+<li><strong>Yes</strong> = you are changing to a new EAN on purpose. Your new EAN goes in the file, with no warning.</li>
+<li><strong>No</strong> = the tool keeps B&amp;Q's EAN in the file and shows an amber warning saying so.</li>
+<li>Not answered yet = B&amp;Q's EAN stays in the file (a small grey line says so); no warning.</li>
+</ul>
+</li>
+<li>Click <strong>Download all files</strong>. You get <strong>one file per B&amp;Q category</strong>, e.g. <code>new_animal_beds_2026-11-02.xlsx</code>.<ul>
+<li>Offline/file mode only: if a category says <strong>Choose template</strong>, click it and pick that file from <code>listings\templates</code> once.</li>
+</ul>
+</li>
+<li>Where the files go:<ul>
+<li>Windows: the <strong>Downloads</strong> folder.</li>
+<li>iPhone: Safari asks <strong>Download?</strong> › tap <strong>Download</strong>. The files are in the <strong>Files</strong> app › <strong>Downloads</strong>. If only one file appears, tap each category's own <strong>Download</strong> button.</li>
+</ul>
+</li>
+</ol>
+<hr />
+<h2>C. Import on B&amp;Q (you do this yourself)</h2>
+<ol>
+<li>Log in to the <strong>B&amp;Q / Kingfisher seller portal (Mirakl)</strong>.</li>
+<li>Go to the product import page (in Mirakl this is under <strong>Catalog / Products › Import</strong> – the exact menu name can differ on your account).</li>
+<li>Upload <strong>one downloaded file at a time</strong> and wait for the import report.</li>
+<li>If B&amp;Q rejects a line, open the report, fix that product in the tool (<strong>Fix existing</strong>) and download again.</li>
+<li>Price, stock, lead time and logistic class are <strong>blank on purpose</strong>. Set them with your usual offer/price file.</li>
+</ol>
+<p>The tool never imports, deletes or changes anything on B&amp;Q.</p>
+<hr />
+<h2>D. Settings (gear icon, top right)</h2>
+<ol>
+<li><strong>Variant groups</strong> – choose your <strong>All variant.xlsx</strong> (or your B&amp;Q folder once) so Variant Group IDs come from your list.</li>
+<li><strong>Gemini (optional)</strong> – if you want AI-polished text, paste your free Gemini key here. It is saved <strong>only in this browser on this device</strong> (never in the files or on GitHub). Only public product facts are sent. With no key, the tool uses its own text.</li>
+<li><strong>Dark mode</strong> – moon/sun button. The look stays the same, only darker.</li>
+<li><strong>Help</strong> – <strong>Open the step-by-step guide</strong> opens this page. Here you can also see the tool version.</li>
+</ol>
+<hr />
+<h2>E. Updating to a new version</h2>
+<ol>
+<li>A new version is a new set of files (<code>listings/index.html</code>, <code>listings/phone/index.html</code>, <code>listings/templates/</code>, <code>downloads/</code>).</li>
+<li>Website: replace the files in your B-Q GitHub repo yourself (upload/commit). The website updates in a few minutes. Press <strong>Ctrl + F5</strong> once to reload.</li>
+<li>Offline: download the ZIP again and replace your <code>C:\BQ</code> folder.</li>
+<li>Your saved list, Gemini key and settings stay in the browser. They are not in the files, so replacing files does not delete them.</li>
+<li>Check the version under <strong>Settings › Help</strong>.</li>
+</ol>
+<h2>F. If something goes wrong</h2>
+<ol>
+<li>A red box "Sorry – that didn't work" appears: nothing was sent anywhere. Try again. If it repeats, take a screenshot and send it.</li>
+<li>A page that only shows "If you can see this, the tool isn't running" was opened in a preview. Open it in Chrome/Edge (Windows) or Safari via the web link (iPhone).</li>
+</ol></main></body></html>
