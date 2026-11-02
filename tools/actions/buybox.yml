@@ -1,0 +1,48 @@
+# B&Q buy box run (Access tab). To switch it on, this file must live at .github/workflows/buybox.yml
+# (see HOW_TO_USE_tabs.md). Needs the Actions secret BQ_PASSWORD (already set). Free on a public repo.
+name: Buy box
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Only the first N EANs (blank = all)"
+        required: false
+        default: ""
+  push:
+    branches: [main]
+    paths: ["data/codes_*.enc"]
+concurrency: { group: buybox, cancel-in-progress: false }
+permissions: { contents: write }
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -q requests beautifulsoup4 pandas openpyxl xlrd cryptography
+      - name: "Look up every EAN on diy.com (polite, 1 request per second)"
+        env:
+          BQ_PASSWORD: ${{ secrets.BQ_PASSWORD }}
+          LIMIT: ${{ github.event.inputs.limit }}
+        run: |
+          codes=$(ls data/codes_*.enc 2>/dev/null | sort | tail -1)
+          av=$(ls data/all_variant_*.enc 2>/dev/null | sort | tail -1)
+          [ -n "$codes" ] || { echo "No data/codes_*.enc in the repo"; exit 2; }
+          python3 tools/buybox/run_buybox.py --codes "$codes" ${av:+--all-variant "$av"} --prev buybox.enc \
+            --out /tmp/buybox.enc --runner github --rate 1.0 --workers 3 --max-minutes 320 ${LIMIT:+--limit $LIMIT} || rc=$?
+          [ -f /tmp/buybox.enc ] && cp /tmp/buybox.enc buybox.enc
+          exit ${rc:-0}
+      - name: Save the encrypted result to the repo
+        if: always()
+        run: |
+          [ -f /tmp/buybox.enc ] || exit 0
+          git config user.name "buybox-bot"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for i in 1 2 3 4 5; do
+            git fetch -q origin main && git reset -q --hard origin/main && cp /tmp/buybox.enc buybox.enc && git add buybox.enc
+            git diff --cached --quiet && exit 0
+            git commit -qm "Buy box result (GitHub run ${{ github.run_number }})" && git push -q origin HEAD:main && exit 0
+            sleep $((i*10))
+          done
+          exit 1
