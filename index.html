@@ -215,6 +215,8 @@ function num(v){return typeof v==="number"?v.toLocaleString("en-GB"):esc(v)}
 function money(v){return v===""||v==null||isNaN(+v)?"–":"£"+(+v).toFixed(2)}
 function uk(iso){if(!iso)return "–";var d=new Date(iso);if(isNaN(d))return esc(iso);
  return d.toLocaleString("en-GB",{timeZone:"Europe/London",day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})+" UK"}
+function ukt(iso,full){if(!iso)return "";var d=new Date(iso);if(isNaN(d))return String(iso);
+ return d.toLocaleString("en-GB",full?{timeZone:"Europe/London",day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false}:{timeZone:"Europe/London",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit",hour12:false})}
 function stamp(){var d=new Date(),p=function(n){return(n<10?"0":"")+n};return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"_"+p(d.getHours())+p(d.getMinutes())+p(d.getSeconds())}
 function norm(s){return String(s==null?"":s).toLowerCase().replace(/[^a-z0-9&]/g,"")}
 function hex(u){var s="";for(var i=0;i<u.length;i++)s+=(u[i]<16?"0":"")+u[i].toString(16);return s}
@@ -369,17 +371,17 @@ function results(doc){var R=doc.run||{},rows=doc.rows||[],st={q:"",f:"",n:100};
  function draw(){var q=st.q.trim().toLowerCase();
   var out=rows.filter(function(r){return(!q||r.ean.indexOf(q)>=0||String(r.sku).toLowerCase().indexOf(q)>=0||String(r.seller).toLowerCase().indexOf(q)>=0||String(r.variant||"").toLowerCase().indexOf(q)>=0)&&
    (!st.f||(st.f==="none"?!r.seller:r.winning===st.f))});
-  var h='<div class="tw"><table class="bt"><thead><tr><th>EAN</th><th>Link</th><th>Winner seller</th><th>Winner price</th><th>Our price</th><th>Winning?</th></tr></thead><tbody>'+
+  var h='<div class="tw"><table class="bt"><thead><tr><th>EAN</th><th>Link</th><th>Winner seller</th><th>Winner price</th><th>Our price</th><th>Winning?</th><th>Fetched at (UK)</th></tr></thead><tbody>'+
    out.slice(0,st.n).map(function(r){return '<tr><td><span class="mono">'+esc(r.ean)+'</span>'+(r.sku?'<br><span class="mut mono">'+esc(r.sku)+'</span>':"")+'</td><td>'+(r.url?link(r.url,"B&amp;Q ↗"):'<span class="mut">–</span>')+'</td><td>'+(r.seller?esc(r.seller):'<span class="mut">'+esc(r.status)+'</span>')+
-    '</td><td class="n">'+money(r.price)+'</td><td class="n">'+money(r.our_price)+'</td><td>'+(r.winning==="Yes"?'<span class="chip keep">Yes</span>':r.winning==="No"?'<span class="chip del">No</span>':'<span class="mut">–</span>')+'</td></tr>'}).join("")+'</tbody></table></div>';
+    '</td><td class="n">'+money(r.price)+'</td><td class="n">'+money(r.our_price)+'</td><td>'+(r.winning==="Yes"?'<span class="chip keep">Yes</span>':r.winning==="No"?'<span class="chip del">No</span>':'<span class="mut">–</span>')+'</td><td class="mut" style="white-space:nowrap">'+(r.fetched?esc(ukt(r.fetched)):'–')+'</td></tr>'}).join("")+'</tbody></table></div>';
   if(!out.length)h='<div class="box note">Nothing matches – clear the search or filter.</div>';
   if(out.length>st.n)h+='<button class="more" type="button" id="amore">Show more ('+(out.length-st.n)+' left)</button>';
   $("acnt").textContent=out.length?"Showing "+Math.min(st.n,out.length)+" of "+out.length:"";$("atab").innerHTML=h;var m=$("amore");if(m)m.onclick=function(){st.n+=200;draw()}}
  $("aq").oninput=function(){st.q=this.value;st.n=100;draw()};$("af").onchange=function(){st.f=this.value;st.n=100;draw()};
  var b=$("axl");b.disabled=false;b.onclick=function(){b.disabled=true;b.textContent="Preparing…";xlsx().then(function(X){
-  var aoa=[["EAN","Offer SKU","Variant code","B&Q link","Winner seller","Winner price","Our price","Winning?","Reviews","Status"]].concat(rows.map(function(r){
-   return[String(r.ean),String(r.sku||""),String(r.variant||""),r.url||"",r.seller||"",r.price==null||r.price===""?"":+r.price,r.our_price==null||r.our_price===""?"":+r.our_price,r.winning||"",r.reviews===""||r.reviews==null?"":+r.reviews,r.status||""]}));
-  var wb=X.utils.book_new(),ws=X.utils.aoa_to_sheet(aoa);ws["!cols"]=[{wch:15},{wch:16},{wch:14},{wch:40},{wch:24},{wch:11},{wch:10},{wch:9},{wch:8},{wch:22}];X.utils.book_append_sheet(wb,ws,"Buy box");
+  var aoa=[["EAN","Offer SKU","Variant code","B&Q link","Winner seller","Winner price","Our price","Winning?","Reviews","Status","Fetched at (UK)"]].concat(rows.map(function(r){
+   return[String(r.ean),String(r.sku||""),String(r.variant||""),r.url||"",r.seller||"",r.price==null||r.price===""?"":+r.price,r.our_price==null||r.our_price===""?"":+r.our_price,r.winning||"",r.reviews===""||r.reviews==null?"":+r.reviews,r.status||"",ukt(r.fetched,true)]}));
+  var wb=X.utils.book_new(),ws=X.utils.aoa_to_sheet(aoa);ws["!cols"]=[{wch:15},{wch:16},{wch:14},{wch:40},{wch:24},{wch:11},{wch:10},{wch:9},{wch:8},{wch:22},{wch:20}];X.utils.book_append_sheet(wb,ws,"Buy box");
   X.utils.book_append_sheet(wb,X.utils.aoa_to_sheet([["Run finished",uk(R.finished)],["Status",R.status],["Ran on",R.runner==="github"?"GitHub":"Dora's computer"],["EANs",R.total],["Checked",R.checked],["Winning",R.winning],["Losing",R.losing],["EAN list",R.codes_source||""]]),"Run");
   X.writeFile(wb,"B&Q buy box "+String(R.finished||"").slice(0,10)+".xlsx")}).catch(function(e){alert(why(e))}).then(function(){b.disabled=false;b.textContent="⬇ Download Excel"})};
  draw()}
