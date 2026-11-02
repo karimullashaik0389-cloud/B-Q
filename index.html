@@ -26,6 +26,38 @@ a.big{text-decoration:none;-webkit-tap-highlight-color:transparent}.big b{font-s
 #back{position:fixed;left:0;top:50%;transform:translateY(-50%);z-index:6;background:rgba(15,23,42,.78);color:#fff;width:30px;padding:12px 0;border-radius:0 12px 12px 0;font-size:11px;font-weight:700;line-height:1.1;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.25)}
 #back b{display:block;font-size:20px}
 .hint{color:#94A3B8;font-size:14px;margin:10px 0 0}
+#tabv{position:fixed;inset:0;z-index:5;background:#F1F5F9;color:#0F172A;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.tbar{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:12px;background:#0F172A;color:#F8FAFC;padding:calc(8px + env(safe-area-inset-top)) 12px 8px}
+.tbar b{font-size:18px}#tback{background:#FF6600;color:#fff;font-weight:700;font-size:16px;padding:10px 16px;border-radius:10px}
+#tbody{max-width:1100px;margin:0 auto;padding:14px 12px calc(40px + env(safe-area-inset-bottom))}
+#tbody h2{font-size:18px;margin:22px 0 8px}#tbody h2:first-child{margin-top:4px}
+.src{background:#fff;border-radius:12px;padding:10px 12px;font-size:14px;color:#334155;margin-bottom:12px;border:1px solid #E2E8F0}
+.src.warn{background:#FFF7ED;border-color:#FDBA74;color:#9A3412}
+.sumg{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:12px}
+.sc{background:#fff;border-radius:12px;padding:10px 12px;border-left:5px solid #FF6600}.sc b{display:block;font-size:24px}.sc span{font-size:13px;color:#64748B}
+.seg{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0}.seg button{padding:9px 12px;border-radius:999px;background:#E2E8F0;color:#0F172A;font-size:14px;font-weight:600}
+.seg button.on{background:#0F172A;color:#fff}
+.ctl{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;align-items:center}
+.ctl input[type=search]{flex:1 1 220px;font-size:16px;padding:11px 12px;border-radius:10px;border:1px solid #CBD5E1;background:#fff;color:#0F172A}
+.ctl select{font-size:15px;padding:10px;border-radius:10px;border:1px solid #CBD5E1;background:#fff;color:#0F172A}
+.btn{display:inline-block;padding:11px 14px;border-radius:10px;background:#0F172A;color:#fff;font-size:15px;font-weight:600;text-decoration:none}
+.btn.o{background:#FF6600}.btn.l{background:#fff;color:#0F172A;border:1px solid #CBD5E1}.btn:disabled{opacity:.5}
+.cnt{font-size:14px;color:#64748B;margin:6px 0 8px}
+.it{background:#fff;border-radius:12px;padding:12px;margin-bottom:8px;border:1px solid #E2E8F0;font-size:14px;line-height:1.45}
+.it .h{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin-bottom:4px}.it .nm{font-weight:600;color:#0F172A}
+.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px}.mut{color:#64748B}
+.chip{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700;background:#E2E8F0;color:#334155}
+.chip.del{background:#FEE2E2;color:#991B1B}.chip.chk{background:#FEF3C7;color:#92400E}.chip.fix{background:#DBEAFE;color:#1E40AF}.chip.keep{background:#DCFCE7;color:#166534}
+.it a,.bt a{color:#C2410C;font-weight:600}
+.grp{background:#fff;border-radius:12px;margin-bottom:10px;border:1px solid #E2E8F0;overflow:hidden}
+.grp .gh{padding:10px 12px;background:#F8FAFC;border-bottom:1px solid #E2E8F0;font-size:14px}.grp .of{padding:10px 12px;border-top:1px solid #F1F5F9;font-size:14px;line-height:1.45}
+.more{display:block;width:100%;margin:8px 0;padding:12px;border-radius:10px;background:#fff;border:1px solid #CBD5E1;font-size:15px;font-weight:600;color:#0F172A}
+.tw{overflow-x:auto;background:#fff;border-radius:12px;border:1px solid #E2E8F0}
+table.bt{border-collapse:collapse;width:100%;font-size:14px}.bt th,.bt td{padding:8px 10px;border-bottom:1px solid #F1F5F9;text-align:left;white-space:nowrap}
+.bt th{background:#F8FAFC;font-size:12px;color:#64748B;text-transform:uppercase;position:sticky;top:0}.bt td.n{text-align:right}
+.box{background:#fff;border-radius:12px;padding:12px;border:1px solid #E2E8F0;margin-bottom:12px;font-size:15px;line-height:1.5}
+.box ol{margin:8px 0 0;padding-left:22px}.box li{margin-bottom:8px}.ok{color:#166534;font-weight:700}.bad{color:#991B1B;font-weight:700}
+.note{font-size:14px;color:#475569}
 #busy{position:fixed;inset:0;z-index:7;background:rgba(15,23,42,.88);display:flex;align-items:center;justify-content:center;font-size:16px;color:#F8FAFC}
 </style></head><body>
 <div class="wrap" id="login">
@@ -41,14 +73,17 @@ a.big{text-decoration:none;-webkit-tap-highlight-color:transparent}.big b{font-s
  </form>
 </div>
 <div class="wrap hide" id="menu">
- <div class="logo">B&amp;Q</div><h1>Choose a dashboard</h1><p class="sub">Both open the same app. Switch any time with ‹ Menu on the left.</p>
+ <div class="logo">B&amp;Q</div><h1>Choose a dashboard</h1><p class="sub">Sales and Orders open the same app. Duplicates and Access have ‹ Back at the top. Your phone’s back gesture also returns here.</p>
  <button class="big" data-d="sales"><b>Sales</b><span>Sales, orders, units and profit · best sellers · calculator</span></button>
  <button class="big" data-d="orders"><b>Orders</b><span>Every order with profit, incl. cancelled · needs fixing</span></button>
  <a class="big" id="listings" href="listings/"><b>Listings</b><span>Create and fix B&amp;Q listings · templates · download files</span></a>
+ <button class="big" data-v="dups"><b>Duplicates</b><span>Same product listed twice · delete, fix and check lists</span></button>
+ <button class="big" data-v="access"><b>Access</b><span>Buy box winners · run buy box · update All variant</span></button>
  <button class="ghost" id="lock">🔒 Lock</button>
 </div>
 <div id="viewer" class="hide"><iframe id="frame" title="Dashboard" allow="clipboard-write"></iframe></div>
 <button id="back" class="hide" aria-label="Back to menu"><b>‹</b>Me<br>nu</button>
+<div id="tabv" class="hide"><div class="tbar"><button id="tback" type="button">‹ Back</button><b id="ttitle"></b></div><div id="tbody"></div></div>
 <div id="busy" class="hide">Opening…</div>
 <script>
 (function(){
@@ -57,8 +92,10 @@ a.big{text-decoration:none;-webkit-tap-highlight-color:transparent}.big b{font-s
    "Remember me" keeps the file keys on this device, but only wrapped (encrypted) with a device password,
    never in plain form. The device password starts as the password typed at login and can be changed
    from the app's Settings; that change applies to this device only. */
-var FILES={sales:"sales.enc",orders:"orders.enc"},ITER=600000,LS1="bqDashKeys.v1",LS2="bqDashKeys.v2";
+var FILES={sales:"sales.enc",orders:"orders.enc"},ITER=600000,AUX_HEX="94ccba845e4963161cceda2f070f59d4",LS1="bqDashKeys.v1",LS2="bqDashKeys.v2";
 var $=function(i){return document.getElementById(i)};
+/* aux = one extra key (shared salt AUX_HEX) for the Duplicates / Access tab files and for encrypting uploads */
+function auxSalt(){var u=new Uint8Array(16);for(var i=0;i<16;i++)u[i]=parseInt(AUX_HEX.substr(i*2,2),16);return u}
 var keys={},bufs={},curUrl=null,te=new TextDecoder(),te2=new TextEncoder(),mode="main";
 function b64(u8){var s="";for(var i=0;i<u8.length;i+=8192)s+=String.fromCharCode.apply(null,u8.subarray(i,i+8192));return btoa(s)}
 function unb64(s){var b=atob(s),u=new Uint8Array(b.length);for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u}
@@ -81,9 +118,9 @@ function forget(){try{localStorage.removeItem(LS2);localStorage.removeItem(LS1)}
 function tryMain(pw){var nk={};
  return Promise.all(Object.keys(FILES).map(function(d){return getBuf(d).then(function(b){var p=parts(b);
   return kdf(pw,p.salt,true,["decrypt"]).then(function(k){nk[d]={key:k,salt:p.salt.slice()};return decrypt(k,p)})})}))
- .then(function(){return nk})}
+ .then(function(){return kdf(pw,auxSalt(),true,["encrypt","decrypt"])}).then(function(k){nk.aux={key:k,salt:auxSalt()};return nk})}
 /* wrap the file keys with a device password and keep only the wrapped copy */
-function wrapStore(pw,ks){var inner={},ds=Object.keys(FILES),salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));
+function wrapStore(pw,ks){var inner={},ds=Object.keys(FILES).concat(ks.aux?["aux"]:[]),salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));
  return Promise.all(ds.map(function(d){return crypto.subtle.exportKey("raw",ks[d].key).then(function(raw){inner[d]={salt:b64(ks[d].salt),key:b64(new Uint8Array(raw))}})}))
  .then(function(){return kdf(pw,salt,false,["encrypt"])})
  .then(function(wk){return crypto.subtle.encrypt({name:"AES-GCM",iv:iv},wk,te2.encode(JSON.stringify(inner)))})
@@ -91,8 +128,9 @@ function wrapStore(pw,ks){var inner={},ds=Object.keys(FILES),salt=crypto.getRand
 function unwrap(pw){var o=stored();if(!o)return Promise.reject(new Error("none"));
  return kdf(pw,unb64(o.s),false,["decrypt"]).then(function(wk){return crypto.subtle.decrypt({name:"AES-GCM",iv:unb64(o.iv)},wk,unb64(o.ct))})
  .then(function(plain){var inner=JSON.parse(te.decode(plain)),nk={};
-  return Promise.all(Object.keys(FILES).map(function(d){if(!inner[d])throw new Error("x");
-   return crypto.subtle.importKey("raw",unb64(inner[d].key),{name:"AES-GCM"},true,["decrypt"]).then(function(k){nk[d]={key:k,salt:unb64(inner[d].salt)}})}))
+  if(!inner.aux)throw new Error("stale");   /* saved before the Duplicates/Access tabs existed */
+  return Promise.all(Object.keys(FILES).concat(["aux"]).map(function(d){if(!inner[d])throw new Error("x");
+   return crypto.subtle.importKey("raw",unb64(inner[d].key),{name:"AES-GCM"},true,d==="aux"?["encrypt","decrypt"]:["decrypt"]).then(function(k){nk[d]={key:k,salt:unb64(inner[d].salt)}})}))
   .then(function(){return nk})})}
 /* are the saved keys still for the files on the site? */
 function fresh(nk){return Promise.all(Object.keys(FILES).map(function(d){return getBuf(d).then(function(b){return sameSalt(nk[d].salt,parts(b).salt)})}))
@@ -128,14 +166,18 @@ function open(d){busy(true);
   return decrypt(k.key,p)}).then(function(plain){
   if(curUrl)URL.revokeObjectURL(curUrl);
   curUrl=URL.createObjectURL(new Blob([te.decode(plain)],{type:"text/html;charset=utf-8"}));
-  $("frame").src=curUrl;$("viewer").classList.remove("hide");
+  setFrame(curUrl);$("viewer").classList.remove("hide");
   document.title=d==="sales"?"B&Q Sales":"B&Q Orders";busy(false)})
  .catch(function(e){busy(false);
   if(e&&e.message==="net"){alert("Couldn’t load the dashboard. Check your connection.");return}
   lock("Please enter the main password again (the dashboards were updated).")})}
-function back(){$("viewer").classList.add("hide");$("frame").src="about:blank";
+/* location.replace: frame changes add no browser-history entries, so phone Back returns to the cards */
+function setFrame(u){var f=$("frame");try{f.contentWindow.location.replace(u)}catch(e){f.src=u}}
+function back(){$("viewer").classList.add("hide");setFrame("about:blank");
  if(curUrl){URL.revokeObjectURL(curUrl);curUrl=null}document.title="B&Q Dashboards"}
-function lock(msg){forget();keys={};bufs={};back();setMode("main",msg||"")}
+function lock(msg){forget();keys={};bufs={};back();if(window.BQTabs)BQTabs.close();setMode("main",msg||"")}
+/* used by tabs_v1.js (same page) */
+window.BQ={aux:function(){return keys.aux?keys.aux.key:null},lock:lock,busy:busy,back:back};
 /* messages from the app inside the frame */
 window.addEventListener("message",function(e){var f=$("frame");
  if(!f||e.source!==f.contentWindow||!e.data||typeof e.data.bq!=="string")return;
@@ -155,6 +197,233 @@ $("forget").addEventListener("click",function(){forget();setMode("main","This de
 if(!window.crypto||!crypto.subtle){$("msg").textContent="This browser can’t unlock the dashboards (needs HTTPS and a modern browser).";$("go").disabled=true}
 else{var had1=false;try{had1=!!localStorage.getItem(LS1);localStorage.removeItem(LS1)}catch(e){}
  if(stored())setMode("device");else setMode("main",had1?"For extra safety, please type the password once more. Saved logins are now protected by your password.":"");}
+})();
+</script>
+<script>
+(function(){
+"use strict";
+/* B&Q dashboard tabs: Duplicates and Access. Same page and same unlock as login_v5.js (uses its "aux" key).
+   Everything is decrypted in this browser. Uploads are encrypted here before they leave the device.
+   No GitHub token anywhere: uploads go through GitHub's own upload page, runs through GitHub's own Run button. */
+var OWNER="karimullashaik0389-cloud",REPO="B-Q",API="https://api.github.com/repos/"+OWNER+"/"+REPO,GH="https://github.com/"+OWNER+"/"+REPO;
+var UPLOAD=GH+"/upload/main/data",WF="buybox.yml",AUX_HEX="94ccba845e4963161cceda2f070f59d4",XLSX_LIB="lib/xlsx.full.min.js";
+var $=function(i){return document.getElementById(i)||document.createElement("div")}/* late async updates after Back go to a detached div */,te=new TextDecoder(),tenc=new TextEncoder();
+var cur=null,timer=null,PAGE=40;
+function esc(v){return String(v==null?"":v).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
+function el(h){var d=document.createElement("div");d.innerHTML=h;return d.firstElementChild}
+function num(v){return typeof v==="number"?v.toLocaleString("en-GB"):esc(v)}
+function money(v){return v===""||v==null||isNaN(+v)?"–":"£"+(+v).toFixed(2)}
+function uk(iso){if(!iso)return "–";var d=new Date(iso);if(isNaN(d))return esc(iso);
+ return d.toLocaleString("en-GB",{timeZone:"Europe/London",day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})+" UK"}
+function stamp(){var d=new Date(),p=function(n){return(n<10?"0":"")+n};return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"_"+p(d.getHours())+p(d.getMinutes())+p(d.getSeconds())}
+function norm(s){return String(s==null?"":s).toLowerCase().replace(/[^a-z0-9&]/g,"")}
+function hex(u){var s="";for(var i=0;i<u.length;i++)s+=(u[i]<16?"0":"")+u[i].toString(16);return s}
+function auxSalt(){var u=new Uint8Array(16);for(var i=0;i<16;i++)u[i]=parseInt(AUX_HEX.substr(i*2,2),16);return u}
+function key(){var k=window.BQ&&BQ.aux();if(!k)throw new Error("nokey");return k}
+function decrypt(buf){var u=new Uint8Array(buf);
+ if(u.length<48||String.fromCharCode(u[0],u[1],u[2],u[3])!=="BQE1")return Promise.reject(new Error("badfile"));
+ if(hex(u.subarray(4,20))!==AUX_HEX)return Promise.reject(new Error("otherkey"));
+ var k;try{k=key()}catch(e){return Promise.reject(e)}
+ return crypto.subtle.decrypt({name:"AES-GCM",iv:u.subarray(20,32)},k,u.subarray(32)).then(function(p){return new Uint8Array(p)},function(){throw new Error("otherkey")})}
+function encrypt(u8){var iv=crypto.getRandomValues(new Uint8Array(12));
+ return crypto.subtle.encrypt({name:"AES-GCM",iv:iv},key(),u8).then(function(ct){ct=new Uint8Array(ct);
+  var out=new Uint8Array(32+ct.length);out.set(tenc.encode("BQE1"),0);out.set(auxSalt(),4);out.set(iv,20);out.set(ct,32);return out})}
+function getEnc(url){return fetch(url,{cache:"no-cache"}).then(function(r){if(r.status===404)throw new Error("notyet");if(!r.ok)throw new Error("net");return r.arrayBuffer()}).then(decrypt)}
+function getJSON(url){return getEnc(url).then(function(u){return JSON.parse(te.decode(u))})}
+function why(e){var m=e&&e.message;return m==="notyet"?"Not published yet.":m==="net"||(e&&e.name==="TypeError")?"Couldn’t load it – check your connection and tap Back, then open the card again.":
+ m==="otherkey"?"This file was made with a different password.":m==="nokey"?"Please unlock again.":"Something went wrong ("+esc(m||e)+")."}
+function save(name,blob){var a=document.createElement("a"),u=URL.createObjectURL(blob);a.href=u;a.download=name;document.body.appendChild(a);a.click();
+ setTimeout(function(){URL.revokeObjectURL(u);a.remove()},4000)}
+var xlsxP=null;
+function xlsx(){if(window.XLSX)return Promise.resolve(window.XLSX);if(xlsxP)return xlsxP;
+ xlsxP=new Promise(function(ok,no){var s=document.createElement("script");s.src=XLSX_LIB;s.onload=function(){ok(window.XLSX)};s.onerror=function(){xlsxP=null;no(new Error("net"))};document.head.appendChild(s)});return xlsxP}
+function gh(path){return fetch(API+path,{cache:"no-store",headers:{Accept:"application/vnd.github+json"}}).then(function(r){if(!r.ok)throw new Error("gh"+r.status);return r.json()})}
+
+/* ---------- view shell ---------- */
+function openTab(v){cur=v;$("ttitle").textContent=v==="dups"?"Duplicates":"Access";$("tbody").innerHTML='<p class="note">Loading…</p>';
+ $("tabv").classList.remove("hide");$("tabv").scrollTop=0;document.title=v==="dups"?"B&Q Duplicates":"B&Q Access";
+ (v==="dups"?dups():access()).catch(function(e){if(e&&e.message==="nokey"){close();BQ.lock("Please type the main password once more (new cards were added).");return}
+  $("tbody").innerHTML='<div class="src warn">'+why(e)+'</div>'})}
+function close(){cur=null;if(timer){clearInterval(timer);timer=null}$("tabv").classList.add("hide");$("tbody").innerHTML="";document.title="B&Q Dashboards"}
+window.BQTabs={close:close,open:openTab};
+/* browser / phone Back returns to the cards (also from Sales and Orders, whose app is unchanged) */
+var pushed=false;function push(){try{if(!pushed){history.pushState({bqv:1},"");pushed=true}}catch(e){}}
+function unpush(){if(pushed){pushed=false;try{history.back()}catch(e){}}}
+window.addEventListener("popstate",function(){if(!pushed)return;pushed=false;if(cur)close();else if(!$("viewer").classList.contains("hide")&&window.BQ&&BQ.back)BQ.back()});
+document.querySelectorAll("[data-v]").forEach(function(b){b.addEventListener("click",function(){push();openTab(b.getAttribute("data-v"))})});
+document.querySelectorAll("[data-d]").forEach(function(b){b.addEventListener("click",push)});
+$("tback").addEventListener("click",function(){close();unpush()});
+
+/* ---------- Duplicates ---------- */
+function chip(d){d=String(d||"");var c=/^delete|candidate/i.test(d)?"del":/^check/i.test(d)?"chk":/fix$/i.test(d)&&!/no fix/i.test(d)?"fix":/^keep/i.test(d)?"keep":"";
+ return d?'<span class="chip '+c+'">'+esc(d)+'</span>':""}
+function link(u,t){return u?'<a href="'+esc(u)+'" target="_blank" rel="noopener">'+(t||"Open on B&amp;Q ↗")+'</a>':""}
+function facts(o){var f=[];
+ if(o.active)f.push(esc(o.active));if(o.units!==""&&o.units!=null)f.push("units "+num(o.units));if(o.reviews!==""&&o.reviews!=null)f.push("reviews "+num(o.reviews));
+ if(o.strength!==""&&o.strength!=null)f.push("strength "+num(o.strength));if(o.live)f.push("page: "+esc(o.live));
+ if(o.our_price!==""&&o.our_price!=null)f.push("our "+money(o.our_price));if(o.bb_seller)f.push("buy box "+esc(o.bb_seller)+" "+money(o.bb_price));
+ if(o.variant)f.push("variant "+esc(o.variant));return f.join(" · ")}
+function offerHTML(o,kind){var h='<div class="h">'+chip(o.decision)+'<span class="mut">Group '+esc(o.group)+'</span><span class="mono">SKU '+esc(o.sku)+'</span><span class="mono">EAN '+esc(o.ean)+'</span></div>'+
+ '<div class="nm">'+esc(o.name)+'</div><div class="mut">'+facts(o)+'</div>';
+ if(o.why)h+='<div><b>Why:</b> '+esc(o.why)+'</div>';
+ if(kind==="delete"&&o.kept_instead)h+='<div><b>Kept instead:</b> <span class="mono">'+esc(o.kept_instead)+'</span> <span class="mut">(units '+num(o.kept_units)+', reviews '+num(o.kept_reviews)+(o.kept_strength!==undefined&&o.kept_strength!==""?", strength "+num(o.kept_strength):"")+(o.kept_live?", "+esc(o.kept_live):"")+')</span></div>';
+ if(o.fix)h+='<div><b>Fix:</b> '+esc(o.fix)+'</div>';
+ if(kind==="fix"&&(o.title_score!=null||o.desc_score!=null))h+='<div class="mut">scores – title '+esc(o.title_score)+', description '+esc(o.desc_score)+', bullets '+esc(o.bullet_score)+', photos '+esc(o.photo_score)+'</div>';
+ if(o.note)h+='<div><b>Note:</b> '+esc(o.note)+'</div>';
+ return h+'<div>'+link(o.link)+'</div>'}
+function hit(o,q){if(!q)return true;return String(o.sku||"").toLowerCase().indexOf(q)>=0||String(o.ean||"").indexOf(q)>=0||String(o.name||"").toLowerCase().indexOf(q)>=0||String(o.variant||"").toLowerCase().indexOf(q)>=0}
+function csv(rows,cols){var e=function(v){v=v==null?"":String(v);return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+ return "\ufeff"+[cols.map(function(c){return e(c[1])}).join(",")].concat(rows.map(function(r){return cols.map(function(c){return e(r[c[0]])}).join(",")})).join("\r\n")}
+function dups(){return getJSON("duplicates.enc").then(function(doc){
+ var D=doc.data,S=D.summary||{},old=doc.source==="29oct",st={tab:"delete",q:"",act:"",sales:"",dec:"",size:"",n:PAGE};
+ var lists={delete:D.delete_list||[],fix:D.fix_list||[],check:D.check_list||[]};
+ var cards=old?[["Groups",S.groups],["Offers in groups",S.offers_in_groups],["Candidates to delete",S.delete],["Keep",S.keep_no_fix],["Groups of 2",S.groups_of_2],["Groups of 3",S.groups_of_3],["Groups of 4+",S.groups_of_4_plus]]
+  :[["Groups",S.groups],["Offers in groups",S.offers_in_groups],["Delete (verified)",S.delete],["Keep – fix",S.keep_fix],["Check",S.check],["Keep – no fix",S.keep_no_fix],["Groups of 2",S.groups_of_2],["Groups of 3",S.groups_of_3],["Groups of 4+",S.groups_of_4_plus],["New since 29 Oct",S.new_groups]];
+ var h=(old?'<div class="src warn" id="dsrc"><b>From 29 Oct list</b> – the new duplicate check has not finished yet, so this shows the 29 Oct list. "Candidates to delete" were <b>not</b> live-checked: check before deleting.</div>'
+  :'<div class="src" id="dsrc"><b>Duplicate check of '+esc(D.run_date)+'</b>'+(D.order_range&&D.order_range[0]?' · sales from '+esc(D.order_range[0])+' to '+esc(D.order_range[1]):"")+(S.live_checked?' · B&amp;Q pages checked live':"")+' · built '+esc(doc.source_time)+' UK</div>')+
+  '<div class="sumg" id="dsum">'+cards.filter(function(c){return c[1]!==undefined&&c[1]!==""}).map(function(c){return '<div class="sc"><b>'+num(c[1])+'</b><span>'+esc(c[0])+'</span></div>'}).join("")+'</div>'+
+  ((D.notes||[]).length?'<div class="box note">'+D.notes.map(esc).join("<br>")+'</div>':"")+
+  '<div class="seg" id="dseg">'+[["delete",(old?"Candidates to delete":"Delete")+" ("+lists.delete.length+")"],["fix","Fix ("+lists.fix.length+")"],["check","Check ("+lists.check.length+")"],["groups","All groups ("+(D.groups||[]).length+")"]]
+   .map(function(t){return '<button type="button" data-t="'+t[0]+'">'+esc(t[1])+'</button>'}).join("")+'</div>'+
+  '<div class="ctl"><input type="search" id="dq" placeholder="Search SKU, EAN or name" autocomplete="off" autocapitalize="off" spellcheck="false">'+
+  '<select id="dact" aria-label="Active"><option value="">Active + inactive</option><option>Active</option><option>Inactive</option></select>'+
+  '<select id="dsales" aria-label="Sales"><option value="">Any sales</option><option value="y">With sales</option><option value="n">No sales</option></select>'+
+  '<select id="ddec" aria-label="Decision"><option value="">Any decision</option></select>'+
+  '<select id="dsize" aria-label="Group size"><option value="">Any group size</option><option>2</option><option>3</option><option value="4">4+</option></select></div>'+
+  '<div class="ctl"><button class="btn o" type="button" id="dcsv">⬇ Download '+(old?"candidates":"Delete list")+' (CSV, '+lists.delete.length+')</button></div>'+
+  '<div class="cnt" id="dcnt"></div><div id="dlist"></div>';
+ $("tbody").innerHTML=h;
+ var decs={};(D.groups||[]).forEach(function(g){(g.offers||[]).forEach(function(o){if(o.decision)decs[o.decision]=1})});
+ Object.keys(decs).sort().forEach(function(d){$("ddec").appendChild(new Option(d,d))});
+ if(!Object.keys(lists).some(function(k){return lists[k].some(function(o){return o.active})})&&!(D.groups||[]).some(function(g){return(g.offers||[]).some(function(o){return o.active})}))$("dact").classList.add("hide");
+ function units(o){return +o.units>0}
+ function draw(){var q=st.q.trim().toLowerCase(),out=[],html="";
+  document.querySelectorAll("#dseg button").forEach(function(b){b.classList.toggle("on",b.getAttribute("data-t")===st.tab)});
+  $("ddec").classList.toggle("hide",st.tab!=="groups");$("dsize").classList.toggle("hide",st.tab!=="groups");
+  var f=function(o){return hit(o,q)&&(!st.act||o.active===st.act)&&(!st.sales||(st.sales==="y")===units(o))};
+  if(st.tab==="groups"){out=(D.groups||[]).filter(function(g){var of=g.offers||[];
+    return (!st.size||(st.size==="4"?g.size>=4:g.size==+st.size))&&of.some(function(o){return f(o)&&(!st.dec||o.decision===st.dec)})});
+   out.slice(0,st.n).forEach(function(g){html+='<div class="grp"><div class="gh"><b>Group '+esc(g.group)+'</b> · '+esc(g.size)+' offers · '+esc(g.why_duplicated)+
+    (g.vs_29_oct&&!old?' · <span class="mut">'+esc(g.vs_29_oct)+'</span>':"")+(g.keep_both?' · <span class="chip keep">keep both</span>':"")+(g.note?'<div><b>Note:</b> '+esc(g.note)+'</div>':"")+'</div>'+
+    (g.offers||[]).map(function(o){return '<div class="of">'+offerHTML(o,"group")+'</div>'}).join("")+'</div>'})}
+  else{out=lists[st.tab].filter(f);out.slice(0,st.n).forEach(function(o){html+='<div class="it">'+offerHTML(o,st.tab)+'</div>'})}
+  $("dcnt").textContent=out.length?"Showing "+Math.min(st.n,out.length)+" of "+out.length+(st.tab==="groups"?" groups":" offers"):"";
+  if(!out.length)html='<div class="box note">'+(q||st.act||st.sales||st.dec||st.size?"Nothing matches – clear the search or filters.":st.tab==="fix"?"No listings to fix in this list.":st.tab==="check"?"Nothing to check in this list.":"Nothing in this list.")+'</div>';
+  if(out.length>st.n)html+='<button class="more" type="button" id="dmore">Show more ('+(out.length-st.n)+' left)</button>';
+  $("dlist").innerHTML=html;var m=$("dmore");if(m)m.onclick=function(){st.n+=PAGE*2;draw()}}
+ document.querySelectorAll("#dseg button").forEach(function(b){b.onclick=function(){st.tab=b.getAttribute("data-t");st.n=PAGE;draw()}});
+ $("dq").oninput=function(){st.q=this.value;st.n=PAGE;draw()};
+ [["dact","act"],["dsales","sales"],["ddec","dec"],["dsize","size"]].forEach(function(p){$(p[0]).onchange=function(){st[p[1]]=this.value;st.n=PAGE;draw()}});
+ $("dcsv").onclick=function(){var cols=old?[["group","Group"],["sku","Offer SKU"],["ean","EAN"],["name","Name"],["link","B&Q link"],["variant","Variant code"],["our_price","Our price"],["bb_price","Buy box price"],["bb_seller","Buy box seller"],["winning","Winning?"],["reviews","Reviews"],["units","30-day sales"],["free_stock","Free stock"],["decision","Decision"]]
+   :[["group","Group"],["sku","Offer SKU"],["ean","EAN"],["name","Name"],["link","B&Q link"],["active","Active"],["units","Units sold"],["reviews","Reviews"],["strength","Listing strength"],["live","Page check"],["decision","Decision"],["why","Why"],["kept_instead","Kept instead (SKU)"],["kept_units","Kept units"],["kept_reviews","Kept reviews"],["kept_strength","Kept strength"],["kept_live","Kept page check"]];
+  save((old?"B&Q duplicates - candidates to delete (29 Oct list).csv":"B&Q duplicates - Delete list "+(D.run_date||"")+".csv"),new Blob([csv(lists.delete,cols)],{type:"text/csv;charset=utf-8"}))};
+ draw()})}
+
+/* ---------- Access ---------- */
+function newest(list,prefix){return list.filter(function(f){return f.type==="file"&&f.name.indexOf(prefix)===0&&/\.enc$/.test(f.name)}).sort(function(a,b){return a.name<b.name?1:-1})}
+function metaOf(f,kind){return fetch(f.download_url,{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error("net");return r.arrayBuffer()}).then(decrypt).then(function(u){
+ if(kind==="av"){var h=te.decode(u.subarray(0,6));if(h!=="BQAV1\n")throw new Error("badfile");var nl=u.indexOf(10,6);return JSON.parse(te.decode(u.subarray(6,nl)))}
+ return JSON.parse(te.decode(u)).meta})}
+function bestMeta(files,kind){var c=files.slice(0,3);return Promise.all(c.map(function(f){return metaOf(f,kind).then(function(m){m._file=f.name;return m},function(){return null})}))
+ .then(function(ms){ms=ms.filter(Boolean);ms.sort(function(a,b){return(a.created||"")<(b.created||"")?1:-1});return ms[0]||null})}
+function access(){
+ var h='<h2>Buy box</h2><div class="box" id="arun">Checking the last run…</div><div class="box" id="ago"></div>'+
+  '<h2>Results</h2><div class="ctl"><input type="search" id="aq" placeholder="Search EAN, SKU or seller" autocomplete="off" autocapitalize="off" spellcheck="false">'+
+  '<select id="af" aria-label="Filter"><option value="">All</option><option value="No">Losing</option><option value="Yes">Winning</option><option value="none">No winner found</option></select>'+
+  '<button class="btn o" type="button" id="axl" disabled>⬇ Download Excel</button></div><div class="cnt" id="acnt"></div><div id="atab"></div>'+
+  '<h2>Update All variant</h2><div class="box" id="aav"><div id="avlast" class="note">Checking…</div>'+
+   '<p class="note">Do this after you export <b>All variant.xlsx</b> from Access (table All_VAR). It replaces the file the buy box uses for Variant codes.</p>'+
+   '<ol><li><label class="btn o" for="avfile">1. Choose All variant.xlsx</label><input type="file" id="avfile" accept=".xlsx,.xls,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" class="hide"></li>'+
+   '<li id="avstep2" class="hide"></li><li id="avstep3" class="hide"></li></ol><div id="avmsg" class="note"></div></div>'+
+  '<h2>Use a new EAN list (optional)</h2><div class="box" id="acodes"><div id="cdlast" class="note">Checking…</div>'+
+   '<p class="note">Normally the buy box uses the newest offers export on Dora’s computer. To check a different list, pick an Excel with an EAN column (offers export or a codes list).</p>'+
+   '<ol><li><label class="btn l" for="cdfile">1. Choose the Excel</label><input type="file" id="cdfile" accept=".xlsx,.xls,.xlsm,.csv" class="hide"></li><li id="cdstep2" class="hide"></li><li id="cdstep3" class="hide"></li></ol><div id="cdmsg" class="note"></div></div>';
+ $("tbody").innerHTML=h;
+ $("avfile").onchange=function(){if(this.files[0])pickAV(this.files[0]);this.value=""};
+ $("cdfile").onchange=function(){if(this.files[0])pickCodes(this.files[0]);this.value=""};
+ var dataList=gh("/contents/data").catch(function(e){return e.message==="gh404"?[]:null});
+ dataList.then(function(list){
+  if(list===null){$("avlast").textContent="Couldn’t check GitHub right now (try again in a minute).";$("cdlast").textContent="";return}
+  bestMeta(newest(list,"all_variant_"),"av").then(function(m){$("avlast").innerHTML=m?'<b>Last updated '+uk(m.created)+', '+num(m.rows)+' rows</b> <span class="mut">('+esc(m.name)+')</span>':'<b>Not uploaded yet.</b>'});
+  bestMeta(newest(list,"codes_"),"codes").then(function(m){$("cdlast").innerHTML=m?'Newest list: <b>'+esc(m.source)+'</b>, '+num(m.rows)+' EANs, from '+uk(m.created):'No list uploaded yet – the buy box uses the offers export on Dora’s computer.'})});
+ runBox();
+ return getJSON("buybox.enc").then(results,function(e){
+  $("arun").innerHTML=e.message==="notyet"?"No buy box result yet.":why(e);$("atab").innerHTML="";}).then(function(){})}
+function runBox(){var box=$("ago");
+ gh("/actions/workflows").then(function(j){var w=(j.workflows||[]).filter(function(w){return /buybox\.yml$/.test(w.path)&&w.state==="active"})[0];if(!w)throw new Error("nowf");return w})
+ .then(function(w){var url=GH+"/actions/workflows/"+WF;
+  box.innerHTML='<a class="btn o" id="arunbtn" href="'+url+'" target="_blank" rel="noopener">▶ Run buy box now</a>'+
+   '<ol class="note"><li>On GitHub tap <b>Run workflow</b>, then the green <b>Run workflow</b>.</li><li>Come back here. It takes about 1–2 hours for every EAN; this page shows the progress.</li></ol><div id="aprog" class="note"></div>';
+  var poll=function(){gh("/actions/workflows/"+w.id+"/runs?per_page=1").then(function(r){var x=(r.workflow_runs||[])[0],p=$("aprog");if(!p)return;
+   if(!x){p.textContent="No GitHub run yet.";return}
+   if(x.status!=="completed")p.innerHTML='<span class="ok">Running now</span> – started '+uk(x.run_started_at||x.created_at)+'. <a href="'+esc(x.html_url)+'" target="_blank" rel="noopener">See it on GitHub ↗</a> (updates every 30 s)';
+   else p.innerHTML='Last GitHub run: '+(x.conclusion==="success"?'<span class="ok">finished OK</span>':'<span class="bad">'+esc(x.conclusion)+'</span>')+' at '+uk(x.updated_at)+'. <a href="'+esc(x.html_url)+'" target="_blank" rel="noopener">Details ↗</a>';
+   if(x.status==="completed"&&timer){clearInterval(timer);timer=null;if(cur==="access")getJSON("buybox.enc").then(results,function(){})}
+   else if(x.status!=="completed"&&!timer)timer=setInterval(poll,30000)},function(){})};poll()})
+ .catch(function(){box.innerHTML='<b>Runs on Dora’s computer – Ask Dora to run it.</b><p class="note">The GitHub run button is not switched on yet. Results appear here as soon as Dora’s run finishes.</p>'})}
+function results(doc){var R=doc.run||{},rows=doc.rows||[],st={q:"",f:"",n:100};
+ var s=R.status==="complete"?'<span class="ok">Complete</span>':R.status==="blocked"?'<span class="bad">Stopped – diy.com blocked the run</span>':'<span class="bad">Stopped early'+(R.stop_reason?" ("+esc(R.stop_reason)+")":"")+'</span>';
+ $("arun").innerHTML='<div><b>Last run: '+uk(R.finished)+'</b> · '+s+' · on '+(R.runner==="github"?"GitHub":"Dora’s computer")+(R.minutes!=null?' · took '+esc(R.minutes)+' min':"")+'</div>'+
+  '<div>'+num(R.checked)+' of '+num(R.total)+' EANs checked · <span class="ok">winning '+num(R.winning)+'</span> · <span class="bad">losing '+num(R.losing)+'</span> · no winner found '+num((R.checked||0)-(R.with_seller||0))+'</div>'+
+  (R.codes_source?'<div class="mut">EAN list: '+esc(R.codes_source)+'</div>':"");
+ function draw(){var q=st.q.trim().toLowerCase();
+  var out=rows.filter(function(r){return(!q||r.ean.indexOf(q)>=0||String(r.sku).toLowerCase().indexOf(q)>=0||String(r.seller).toLowerCase().indexOf(q)>=0||String(r.variant||"").toLowerCase().indexOf(q)>=0)&&
+   (!st.f||(st.f==="none"?!r.seller:r.winning===st.f))});
+  var h='<div class="tw"><table class="bt"><thead><tr><th>EAN</th><th>Link</th><th>Winner seller</th><th>Winner price</th><th>Our price</th><th>Winning?</th></tr></thead><tbody>'+
+   out.slice(0,st.n).map(function(r){return '<tr><td><span class="mono">'+esc(r.ean)+'</span>'+(r.sku?'<br><span class="mut mono">'+esc(r.sku)+'</span>':"")+'</td><td>'+(r.url?link(r.url,"B&amp;Q ↗"):'<span class="mut">–</span>')+'</td><td>'+(r.seller?esc(r.seller):'<span class="mut">'+esc(r.status)+'</span>')+
+    '</td><td class="n">'+money(r.price)+'</td><td class="n">'+money(r.our_price)+'</td><td>'+(r.winning==="Yes"?'<span class="chip keep">Yes</span>':r.winning==="No"?'<span class="chip del">No</span>':'<span class="mut">–</span>')+'</td></tr>'}).join("")+'</tbody></table></div>';
+  if(!out.length)h='<div class="box note">Nothing matches – clear the search or filter.</div>';
+  if(out.length>st.n)h+='<button class="more" type="button" id="amore">Show more ('+(out.length-st.n)+' left)</button>';
+  $("acnt").textContent=out.length?"Showing "+Math.min(st.n,out.length)+" of "+out.length:"";$("atab").innerHTML=h;var m=$("amore");if(m)m.onclick=function(){st.n+=200;draw()}}
+ $("aq").oninput=function(){st.q=this.value;st.n=100;draw()};$("af").onchange=function(){st.f=this.value;st.n=100;draw()};
+ var b=$("axl");b.disabled=false;b.onclick=function(){b.disabled=true;b.textContent="Preparing…";xlsx().then(function(X){
+  var aoa=[["EAN","Offer SKU","Variant code","B&Q link","Winner seller","Winner price","Our price","Winning?","Reviews","Status"]].concat(rows.map(function(r){
+   return[String(r.ean),String(r.sku||""),String(r.variant||""),r.url||"",r.seller||"",r.price==null||r.price===""?"":+r.price,r.our_price==null||r.our_price===""?"":+r.our_price,r.winning||"",r.reviews===""||r.reviews==null?"":+r.reviews,r.status||""]}));
+  var wb=X.utils.book_new(),ws=X.utils.aoa_to_sheet(aoa);ws["!cols"]=[{wch:15},{wch:16},{wch:14},{wch:40},{wch:24},{wch:11},{wch:10},{wch:9},{wch:8},{wch:22}];X.utils.book_append_sheet(wb,ws,"Buy box");
+  X.utils.book_append_sheet(wb,X.utils.aoa_to_sheet([["Run finished",uk(R.finished)],["Status",R.status],["Ran on",R.runner==="github"?"GitHub":"Dora's computer"],["EANs",R.total],["Checked",R.checked],["Winning",R.winning],["Losing",R.losing],["EAN list",R.codes_source||""]]),"Run");
+  X.writeFile(wb,"B&Q buy box "+String(R.finished||"").slice(0,10)+".xlsx")}).catch(function(e){alert(why(e))}).then(function(){b.disabled=false;b.textContent="⬇ Download Excel"})};
+ draw()}
+
+/* ---------- uploads (encrypted here, then GitHub's own upload page) ---------- */
+function findHeader(X,wb,want){/* -> {sheet, hdr row index, rows (array of arrays), col index map} for the first sheet having a header cell in want[] */
+ for(var s=0;s<wb.SheetNames.length;s++){var a=X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[s]],{header:1,raw:true,defval:""});
+  for(var i=0;i<Math.min(a.length,10);i++){var m={};a[i].forEach(function(c,j){var n=norm(c);if(n&&!(n in m))m[n]=j});
+   if(want.some(function(w){return w in m}))return{sheet:wb.SheetNames[s],hi:i,rows:a,map:m,head:a[i]}}}return null}
+function col(m){for(var i=1;i<arguments.length;i++)if(arguments[i] in m)return m[arguments[i]];return -1}
+function readBook(file){return xlsx().then(function(X){return file.arrayBuffer().then(function(buf){var wb;
+ try{wb=X.read(new Uint8Array(buf),{type:"array",dense:false})}catch(e){throw new Error("notexcel")}return{X:X,wb:wb,buf:new Uint8Array(buf)}})})}
+function steps(prefix,name,blob,what){var s2=$(prefix+"step2"),s3=$(prefix+"step3");
+ s2.innerHTML='<button class="btn o" type="button" id="'+prefix+'save">2. Save the locked file</button> <span class="mut mono">'+esc(name)+'</span>';s2.classList.remove("hide");s3.classList.add("hide");
+ $(prefix+"save").onclick=function(){save(name,blob);
+  s3.innerHTML='<a class="btn o" href="'+UPLOAD+'" target="_blank" rel="noopener">3. Open GitHub upload</a><div class="note">On GitHub tap <b>choose your files</b>, pick <b>'+esc(name)+'</b> (in Downloads), then tap the green <b>Commit changes</b>. Done – '+what+'</div>';
+  s3.classList.remove("hide")}}
+function pickAV(file){var msg=$("avmsg");msg.innerHTML="Reading "+esc(file.name)+"…";$("avstep2").classList.add("hide");$("avstep3").classList.add("hide");
+ readBook(file).then(function(b){var f=findHeader(b.X,b.wb,["variantcode"]);
+  if(!f)throw new Error("novar");var vc=f.map.variantcode,n=0;
+  for(var i=f.hi+1;i<f.rows.length;i++)if(String(f.rows[i][vc]).trim()!=="")n++;
+  if(!n)throw new Error("empty");
+  return crypto.subtle.digest("SHA-256",b.buf).then(function(d){var meta={name:file.name,rows:n,created:new Date().toISOString().replace(/\.\d+Z$/,"Z"),col:String(f.head[vc]),sheet:f.sheet,size:b.buf.length,sha256:hex(new Uint8Array(d))};
+   var head=tenc.encode("BQAV1\n"+JSON.stringify(meta)+"\n"),all=new Uint8Array(head.length+b.buf.length);all.set(head,0);all.set(b.buf,head.length);
+   return encrypt(all).then(function(enc){var name="all_variant_"+stamp()+".enc";
+    msg.innerHTML='<span class="ok">✓ Looks right:</span> <b>'+num(n)+' rows</b> with a Variant code (sheet “'+esc(f.sheet)+'”, '+f.head.filter(function(x){return x!==""}).length+' columns). This will replace the current All variant file.';
+    steps("av",name,new Blob([enc],{type:"application/octet-stream"}),"the buy box uses it from the next run.")})})})
+ .catch(function(e){var m=e&&e.message;msg.innerHTML='<span class="bad">'+(m==="novar"?"That doesn’t look like the All variant file – it has no “Variant code” column. Please pick the All variant.xlsx you exported from Access.":
+  m==="empty"?"That file has a Variant code column but no rows in it. Please export All variant again.":m==="notexcel"?"That isn’t an Excel file. Please pick All variant.xlsx.":why(e))+'</span>'})}
+function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.name)+"…";$("cdstep2").classList.add("hide");$("cdstep3").classList.add("hide");
+ readBook(file).then(function(b){var f=findHeader(b.X,b.wb,["productid","ean","ean13","barcode","productsku","code","codes"]);
+  if(!f)throw new Error("noean");var m=f.map,ce=col(m,"productid","ean","ean13","barcode","productsku","code","codes"),cs=col(m,"sku","offersku","shopsku"),cp=col(m,"b&qinvprice","price","ourprice","offerprice"),
+  cv=col(m,"variantcode"),cu=col(m,"producturl","url","link"),ca=col(m,"activated"),seen={},rows=[];
+  for(var i=f.hi+1;i<f.rows.length;i++){var r=f.rows[i],e=String(r[ce]).trim().replace(/\.0$/,"");
+   if(/^\d+(\.\d+)?e\+?\d+$/i.test(e))e=Number(e).toFixed(0);if(!/^\d{8,14}$/.test(e)||seen[e])continue;
+   if(ca>=0&&["true","yes","1"].indexOf(String(r[ca]).trim().toLowerCase())<0)continue;seen[e]=1;
+   var p=cp>=0?parseFloat(String(r[cp]).replace(/[£,]/g,"")):NaN;
+   rows.push([e,cs>=0?String(r[cs]).trim():"",isNaN(p)||p<=0?null:Math.round(p*100)/100,cv>=0?String(r[cv]).trim():"",cu>=0&&/_BQ\.prd/.test(r[cu])?String(r[cu]).trim():""])}
+  if(!rows.length)throw new Error("noean");
+  var meta={source:file.name,created:new Date().toISOString().replace(/\.\d+Z$/,"Z"),rows:rows.length,active_only:ca>=0,by:"page"};
+  return encrypt(tenc.encode(JSON.stringify({meta:meta,rows:rows}))).then(function(enc){var name="codes_"+stamp()+".enc";
+   msg.innerHTML='<span class="ok">✓ '+num(rows.length)+' EANs found</span>'+(ca>=0?' (active offers only)':"")+'.';
+   steps("cd",name,new Blob([enc],{type:"application/octet-stream"}),"the next buy box run uses this list.")})})
+ .catch(function(e){var m=e&&e.message;msg.innerHTML='<span class="bad">'+(m==="noean"?"No EAN codes found in that file. It needs a column called EAN, product-id or Product SKU with 13-digit codes.":m==="notexcel"?"That isn’t an Excel file.":why(e))+'</span>'})}
 })();
 </script>
 </body></html>
