@@ -60,10 +60,28 @@ t('FUZZ 50,000 random rows: nothing uploaded at a loss, under 50%, China under 1
     out.rows.forEach(o => { if (!o.upload) return; up++; const c = B.calc({ cost: o.cost, mult: o.mult, post: o.post, collab: o.collab }, o.finalp);
       assert.ok(c.profit > 0, o.sku); assert.ok(c.pc >= .5 - 1e-9, o.sku); assert.ok(!o.dup); if (!opt.checkPost) assert.ok(!o.check);
       if (o.china && o.your == null) assert.ok(c.pc >= 1 - 1e-9, 'china ' + o.sku + ' ' + c.pc);
-      if (!o.china && o.your == null && !o.step) assert.ok(c.pc <= .8 + 0.01 / o.cost + 1e-9 || o.finalp <= o.price, 'uk over 80% ' + o.sku);
+      if (!o.china && o.your == null) assert.ok(c.pc <= .8 + 1e-9 || o.finalp <= o.price, 'uk over 80% ' + o.sku + ' ' + c.pc);
+      if (typeof o.raw === 'number' && !o.china) assert.ok(B.calc(o.a || { cost: o.cost, mult: o.mult, post: o.post, collab: o.collab }, o.raw).pc <= .8 + 1e-9, 'raw over 80% ' + o.sku);
       assert.ok(o.finalp !== o.price); });
     assert.ok(up > 100, 'fuzz uploads ' + up); assert.strictEqual(new Set(out.rows.filter(o => o.upload).map(o => o.sku)).size, up); });
 });
+
+t('cap price rounds DOWN: never over 80%, and 1p more would be over', () => { let k = 0;
+  for (let c = .05; c < 60; c += .0731) [1.5, 2].forEach(m => [0, 1.75, 2.3, 8].forEach(post => { const a = { cost: c, mult: m, post: post, collab: 0 };
+    const p = B.priceMax(a, .8); assert.ok(B.calc(a, p).pc <= .8 + 1e-9, 'cap ' + c + ' ' + p); assert.ok(B.calc(a, Math.round(p * 100 + 1) / 100).pc > .8 - 1e-9); k++; }));
+  assert.ok(k > 3000); });
+t('floor price rounds UP: never under the floor (China and UK floors 50/60/70%)', () => {
+  for (let c = .05; c < 60; c += .0731) [.5, .6, .7, 1].forEach(f => { const a = { cost: c, mult: f === 1 ? 2 : 1.5, post: 1.75, collab: 0 };
+    const p = B.floorPrice(a, f, f === 1); assert.ok(B.calc(a, p).pc >= f - 1e-9, 'floor ' + c + ' ' + f); }); });
+t('UK floor 80% = cap 80%: floor never above cap (cap wins, within 1p)', () => {
+  for (let c = .05; c < 1; c += .0137) { const a = { cost: c, mult: 1.5, post: 1.75, collab: 0 }, fp = B.floorPrice(a, .8, false), cp = B.priceMax(a, .8);
+    assert.ok(fp <= cp + 1e-9); assert.ok(B.calc(a, fp).pc <= .8 + 1e-9); assert.ok(B.calc(a, fp + .01).pc > .8 - 1e-9); } });
+t('decide: no-competitor UK and 100+ step never over 80% after rounding', () => {
+  for (let c = .3; c < 40; c += .113) {
+    const o = D({ cost: c, price: 999, bb: null, sales: 0 }); assert.ok(o.ceil == null || B.calc({ cost: c, mult: 1.5, post: 1.75, collab: 0 }, o.ceil).pc <= .8 + 1e-9);
+    const a = { cost: c, mult: 1.5, post: 1.75, collab: 0 }, p0 = B.priceFor(a, .75), s = D({ cost: c, price: p0, bb: p0, seller: 'Diva Packages', sales: 150 }, { raise100: true });
+    if (typeof s.raw === 'number') assert.ok(B.calc(a, s.raw).pc <= .8 + 1e-9, 'step ' + c + ' ' + s.raw);
+    const fl = D({ cost: c, price: 999, bb: 1, sales: 0 }); if (typeof fl.floor === 'number') assert.ok(B.calc(a, fl.floor).pc >= B.floorOf(false, 0, c).f - 1e-9 || B.floorOf(false, 0, c).f === .8); } });
 console.log('pricing engine: ' + n + ' tests passed');
 // sales30: same rule as the Sales tab (not cancelled, newest order day - 29 days)
 (() => { const D0 = Date.UTC(2026, 10, 2, 10) / 6e4, d = 1440;

@@ -32,6 +32,9 @@ if 'BQP.calc' not in a:
     a=a[:j]+',calcAt:calcAt,floorOf:floorOf,U30:U30,profitAt:profitAt'+a[j:]
     open(D+'app.js','w',encoding='utf-8').write(a); print('app.js patched')
 else: print('app.js already uses BQP')
+a=open(D+'app.js',encoding='utf-8').read()
+if 'mp:priceFor(a,Fl.f),' in a:   # calculator 'min price' = the same floor price as the Pricing tab (floor up, never over the cap)
+    assert a.count('mp:priceFor(a,Fl.f),')==1; a=a.replace('mp:priceFor(a,Fl.f),','mp:BQP.floorPrice(a,Fl.f,isChina(k)),'); open(D+'app.js','w',encoding='utf-8').write(a); print('app.js min price patched')
 b=open(D+'build.py',encoding='utf-8').read()
 if 'bq_price.js' not in b:
     o1="data=open('data.js',encoding='utf-8').read();"

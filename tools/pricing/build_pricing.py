@@ -100,11 +100,11 @@ def calc(r, w):
         'V': w(f'D{r}*U{r}+X{r}'),
         'W': w(f'IF(AND(ISNUMBER(K{r}),ISNUMBER(D{r})),IF(D{r}>0,V{r}+K{r},"NEED YOUR REVIEW"),"NEED YOUR REVIEW")'),
         'P': w(f'IF(NOT(ISNUMBER(W{r})),"NEED YOUR REVIEW",IF(U{r}=2,1,IF(R{r}>=1,0.5,IF(D{r}<1,0.8,IF(D{r}<5,0.7,IF(D{r}<10,0.6,0.5))))))'),
-        'O': w(f'IF(ISNUMBER(W{r}),ROUNDUP(ROUND((W{r}+D{r}*P{r})/0.85,6),2),"NEED YOUR REVIEW")'),
-        'Q': w(f'IF(ISNUMBER(W{r}),IF(U{r}=2,"No ceiling",ROUNDUP(ROUND((W{r}+D{r}*0.8)/0.85,6),2)),"NEED YOUR REVIEW")'),
+        'O': w(f'IF(ISNUMBER(W{r}),IF(U{r}=2,ROUNDUP(ROUND((W{r}+D{r}*P{r})/0.85,6),2),MIN(ROUNDUP(ROUND((W{r}+D{r}*P{r})/0.85,6),2),ROUNDDOWN(ROUND((W{r}+D{r}*0.8)/0.85,6),2))),"NEED YOUR REVIEW")'),
+        'Q': w(f'IF(ISNUMBER(W{r}),IF(U{r}=2,"No ceiling",ROUNDDOWN(ROUND((W{r}+D{r}*0.8)/0.85,6),2)),"NEED YOUR REVIEW")'),
         'F': w(f'IF(ISNUMBER(W{r}),ROUND({exact("E"+str(r))},2),"NEED YOUR REVIEW")'),
         'G': w(f'IF(ISNUMBER(W{r}),{exact("E"+str(r))}/D{r},"NEED YOUR REVIEW")'),
-        'AF': w(f'IF(AND(ISNUMBER(W{r}),{win},U{r}=1.5,R{r}>=100),IF(G{r}<0.8-0.000000001,ROUNDUP(ROUND((W{r}+D{r}*MIN(0.8,G{r}+0.1))/0.85,6),2),""),"")'),
+        'AF': w(f'IF(AND(ISNUMBER(W{r}),{win},U{r}=1.5,R{r}>=100),IF(G{r}<0.8-0.000000001,MIN(ROUNDUP(ROUND((W{r}+D{r}*MIN(0.8,G{r}+0.1))/0.85,6),2),ROUNDDOWN(ROUND((W{r}+D{r}*0.8)/0.85,6),2)),""),"")'),
         'AA': w(f'IF(NOT(ISNUMBER(W{r})),"NEED YOUR REVIEW",IF({win},IF(AND(ISNUMBER(AF{r}),AF{r}>E{r}),AF{r},"Already winning"),IF(U{r}=2,IF(NOT(ISNUMBER(H{r})),O{r},IF({bb1}<O{r},"Margin too low",IF(R{r}<1,O{r},{bb1}))),IF(R{r}>=1,IF(NOT(ISNUMBER(H{r})),"No competitor – kept",IF({bb1}<O{r},"Margin too low",MIN(Q{r},{bb1}))),IF(NOT(ISNUMBER(H{r})),Q{r},IF({bb1}<O{r},"Margin too low",MIN(Q{r},{bb1})))))))'),
         'S': w(f'IF(NOT(ISNUMBER(W{r})),"NEED YOUR REVIEW – "&IF(AND(ISNUMBER(D{r}),D{r}>0),"no postage or weight","no cost"),IF({win},IF(AND(ISNUMBER(AF{r}),AF{r}>E{r}),"1 Winning, 100+ sales – raise 10% (max 80%)","1 Already winning – kept"),IF(U{r}=2,IF(NOT(ISNUMBER(H{r})),"4 China – no competitor, 100%",IF({bb1}<O{r},"4 China – margin too low, kept",IF(R{r}<1,"4 China – 0 sales, 100%","4 China – 1p under BB"))),IF(R{r}>=1,IF(NOT(ISNUMBER(H{r})),"2 UK sold – no competitor, kept",IF({bb1}<O{r},"2 UK sold – margin too low, kept",IF({bb1}>Q{r},"2 UK sold – capped at 80%","2 UK sold – 1p under BB"))),IF(NOT(ISNUMBER(H{r})),"3 UK 0 sales – no competitor, 80%",IF({bb1}<O{r},"3 UK 0 sales – margin too low, kept",IF({bb1}>Q{r},"3 UK 0 sales – capped at 80%","3 UK 0 sales – 1p under BB")))))))'),
         'J': w(f'IF(NOT(ISNUMBER(W{r})),"NEED YOUR REVIEW",IF(ISNUMBER(L{r}),IF(ROUND(L{r},2)=ROUND(E{r},2),"Your price",IF(ROUND({exact("L"+str(r))},2)<=0,"Loss – blocked",IF({exact("L"+str(r))}/D{r}<0.5-0.000000001,"Under 50% – blocked","Your price"))),IF(ISNUMBER(AA{r}),IF(ROUND({exact("AA"+str(r))},2)<=0,"Loss – blocked",IF(ROUND(AA{r},2)>ROUND(E{r},2),IF(ISNUMBER(AF{r}),"Raise 10% – held for review","Raise – held for review"),AA{r})),AA{r})))'),
@@ -193,6 +193,19 @@ def build(stage, TMP):
         C = wb.create_sheet('Check postage'); C.append(['Selling SKU', 'Description', 'Weight (g)', 'Postage used', 'Why', 'Rule price (not uploaded until checked)'])
         for x in rows:
             if x['check']: C.append([x['sku'], x['title'], next((rr[hdr.index('Weight')] for rr in [None] if False), None) if False else None, x['post'], x['check'], x['newp']])
+        H = wb.create_sheet('Held raises')
+        H.append(['Selling SKU', 'Description', 'Supplier', 'Current price', 'Proposed price (NOT uploaded)', 'Profit % now', 'Profit % at proposed', 'Profit £ now', 'Profit £ at proposed',
+                  '30-day sales', 'Sales source', 'Buy box price', 'Buy box seller', 'Why held', 'Rule'])
+        for x in rows:
+            if str(x['status']).startswith('Raise') and not x.get('dup'):
+                why = ('Winning the buy box with 100+ sales: the +10% step (max 80%) is a price RISE, so it waits for you' if x.get('step') else
+                       'Rule price is ABOVE our current price (%s). Price rises are never uploaded automatically – you decide' % ('buy box is higher' if x.get('bb') is not None else 'no competitor'))
+                H.append([x['sku'], x['title'], x['sup'], x['price'], x['raw'], x.get('pc'), x.get('rawPc'), x.get('profit'), x.get('rawProfit'), x['sales'], x.get('srcSales'), x.get('bb'), x.get('seller'), why, x['rule']])
+        for c in H[1]: c.fill = hf; c.font = Font(bold=True, color='FFFFFF'); c.alignment = Alignment(wrap_text=True, vertical='center')
+        for i, wd in enumerate([18, 45, 18, 11, 13, 10, 11, 10, 11, 9, 24, 11, 20, 70, 34]): H.column_dimensions[openpyxl.utils.get_column_letter(i + 1)].width = wd
+        for rr in range(2, H.max_row + 1):
+            for c in 'FG': H[f'{c}{rr}'].number_format = '0.0%'
+            for c in 'DEHIL': H[f'{c}{rr}'].number_format = '£#,##0.00'
         N = wb.create_sheet('Notes')
         for t in NOTES: N.append([t])
         N.column_dimensions['A'].width = 150
@@ -206,6 +219,9 @@ NOTES = [
  'One shared engine (bq_price.js) makes every number here, on the dashboard Pricing tab and on Sales/Orders. Excel formulas repeat the same maths so you can change Your price / Postage.',
  'Total cost = cost + company cost (Ashian Homeware: 1 x cost, others 0.5 x cost) + 15%% of price + postage + collab fee (blank = 0).  Profit = price − total cost.  Profit %% = profit ÷ estimated cost.',
  'Postage = Access Postage Cost if filled, else weight: up to 2000g £1.75, 15200g £2.30, 20000g £8, 25000g £9, 30000g £10.50, above £15. Blank weight and postage = NEED YOUR REVIEW.',
+ 'Postage uses OUR rules only (above). The £1.85 / £2.35 / £5.16 bands in the old master copy are deliberately NOT used – so postage can differ from that file on purpose.',
+ 'Rounding: a price set by the 80%% cap is rounded DOWN to the penny (never over 80%%). A floor price is rounded UP (never under the floor). If floor and cap are both 80%% (cost under £1, no sales) and no penny gives exactly 80%%, the cap wins (just under 80%%).',
+ 'Held raises tab: every price RISE the rules suggest. They are NOT in the upload. Copy a price into Your price if you want it.',
  'Rules: 1 Winning the buy box – keep (UK with 100+ B&Q 30-day sales: a +10%% step up to 80%% is shown but HELD for review). 2 UK sold: 1p under buy box, floor 50%%, max 80%%. 3 UK no sales: floor by cost (<£1 80%%, <£5 70%%, <£10 60%%, else 50%%), max 80%%. 4 China (Ashian): 1p under buy box, floor 100%%.',
  'Buy box 1p under is below the floor = "Margin too low" – price kept, never raised to the floor. A rule price above the current price = "Raise – held for review" (not in the upload).',
  'Safety: a changed price must have profit above £0 AND at least 50%% profit on cost, or it is blocked. Check postage rows (multi-pack or over 30kg) and duplicate SKUs are NOT in the upload until checked.',

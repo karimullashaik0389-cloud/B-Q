@@ -19,7 +19,7 @@ If it says the buy box run is **not complete**, some SKUs use the Access buy box
 ## 3. The boxes at the top (tap one to filter the table)
 - **Will change (in upload)** – these go in the upload file.
 - **Margin too low** – the buy box is too cheap for us. We keep our price. No change.
-- **Raise – held for review** – the rules say we can go up. We do NOT go up unless you say so.
+- **Raise – held for review** – the rules say we can go up. We do NOT go up unless you say so. All of them are listed in the **Held raises** tab of the Excel file (SKU, current price, proposed price, profit % now vs proposed, 30-day sales, why held). They are never in the upload.
 - **Check postage** – multipacks (like "3x ...") and items over 30kg. Check the postage first.
 - **Need your review** – no cost, no postage/weight, or £0 price. Fix the data in Access.
 - **Blocked (loss / under 50%)** – the price would make a loss or be under 50%. It is never uploaded.
@@ -32,7 +32,8 @@ If it says the buy box run is **not complete**, some SKUs use the Access buy box
 - Company cost = cost × 1 for Ashian (China). Cost × 0.5 for others.
 - Profit = price − total cost.
 - Profit % = profit ÷ cost.
-- Postage = the Access "Postage Cost". If that is empty, we use the weight.
+- Postage = the Access "Postage Cost". If that is empty, we use the weight: up to 2000g £1.75, up to 15200g £2.30, up to 20000g £8, up to 25000g £9, up to 30000g £10.50, above that £15.
+- We use **our** postage rules only. The £1.85 / £2.35 / £5.16 bands in the old master file are deliberately **not** used, so postage can differ from that file on purpose.
 
 ## 5. Your own price
 1. Type a price in the **Your price** box on a row.
@@ -60,6 +61,8 @@ Tap **Back to the published data** to return.
 
 ## 10. Rules in one look
 - UK: profit stays between 50% and 80% on cost.
+- Rounding: a price set by the 80% cap is rounded **down** to the penny, so it is never over 80%. A floor price is rounded **up**, so it is never under the floor. (Cost under £1 with no sales has floor and cap both 80%: if no penny gives exactly 80%, the cap wins – just under 80%.)
+- Postage: our rules only (Access figure, else weight bands above). The old file's £1.85 / £2.35 / £5.16 bands are not used.
 - UK, winning with good sales: keep the price.
 - UK, not winning: 1p under the buy box, but never below the floor.
 - UK floor with no sales: cost under £1 80%, under £5 70%, under £10 60%, else 50%. With sales: 50%.
