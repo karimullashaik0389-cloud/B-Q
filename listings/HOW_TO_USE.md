@@ -1,6 +1,6 @@
 # B&Q Listings – how to use (step by step)
 
-Tool version 3.5.6. Read this once, top to bottom. Every step is numbered. You only need a mouse/finger and your product names.
+Tool version 3.5.7. Read this once, top to bottom. Every step is numbered. You only need a mouse/finger and your product names.
 
 **What the tool does:** you give it SKU, EAN and product name. It writes the B&Q title (121–124 characters), 8 bullets, a 150+ word description and the key feature. It also fills the category and attributes, then gives you **one B&Q file per category**. Then **you** import those files on the B&Q portal yourself.
 
@@ -43,7 +43,7 @@ Along the top you see the steps **Add › Sort › Fill gaps › Check**. Every 
 ### 2. Add
 1. Type one product per row: **SKU**, **EAN**, **Product name**. Use **+ Add a row** for more.
 2. For many products (20–30 or more at a time): in Excel, select the three columns (SKU, EAN, Name), press **Ctrl + C**, then in the tool click **Paste from Excel**, press **Ctrl + V** and click **Add these rows**.
-3. Or drop an Excel/CSV sheet, photos or a ZIP on the grey box. Name photos by SKU: `SKU_1.jpg` (main photo), `SKU_2.jpg`…
+3. Or drop your Excel or CSV file (columns SKU, EAN, Product name) on the grey box. The Add step takes only SKU, EAN and Product name – photos come later, as web links on Fill gaps.
 4. **Red rows = the same SKU typed twice.** Both rows go red and **Next is blocked** until you fix one. This stops duplicate SKUs reaching B&Q.
 5. **Amber = the same EAN on two different SKUs.** This is only a warning. Check it is meant (e.g. pack sizes), then carry on.
 6. Finished with a list and already imported on B&Q? Click **Start a new list**. It only clears the list in the tool. Files you downloaded are not touched.
@@ -59,9 +59,18 @@ The tool checks each EAN against your B&Q export and files.
 1. Each product card shows the category the tool picked. Click **Looks right**, or **Change** to pick another.
 2. Click **Next to fill** to jump straight to the next empty box. Only the boxes B&Q *requires* are asked. Usually that is the **weight** and anything the name doesn't say.
 3. Grey/amber "close guess" values are suggestions. Read them, and change them if they are wrong.
-4. **Photos:** B&Q needs a **web link** (starting `https://`) for every photo.
-   - Photos already on B&Q keep their links.
-   - A photo you dropped from your computer is only on this device. Paste its web link (from your own photo host) in the box under the photo, or add it in the file before you import. The tool never uploads photos for you.
+4. **Photos are web links only.** B&Q's import only takes web links, so there is no photo upload and no photo preview in the tool.
+   - Each photo link is listed as text (website / file name) with **Open** (checks the photo in a new tab), **Make main** and **×** (remove). Amber notes warn about Amazon links, iili.io links that may disappear and links that might not be a photo.
+   - **Product with no photos yet:** the count line says *No main photo, add one.* (later, for example, *Photo links: 5 of 9 (main photo: yes). You can add 4 more.*). You get two boxes:
+     - **Main photo link:** paste one `https://` link and click **Set main photo** (or press Enter). It becomes the main photo (`image_main_1`).
+     - **Other photo links (up to 8):** paste all your other links at once. They can be on separate lines, copied straight from an Excel column, separated by spaces, commas, semicolons, tabs or `|`, or even stuck together with no gap. The tool splits them, shows *Found N links* and fills Photo 2 to 9 in order (`image_secondary_1` to `8`). Links with commas or `?v=1&x=2` in them stay whole. Typed links are used when you leave the box or click **Use these links**.
+   - Refused with a red message: links that don't start with `https://` (including `http://`), plain text, and any links after the 8th. The same link twice is skipped. A link that doesn't end in `.jpg`, `.png`, `.webp` or `.gif` is kept with an amber "check this link opens a photo" note. Links on Amazon or on iili.io get an amber warning too, because they can stop working.
+   - **Product that already has photos** (on B&Q, or copied from a sister SKU): the status line says, for example, *We have photos: main photo yes, 4 extra photos (5 of 9). You can add 4 more.* The two boxes start empty:
+     - **Update main photo:** paste one link to replace your main photo (`image_main_1` only). You'll see *Main photo replaced.*
+     - **Update other photos:** paste all other photo links at once (up to 8) to replace your existing extra photos (`image_secondary_1` to `8`). You'll see, for example, *Replaced 4 extra photos with 6 new.* Links you don't paste are dropped. To keep them and add more, click **Copy the current links into the box** first.
+     - Each box has its own **Undo**, which brings back what was there before. If nothing in what you pasted can be used, nothing is replaced.
+   - **Optional, for many products:** your Excel/CSV file on Add can also have the columns **Main photo link** and **Other photo links** (all other links in one cell). They fill the two boxes for you.
+   - **Tip:** use a photo host you control. On freeimage.host / iili.io, leave **Don't autodelete** selected (the default). Free hosts don't promise to keep files, so links can stop working. The tool never uploads photos for you.
 5. **Variant Group ID** is filled automatically:
    - from your **All variant.xlsx** if you loaded it (blank if the SKU is not in it);
    - otherwise products with the same name in a category that allows variants get one group;
