@@ -1,0 +1,71 @@
+# Pricing tab – how to use
+
+Simple steps. Short sentences.
+
+## 1. Open it
+1. Open the dashboard. Type the password.
+2. Tap **Pricing**.
+3. Wait a few seconds. The table loads.
+4. To go back, tap **Back** (top left) or use the phone back button.
+
+## 2. Read the top line
+The grey line at the top says:
+- which **Access file** is used (and its date),
+- which **buy box run** is used (and how many SKUs),
+- where **Price now** comes from.
+
+If it says the buy box run is **not complete**, some SKUs use the Access buy box instead.
+
+## 3. The boxes at the top (tap one to filter the table)
+- **Will change (in upload)** – these go in the upload file.
+- **Margin too low** – the buy box is too cheap for us. We keep our price. No change.
+- **Raise – held for review** – the rules say we can go up. We do NOT go up unless you say so.
+- **Check postage** – multipacks (like "3x ...") and items over 30kg. Check the postage first.
+- **Need your review** – no cost, no postage/weight, or £0 price. Fix the data in Access.
+- **Blocked (loss / under 50%)** – the price would make a loss or be under 50%. It is never uploaded.
+- **Winning – kept** – we have the buy box.
+- **All rows** – every row.
+- **Duplicate SKU** – the same SKU twice in Access. Only the first row is used.
+
+## 4. The money (same on every tab)
+- Total cost = cost + company cost + 15% B&Q fee + postage + collab fee.
+- Company cost = cost × 1 for Ashian (China). Cost × 0.5 for others.
+- Profit = price − total cost.
+- Profit % = profit ÷ cost.
+- Postage = the Access "Postage Cost". If that is empty, we use the weight.
+
+## 5. Your own price
+1. Type a price in the **Your price** box on a row.
+2. The row checks it at once.
+3. If it makes a loss or is under 50% on cost, it says **Blocked**. It will not go in the upload.
+4. If it is fine, it goes in the upload.
+5. Your prices stay after refresh. Clear the box to remove one.
+
+## 6. Two switches
+- **Include 100+ sales raises (+10%, max 80%)** – adds the +10% raises to the upload.
+- **Include “Check postage” rows** – adds multipacks / over 30kg rows. Only tick after you checked postage.
+
+## 7. Download
+- **Download B&Q upload** – the file for B&Q. Same layout as the master template. Only changed SKUs. No duplicates. No loss.
+- **This table (Excel)** – what you see now, for checking.
+
+## 8. Upload to B&Q
+You do this yourself in B&Q (Mirakl): Price import → choose the upload file.
+The dashboard never sends anything to B&Q.
+
+## 9. New Access file (optional)
+Tap **Choose Access .xlsx**. Pick the new Access_*.xlsx (sheet B&QBB3).
+It is read on your device only. Nothing is uploaded.
+Tap **Back to the published data** to return.
+
+## 10. Rules in one look
+- UK: profit stays between 50% and 80% on cost.
+- UK, winning with good sales: keep the price.
+- UK, not winning: 1p under the buy box, but never below the floor.
+- UK floor with no sales: cost under £1 80%, under £5 70%, under £10 60%, else 50%. With sales: 50%.
+- "Sales" means units sold in the last 30 days. We count them from the B&Q orders file. This is the same number the Sales tab uses.
+- If the Access file is newer than the orders file, we use the Access "B n Q 30Days" column instead. The grey box at the top tells you which one was used.
+- A row with price £0 or blank goes to **NEED YOUR REVIEW**. We do not upload it. Please check the listing.
+- China (Ashian): floor 100% on cost. 1p under the buy box, down to the floor.
+- Buy box below the floor: keep our price. Shows "Margin too low".
+- Never a price with profit £0 or less.

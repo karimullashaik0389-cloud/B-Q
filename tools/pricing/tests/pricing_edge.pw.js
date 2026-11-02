@@ -1,0 +1,40 @@
+// Edge cases through the real Pricing tab UI, using MADE-UP Access files (testdata/). Password read from file, never printed.
+const {chromium}=require('/workspace/bq/dashboard/html/node_modules/playwright-core');
+const fs=require('fs');const PW=fs.readFileSync('/workspace/bq/KEEP/secrets/dashboard_password.txt','utf8').trim();const URL=process.argv[2]||'http://127.0.0.1:18431/';
+const TD=__dirname+'/../testdata/';let pass=0,fail=0;const ok=(c,m)=>{if(c){pass++;console.log('PASS',m)}else{fail++;console.log('FAIL',m)}};
+(async()=>{const b=await chromium.launch({executablePath:'/usr/bin/google-chrome'});const ctx=await b.newContext({viewport:{width:390,height:844},acceptDownloads:true});const p=await ctx.newPage();
+const errs=[];p.on('pageerror',e=>errs.push(e.message));
+await p.goto(URL);await p.fill('#pw',PW);await p.click('#go');await p.waitForSelector('#menu:not(.hide)',{timeout:60000});await p.evaluate(()=>localStorage.removeItem('bqPriceYour1'));
+await p.click('[data-v="pricing"]');await p.waitForSelector('#pzsum .sc',{timeout:60000});
+await p.setInputFiles('#pzfile',TD+'Access_2026-11-05_edge.xlsx');await p.waitForSelector('#pzfmsg .ok',{timeout:60000});
+const R=await p.evaluate(()=>{const s=BQPricing.state(),m={};s.res.rows.forEach(o=>{if(!m[o.sku])m[o.sku]=o});return{m,dups:s.res.dups,nosku:s.res.nosku,src:document.getElementById('pzsrc').innerText}});const m=R.m;
+const st=k=>m[k]&&(typeof m[k].status==='number'?'num:'+m[k].status:m[k].status);
+ok(st('T-BLANKCOST')==='NEED YOUR REVIEW'&&!m['T-BLANKCOST'].upload,'blank cost -> Need review, not uploaded');
+ok(st('T-NOPOST')==='NEED YOUR REVIEW','no weight/postage -> Need review');
+ok(m['T-BLANKBB'].bb==null&&m['T-BLANKBB'].status==='No competitor – kept','blank buy box with sales -> keep ('+st('T-BLANKBB')+')');
+ok(m['T-ZERO'].price===0&&st('T-ZERO')==='NEED YOUR REVIEW'&&!m['T-ZERO'].upload&&/suggested £/.test(m['T-ZERO'].rule),'£0 price -> Need review with suggestion, not uploaded ('+m['T-ZERO'].rule+')');
+ok(m['T-TEXT'].price===8.7,'text price £8.70 read as 8.70');
+ok(R.dups===1&&m['T-DUP'].bb===11,'duplicate SKU: first kept, 1 duplicate counted');
+ok(R.nosku===1,'row with no SKU skipped');
+ok(m['T-CHINA'].china&&m['T-CHINA'].floorPct===1&&m['T-CHINA'].finalp>=m['T-CHINA'].floor,'China floor 100%: '+m['T-CHINA'].finalp+' >= '+m['T-CHINA'].floor);
+ok(st('T-CHINA-LOW')==='Margin too low'&&m['T-CHINA-LOW'].finalp===15,'China bb under floor -> Margin too low, price kept');
+ok(m['T-UK'].finalp===12.99||m['T-UK'].rule.indexOf('80%')>=0,'UK 1p under bb (or 80% cap): '+m['T-UK'].finalp+' '+m['T-UK'].rule);
+ok(/Multi-pack/.test(m['T-PACK'].check)&&!m['T-PACK'].upload,'multipack flagged + off upload by default');
+ok(/Over 30kg/.test(m['T-HEAVY'].check),'over 30kg flagged; postage '+m['T-HEAVY'].post);
+ok(/^Raise 10%/.test(st('T-100'))&&!m['T-100'].upload,'100+ sales winning -> +10% held ('+st('T-100')+')');
+ok(m['T-0SALES'].floorPct===0.8,'0 sales cost<£1 -> floor 80%');
+ok(st('T-MTL')==='Margin too low'&&!m['T-MTL'].upload,'UK bb under floor -> Margin too low');
+const up=Object.values(m).filter(o=>o.upload);ok(up.every(o=>o.fprofit>0&&o.fpc>=0.5-1e-9),'all upload rows safe ('+up.length+')');
+ok(/no buy box run newer/.test(R.src),'old buy box run not applied to newer Access file');
+// toggles bring the multipack / 100+ in
+await p.check('#pzr100');await p.check('#pzpost');await p.waitForTimeout(300);
+const t=await p.evaluate(()=>{const s=BQPricing.state();const g=k=>s.res.rows.find(o=>o.sku===k);return[g('T-100').upload,g('T-PACK').upload,g('T-100').fpc]});
+ok(t[0]&&t[1]&&t[2]<=0.81,'toggles add 100+ raise and multipack ('+t+')');await p.uncheck('#pzr100');await p.uncheck('#pzpost');
+// huge file
+const t0=Date.now();await p.setInputFiles('#pzfile',TD+'Access_2026-11-05_big50k.xlsx');await p.waitForFunction(()=>/big50k/.test(document.getElementById('pzfmsg').innerText)&&document.querySelector('#pzfmsg .ok'),null,{timeout:180000});
+const big=await p.evaluate(()=>{const s=BQPricing.state();return{n:s.res.rows.length,up:s.res.rows.filter(o=>o.upload).length,bad:s.res.rows.filter(o=>o.upload&&(!(o.fprofit>0)||o.fpc<0.5-1e-9)).length}});
+ok(big.n===50000&&big.bad===0,'50k-row file: '+big.n+' rows, '+big.up+' in upload, unsafe '+big.bad+', '+((Date.now()-t0)/1000).toFixed(1)+'s');
+const [d]=await Promise.all([p.waitForEvent('download'),p.click('#pzdl')]);const f=__dirname+'/../out/pw_dl/big50k_upload.xlsx';await d.saveAs(f);ok(fs.statSync(f).size>1000,'50k upload download saved');
+const t1=Date.now();await p.fill('#pzq','BIG-0499');await p.waitForTimeout(100);ok(Date.now()-t1<3000,'search on 50k fast');
+ok(errs.length===0,'no page errors '+JSON.stringify(errs));
+await b.close();console.log('RESULT pass',pass,'fail',fail);process.exit(fail?1:0)})().catch(e=>{console.log('CRASH',e.message);process.exit(2)});
