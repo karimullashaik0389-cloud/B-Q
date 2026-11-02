@@ -242,17 +242,26 @@ function xlsx(){if(window.XLSX)return Promise.resolve(window.XLSX);if(xlsxP)retu
 function gh(path){return fetch(API+path,{cache:"no-store",headers:{Accept:"application/vnd.github+json"}}).then(function(r){if(!r.ok)throw new Error("gh"+r.status);return r.json()})}
 
 /* ---------- view shell ---------- */
-function openTab(v){cur=v;$("ttitle").textContent=v==="dups"?"Duplicates":"Access";$("tbody").innerHTML='<p class="note">Loading…</p>';
- $("tabv").classList.remove("hide");$("tabv").scrollTop=0;document.title=v==="dups"?"B&Q Duplicates":"B&Q Access";
- (v==="dups"?dups():access()).catch(function(e){if(e&&e.message==="nokey"){close();BQ.lock("Please type the main password once more (new cards were added).");return}
+/* TAB REGISTRY – to add a tab (e.g. Pricing):
+   1) page_v5.html: add <button class="big" data-v="pricing"><b>Pricing</b><span>…</span></button> in the cards list (before Lock);
+   2) register it: BQTabs.add("pricing",{title:"Pricing",render:function(body,kit){ … return a Promise }})
+      either here in TABS or from a new script inlined after tabs_v1.js by build_site_v5.py.
+   render() fills $("tbody") (passed as body); kit has getJSON/getEnc (decrypt BQE1 files), encrypt, esc, money, uk, ukt, save, xlsx, why, el, gh.
+   ‹ Back, phone back gesture, Loading…, errors and "unlock again" are handled here for every tab. */
+var TABS={dups:{title:"Duplicates",render:function(){return dups()}},access:{title:"Access",render:function(){return access()}}};
+function openTab(v){var T=TABS[v];if(!T)return;cur=v;$("ttitle").textContent=T.title;$("tbody").innerHTML='<p class="note">Loading…</p>';
+ $("tabv").classList.remove("hide");$("tabv").scrollTop=0;document.title="B&Q "+T.title;
+ Promise.resolve().then(function(){return T.render($("tbody"),KIT)}).catch(function(e){if(e&&e.message==="nokey"){close();BQ.lock("Please type the main password once more (new cards were added).");return}
   $("tbody").innerHTML='<div class="src warn">'+why(e)+'</div>'})}
 function close(){cur=null;if(timer){clearInterval(timer);timer=null}$("tabv").classList.add("hide");$("tbody").innerHTML="";document.title="B&Q Dashboards"}
-window.BQTabs={close:close,open:openTab};
+var KIT={getJSON:getJSON,getEnc:getEnc,encrypt:encrypt,esc:esc,money:money,num:num,uk:uk,ukt:ukt,stamp:stamp,save:save,xlsx:xlsx,why:why,el:el,gh:gh,$:$,isOpen:function(v){return cur===v}};
+window.BQTabs={close:close,open:openTab,kit:KIT,add:function(id,def){TABS[id]=def},tabs:TABS};
 /* browser / phone Back returns to the cards (also from Sales and Orders, whose app is unchanged) */
 var pushed=false;function push(){try{if(!pushed){history.pushState({bqv:1},"");pushed=true}}catch(e){}}
 function unpush(){if(pushed){pushed=false;try{history.back()}catch(e){}}}
 window.addEventListener("popstate",function(){if(!pushed)return;pushed=false;if(cur)close();else if(!$("viewer").classList.contains("hide")&&window.BQ&&BQ.back)BQ.back()});
-document.querySelectorAll("[data-v]").forEach(function(b){b.addEventListener("click",function(){push();openTab(b.getAttribute("data-v"))})});
+/* one delegated listener, so any card with data-v="<tab id>" works, including cards added later */
+document.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest("[data-v]");if(b&&TABS[b.getAttribute("data-v")]){push();openTab(b.getAttribute("data-v"))}});
 document.querySelectorAll("[data-d]").forEach(function(b){b.addEventListener("click",push)});
 $("tback").addEventListener("click",function(){close();unpush()});
 
