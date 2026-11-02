@@ -465,6 +465,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
   function rnd(x, d) { var m = Math.pow(10, d), s = x < 0 ? -1 : 1, y = Number((Math.abs(r6(x)) * m).toFixed(6)); return s * Math.floor(y + 0.5) / m; }
   /* Excel ROUNDUP(ROUND(x,6),2) for x >= 0 */
   function ceil2(x) { return Math.ceil(Number((r6(x) * 100).toFixed(6))) / 100; }
+  function floor2(x) { return Math.floor(Number((r6(x) * 100).toFixed(6))) / 100; }
   function band(w) { w = num(w); if (!(w > 0)) return null; for (var i = 0; i < BANDS.length; i++) if (w <= BANDS[i][0]) return { p: BANDS[i][1], lab: BANDS[i][2] }; return { p: OVER[0], lab: OVER[1] }; }
   /* postage: Access 'Postage Cost' if > 0, else weight band, else null (needs review) */
   function postage(pc, w) { var p = num(pc); if (p != null && p > 0) return p; var b = band(w); return b ? b.p : null; }
@@ -481,7 +482,11 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
     return { cost: cost, company: company, fee: fee, post: post, collab: col, total: total, pr: pr, profit: rnd(pr, 2), pc: cost > 0 ? pr / cost : null };
   }
   /* lowest price giving profit >= f x cost, rounded UP to the penny */
+  /* floors / minimum prices round UP to the penny (never under the %); caps round DOWN (never over the %) */
   function priceFor(a, f) { return ceil2((a.cost * a.mult + a.post + (num(a.collab) || 0) + f * a.cost) / (1 - FEE)); }
+  function priceMax(a, f) { return floor2((a.cost * a.mult + a.post + (num(a.collab) || 0) + f * a.cost) / (1 - FEE)); }
+  /* floor price: China = round up; UK = round up but never above the 80% cap (only bites when floor and cap are both 80%) */
+  function floorPrice(a, f, china) { var p = priceFor(a, f); return china ? p : Math.min(p, priceMax(a, UK_MAX)); }
   /* floor % on cost: China 100%; UK sold in last 30 days 50%; UK no sales by cost <1 80%, <5 70%, <10 60%, else 50% */
   function floorOf(china, sales30, cost) {
     if (china) return { f: CHINA_FLOOR, why: 'China product · 100% on cost' };
@@ -516,12 +521,12 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
     var a = { cost: cost, mult: mult, post: post, collab: o.collab };
     o.a = a; o.fixed = fixedCost(a);
     var C = calc(a, cur); o.fee = C.fee; o.company = C.company; o.total = C.total; o.profit = C.profit; o.pr = C.pr; o.pc = C.pc;
-    var Fl = floorOf(china, sales, cost); o.floorPct = Fl.f; o.floorWhy = Fl.why; o.floor = priceFor(a, Fl.f); o.ceil = china ? null : priceFor(a, UK_MAX);
+    var Fl = floorOf(china, sales, cost); o.floorPct = Fl.f; o.floorWhy = Fl.why; o.floor = floorPrice(a, Fl.f, china); o.ceil = china ? null : priceMax(a, UK_MAX);
     var bb1 = bb != null ? rnd(bb - 0.01, 2) : null, raw, step = false;
     if (o.win) {
       raw = 'Already winning'; o.rule = '1 Already winning – kept';
       if (!china && sales >= RAISE_AT && C.pc < UK_MAX - 1e-9) {
-        var sp = priceFor(a, Math.min(UK_MAX, C.pc + RAISE_STEP));
+        var sp = Math.min(priceFor(a, Math.min(UK_MAX, C.pc + RAISE_STEP)), priceMax(a, UK_MAX));
         if (sp > cur) { raw = sp; step = true; o.rule = '1 Winning, 100+ sales – raise 10% (max 80%)'; }
       }
     } else if (china) {
@@ -547,6 +552,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
     /* status (build13 'Buy box winning price' column) */
     if (typeof raw === 'number') {
       var Rc = calc(a, raw);
+      o.rawProfit = Rc.profit; o.rawPc = Rc.pc;
       if (Rc.profit <= 0) o.status = 'Loss – blocked';
       else if (rnd(raw, 2) > rnd(cur, 2) && !(step && opt.raise100)) o.status = step ? 'Raise 10% – held for review' : 'Raise – held for review';
       else o.status = raw;
@@ -635,7 +641,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
   }
   return { FEE: FEE, sales30: sales30, bbMap: bbMap, ukTime: ukTime, fromAccess: fromAccess, eanOf: eanOf, HDR: HDR, ASHIAN: ASHIAN, OTHER: OTHER, UK_MAX: UK_MAX, SAFE_MIN: SAFE_MIN, RAISE_AT: RAISE_AT, BANDS: BANDS, OVER: OVER,
     num: num, rnd: rnd, ceil2: ceil2, band: band, postage: postage, postageSrc: postageSrc, isChina: isChina, multOf: multOf, fixedCost: fixedCost,
-    calc: calc, priceFor: priceFor, floorOf: floorOf, packN: packN, checkPost: checkPost, decide: decide, decideAll: decideAll, VERSION: 'bq_price v1 2026-11-02' };
+    calc: calc, priceFor: priceFor, priceMax: priceMax, floorPrice: floorPrice, floor2: floor2, floorOf: floorOf, packN: packN, checkPost: checkPost, decide: decide, decideAll: decideAll, VERSION: 'bq_price v2 2026-11-02' };
 });
 </script>
 <script>
