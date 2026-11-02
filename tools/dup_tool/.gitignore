@@ -1,0 +1,8 @@
+cache/
+out/
+__pycache__/
+*.xlsx
+*.csv
+*.log
+variant_merges.json
+.env
