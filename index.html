@@ -23,8 +23,6 @@ a.big{text-decoration:none;-webkit-tap-highlight-color:transparent}.big b{font-s
 .hide{display:none!important}
 #viewer{position:fixed;inset:0;background:#F8FAFC;z-index:5}
 #frame{position:absolute;inset:0;width:100%;height:100%;border:0}
-#back{position:fixed;left:0;top:50%;transform:translateY(-50%);z-index:6;background:rgba(15,23,42,.78);color:#fff;width:30px;padding:12px 0;border-radius:0 12px 12px 0;font-size:11px;font-weight:700;line-height:1.1;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.25)}
-#back b{display:block;font-size:20px}
 .hint{color:#94A3B8;font-size:14px;margin:10px 0 0}
 #tabv{position:fixed;inset:0;z-index:5;background:#F1F5F9;color:#0F172A;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .tbar{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:12px;background:#0F172A;color:#F8FAFC;padding:calc(8px + env(safe-area-inset-top)) 12px 8px}
@@ -73,7 +71,7 @@ table.bt{border-collapse:collapse;width:100%;font-size:14px}.bt th,.bt td{paddin
  </form>
 </div>
 <div class="wrap hide" id="menu">
- <div class="logo">B&amp;Q</div><h1>Choose a dashboard</h1><p class="sub">Sales and Orders open the same app. Duplicates and Access have ‹ Back at the top. Your phone’s back gesture also returns here.</p>
+ <div class="logo">B&amp;Q</div><h1>Choose a dashboard</h1><p class="sub">Tap Home in any dashboard to see all six here again. Your phone’s back gesture also returns here.</p>
  <button class="big" data-d="sales"><b>Sales</b><span>Sales, orders, units and profit · best sellers · calculator</span></button>
  <button class="big" data-d="orders"><b>Orders</b><span>Every order with profit, incl. cancelled · needs fixing</span></button>
  <a class="big" id="listings" href="listings/"><b>Listings</b><span>Create and fix B&amp;Q listings · templates · download files</span></a>
@@ -83,8 +81,7 @@ table.bt{border-collapse:collapse;width:100%;font-size:14px}.bt th,.bt td{paddin
  <button class="ghost" id="lock">🔒 Lock</button>
 </div>
 <div id="viewer" class="hide"><iframe id="frame" title="Dashboard" allow="clipboard-write"></iframe></div>
-<button id="back" class="hide" aria-label="Back to menu"><b>‹</b>Me<br>nu</button>
-<div id="tabv" class="hide"><div class="tbar"><button id="tback" type="button">‹ Back</button><b id="ttitle"></b></div><div id="tbody"></div></div>
+<div id="tabv" class="hide"><div class="tbar"><button id="tback" type="button" aria-label="Home – all dashboards"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Home</button><b id="ttitle"></b></div><div id="tbody"></div></div>
 <div id="busy" class="hide">Opening…</div>
 <script>
 (function(){
@@ -186,6 +183,11 @@ window.addEventListener("message",function(e){var f=$("frame");
  var m=e.data,reply=function(o){o.re=m.id;try{e.source.postMessage(o,location.origin!=="null"?location.origin:"*")}catch(x){}};
  if(m.bq==="hello"){reply({ok:true,remembered:!!stored()});return}
  if(m.bq==="lock"){reply({ok:true});lock("Locked. This device no longer remembers you.");return}
+ /* Home cards inside Sales/Orders: open another dashboard (Listings = the listing tool page, the rest = tabs on this page) */
+ if(m.bq==="open"){var v=String(m.v||"");reply({ok:true});
+  if(v==="listings"){location.href=$("listings").getAttribute("href");return}
+  if(v==="sales"||v==="orders"){open(v);return}
+  if(window.BQTabs&&BQTabs.tabs[v]){back();BQTabs.open(v)}return}
  if(m.bq==="rewrap"){var o=String(m.old||""),n=String(m.nw||"");
   if(n.length<8){reply({ok:false,err:"New password needs at least 8 characters"});return}
   var chk=stored()?unwrap(o).catch(function(){return tryMain(o)}):tryMain(o);
