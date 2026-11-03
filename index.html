@@ -71,13 +71,15 @@ table.bt{border-collapse:collapse;width:100%;font-size:14px}.bt th,.bt td{paddin
  </form>
 </div>
 <div class="wrap hide" id="menu">
- <div class="logo">B&amp;Q</div><h1>Choose a dashboard</h1><p class="sub">Tap Home in any dashboard to see all six here again. Your phone’s back gesture also returns here.</p>
+ <div class="logo">B&amp;Q</div><h1>Choose a dashboard</h1><p class="sub">Tap Home in any dashboard to see all eight here again. Your phone’s back gesture also returns here.</p>
  <button class="big" data-d="sales"><b>Sales</b><span>Sales, orders, units and profit · best sellers · calculator</span></button>
  <button class="big" data-d="orders"><b>Orders</b><span>Every order with profit, incl. cancelled · needs fixing</span></button>
  <a class="big" id="listings" href="listings/"><b>Listings</b><span>Create and fix B&amp;Q listings · templates · download files</span></a>
  <button class="big" data-v="dups"><b>Duplicates</b><span>Same product listed twice · delete, fix and check lists</span></button>
  <button class="big" data-v="access"><b>Access</b><span>Buy box winners · run buy box · update All variant</span></button>
  <button class="big" data-v="pricing"><b>Pricing</b><span>New B&amp;Q prices · profit check · buy box · upload file</span></button>
+ <button class="big" data-v="lookup"><b>Individual sales</b><span>One SKU or EAN · units, sales £ and orders · by day · chart</span></button>
+ <button class="big" data-v="calc"><b>Calculator</b><span>Cost · postage · fees · total cost · profit · safe prices</span></button>
  <button class="ghost" id="lock">🔒 Lock</button>
 </div>
 <div id="viewer" class="hide"><iframe id="frame" title="Dashboard" allow="clipboard-write"></iframe></div>
@@ -990,6 +992,293 @@ function pick(file){var msg=$("pzfmsg");msg.textContent="Reading "+file.name+"�
  .catch(function(e){msg.innerHTML='<span class="bad">'+esc(e&&e.message&&!/^(net|notyet|nokey|otherkey)$/.test(e.message)?e.message:K.why(e))+'</span>'})}
 BQTabs.add("pricing",{title:"Pricing",render:function(body){return render(body)}});
 window.BQPricing={state:function(){return st}};
+})();
+</script>
+<script>
+(function(){
+"use strict";
+/* B&Q dashboard – Individual sales tab (look up one SKU or EAN; 7th card). Data: lookup.enc (all B&Q order lines on the box, cancelled removed,
+   + product list from Access B&QBB3 and the B&Q offers export). Decrypted and calculated only in this browser. */
+if(!window.BQTabs)return;
+var K=BQTabs.kit,$=K.$,esc=K.esc,DAYM=1440,MAXR=30,PAGE=50;
+var MON="Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(" "),WD="Sun Mon Tue Wed Thu Fri Sat".split(" ");
+var CSS='.lk-res{display:block;width:100%;text-align:left;background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:10px 12px;margin-bottom:6px;font-size:14px;color:#0F172A}'+
+ '.lk-res.on{border-color:#FF6600;box-shadow:0 0 0 2px #FF6600 inset}.lk-res b{display:block;font-size:15px;margin-bottom:2px}'+
+ '.lk-hd{background:#fff;border-radius:12px;border:1px solid #E2E8F0;padding:12px;margin-bottom:10px}.lk-hd h3{margin:0 0 6px;font-size:17px;line-height:1.3}'+
+ '.lk-kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:6px 12px;font-size:14px}.lk-kv div span{display:block;font-size:12px;color:#64748B}'+
+ '.lk-rel{margin-top:8px;font-size:14px}.lk-rel button{margin:3px 4px 0 0;padding:5px 9px;border-radius:999px;background:#E2E8F0;font-size:13px;font-weight:600;color:#0F172A}'+
+ '.lk-cus{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:-4px 0 10px;font-size:14px}.lk-cus input{font-size:16px;padding:8px;border:1px solid #CBD5E1;border-radius:10px;background:#fff;color:#0F172A}'+
+ '.lk-ch{background:#fff;border-radius:12px;border:1px solid #E2E8F0;padding:10px;margin-bottom:12px}.lk-ch svg{display:block;width:100%;height:170px}'+
+ '.lk-tg{display:flex;align-items:center;gap:8px;font-size:14px;margin-top:8px}.lk-tg input{width:20px;height:20px;accent-color:#FF6600}';
+var st=null;
+function n0(v){return v==null||v===""?"–":Number(v).toLocaleString("en-GB")}
+function m2(v){return v==null||isNaN(v)?"–":"£"+Number(v).toLocaleString("en-GB",{minimumFractionDigits:2,maximumFractionDigits:2})}
+function p2(n){return(n<10?"0":"")+n}
+function dstr(day){var d=new Date(day*864e5);return WD[d.getUTCDay()]+" "+d.getUTCDate()+" "+MON[d.getUTCMonth()]+" "+d.getUTCFullYear()}
+function dshort(day){var d=new Date(day*864e5);return d.getUTCDate()+" "+MON[d.getUTCMonth()]}
+function iso(day){return new Date(day*864e5).toISOString().slice(0,10)}
+function fromIso(s){var m=/^(\d{4})-(\d\d)-(\d\d)$/.exec(s||"");return m?Math.round(Date.UTC(+m[1],m[2]-1,+m[3])/864e5):null}
+function tstr(t){var d=new Date(t*6e4);return d.getUTCDate()+" "+MON[d.getUTCMonth()]+" "+d.getUTCFullYear()+", "+p2(d.getUTCHours())+":"+p2(d.getUTCMinutes())}
+function wall(s){var m=/^(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d)/.exec(s||"");return m?Date.UTC(+m[1],m[2]-1,+m[3],+m[4],+m[5])/6e4:null}
+/* today's date in the UK (Europe/London), as a day number on the same wall-clock scale as the order times */
+function ukToday(){try{var f=new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/London",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date()),o={};
+ f.forEach(function(x){o[x.type]=x.value});return Math.round(Date.UTC(+o.year,o.month-1,+o.day)/864e5)}catch(e){var d=new Date();return Math.round(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/864e5)}}
+function base(s){s=String(s||"").toUpperCase();return(s.match(/-/g)||[]).length>=2?s.replace(/-[^-]*$/,""):""}
+function norm(s){return String(s==null?"":s).toLowerCase()}
+var PER=[["today","Today"],["yday","Yesterday"],["7","7 days"],["15","15 days"],["30","30 days"],["c","Custom"]];
+function range(){var T=ukToday();switch(st.per){case"today":return[T,T];case"yday":return[T-1,T-1];case"7":return[T-6,T];case"15":return[T-14,T];case"30":return[T-29,T];
+ default:var a=fromIso(st.cf),b=fromIso(st.ct);if(a==null)a=T-29;if(b==null)b=T;return a<=b?[a,b]:[b,a]}}
+function prep(D){var P=D.P,L=D.L,by=P.map(function(){return[]}),u30=P.map(function(){return 0}),tot=P.map(function(){return 0}),T=ukToday();
+ for(var i=0;i<L.length;i++){var l=L[i];by[l[0]].push(i);tot[l[0]]+=l[3];if(Math.floor(l[1]/DAYM)>=T-29)u30[l[0]]+=l[3]}
+ var bmap={};P.forEach(function(p,i){[base(p[0]),base(p[3])].forEach(function(b){if(b){(bmap[b]=bmap[b]||[]);if(bmap[b].indexOf(i)<0)bmap[b].push(i)}})});
+ var emap={};P.forEach(function(p,i){if(p[2]){(emap[p[2]]=emap[p[2]]||[]).push(i)}});
+ st.D=D;st.by=by;st.u30=u30;st.tot=tot;st.bmap=bmap;st.emap=emap;st.last=wall(D.meta.last);st.first=wall(D.meta.first)}
+function search(q){q=norm(q).trim();if(!q)return[];var P=st.D.P,hits=[],qb=q.toUpperCase();
+ P.forEach(function(p,i){var sku=norm(p[0]),vc=norm(p[3]),ean=norm(p[2]),sc=-1;
+  if(sku===q||ean===q||vc===q)sc=3;else if(sku.indexOf(q)===0||vc.indexOf(q)===0||ean.indexOf(q)===0)sc=2;
+  else if(sku.indexOf(q)>=0||vc.indexOf(q)>=0||ean.indexOf(q)>=0)sc=1;else if(norm(p[1]).indexOf(q)>=0||norm(p[9]).indexOf(q)>=0)sc=0;
+  else if(base(p[0])&&base(p[0])===base(qb))sc=0.5;
+  if(sc>=0)hits.push([i,sc])});
+ hits.sort(function(a,b){return b[1]-a[1]||st.tot[b[0]]-st.tot[a[0]]||(P[a[0]][0]<P[b[0]][0]?-1:1)});return hits.map(function(h){return h[0]})}
+function related(i){var p=st.D.P[i],s={};[base(p[0]),base(p[3])].forEach(function(b){(st.bmap[b]||[]).forEach(function(j){s[j]=1})});(st.emap[p[2]]||[]).forEach(function(j){s[j]=1});delete s[i];
+ return Object.keys(s).map(Number).sort(function(a,b){return st.tot[b]-st.tot[a]})}
+function render(body){
+ if(!document.getElementById("lk-css")){var s=document.createElement("style");s.id="lk-css";s.textContent=CSS;document.head.appendChild(s)}
+ st={q:"",sel:null,grp:false,per:"7",cf:"",ct:"",n:PAGE};
+ body.innerHTML='<div class="src" id="lksrc">Loading the order history…</div>'+
+  '<div class="ctl"><input type="search" id="lkq" placeholder="Type a SKU or EAN (or part of it)" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" aria-label="SKU or EAN"></div>'+
+  '<div class="cnt" id="lkcnt"></div><div id="lkres"></div><div id="lkdet"></div>';
+ return K.getJSON("lookup.enc").then(function(D){return D},function(e){if(e&&e.message==="notyet")return null;throw e}).then(function(D){
+  if(!D){$("lksrc").innerHTML="<b>The lookup data is not published yet.</b> It is added by the morning refresh.";return}
+  prep(D);var M=D.meta;
+  $("lksrc").innerHTML='<div><b>Orders up to '+esc(tstr(st.last))+' UK</b> · history from '+esc(tstr(st.first).replace(/,.*$/,""))+' · '+n0(M.lines)+' order lines</div>'+
+   '<div class="mut">Cancelled orders are not counted ('+n0(M.cancelled_excluded)+' lines left out). Days = UK date the order was created. B&amp;Q price/stock from the offers export of '+esc(M.offers_saved)+' UK; cost-side price/stock from '+esc(M.access)+'. Published '+esc(K.uk(M.created))+'.</div>';
+  var q=$("lkq");q.oninput=function(){st.q=q.value;st.sel=null;draw()};
+  q.onkeydown=function(e){if(e.key==="Enter"){e.preventDefault();var r=search(q.value);if(r.length){st.sel=r[0];st.grp=false;st.n=PAGE;draw();q.blur()}}};
+  draw()})}
+function draw(){if(!st||!st.D)return;var q=st.q.trim(),P=st.D.P;
+ if(!q){$("lkcnt").textContent="";$("lkres").innerHTML='<div class="box note">Type a SKU (e.g. <span class="mono">DOF-ROT-POW</span>), an OrderWise code or an EAN (e.g. <span class="mono">5056486831411</span>). Part of one works too. Then tap the product.</div>';$("lkdet").innerHTML="";return}
+ var r=search(q);
+ if(!r.length){$("lkcnt").textContent="";$("lkres").innerHTML='<div class="box"><b>No SKU or EAN matches “'+esc(q)+'”.</b><div class="note">Check the code, or type fewer characters.</div></div>';$("lkdet").innerHTML="";return}
+ if(st.sel==null&&r.length===1)st.sel=r[0];
+ var show=st.sel!=null?[]:r.slice(0,MAXR);
+ $("lkcnt").textContent=st.sel!=null?(r.length>1?r.length+" matches – showing the one you picked. Change the search to pick another.":""):(r.length>MAXR?"Top "+MAXR+" of "+r.length+" matches (most sold first) – type more to narrow it":r.length+" match"+(r.length===1?"":"es")+" – tap one");
+ $("lkres").innerHTML=show.map(function(i){var p=P[i];return '<button type="button" class="lk-res" data-i="'+i+'"><b>'+esc(p[1]||p[0])+'</b><span class="mono">'+esc(p[0])+'</span>'+(p[3]&&p[3]!==p[0]?' · <span class="mono mut">OW '+esc(p[3])+'</span>':"")+' · <span class="mono">EAN '+esc(p[2]||"–")+'</span><br><span class="mut">'+n0(st.u30[i])+' units last 30 days · '+n0(st.tot[i])+' all time</span></button>'}).join("");
+ Array.prototype.forEach.call($("lkres").querySelectorAll("[data-i]"),function(b){b.onclick=function(){st.sel=+b.getAttribute("data-i");st.grp=false;st.n=PAGE;draw();try{$("lkdet").scrollIntoView({block:"start"})}catch(e){}}});
+ detail()}
+function detail(){var i=st.sel,el=$("lkdet");if(i==null){el.innerHTML="";return}
+ var P=st.D.P,L=st.D.L,S=st.D.st,p=P[i],rel=related(i),ids=[i].concat(st.grp?rel:[]),R=range(),a=R[0],b=R[1];
+ var lines=[];ids.forEach(function(j){st.by[j].forEach(function(x){var d=Math.floor(L[x][1]/DAYM);if(d>=a&&d<=b)lines.push(x)})});
+ lines.sort(function(x,y){return L[y][1]-L[x][1]});
+ var u=0,s=0,O={},day={};
+ lines.forEach(function(x){var l=L[x],d=Math.floor(l[1]/DAYM),v=day[d]||(day[d]={u:0,s:0,o:{}});u+=l[3];s+=l[4];O[l[2]]=1;v.u+=l[3];v.s+=l[4];v.o[l[2]]=1});
+ var no=Object.keys(O).length,T=ukToday();
+ var h='<div class="lk-hd"><h3>'+esc(p[1]||p[0])+'</h3><div class="lk-kv">'+
+  '<div><span>Offer SKU</span><b class="mono">'+esc(p[0])+'</b></div>'+(p[3]?'<div><span>OrderWise code</span><b class="mono">'+esc(p[3])+'</b></div>':"")+
+  '<div><span>EAN</span><b class="mono">'+esc(p[2]||"–")+'</b></div>'+
+  '<div><span>B&amp;Q price now</span><b>'+(p[6]!=null?m2(p[6]):"–")+'</b></div>'+
+  '<div><span>B&amp;Q stock (offer qty)</span><b>'+(p[7]!=null?n0(p[7]):"–")+'</b>'+(p[8]?' <span class="mut" style="display:inline">'+esc(p[8])+'</span>':"")+'</div>'+
+  '<div><span>Access price / free stock</span><b>'+(p[4]!=null?m2(p[4]):"–")+' / '+(p[5]!=null?n0(p[5]):"–")+'</b></div></div>';
+ if(rel.length){h+='<div class="lk-rel"><span class="mut">Related SKUs (same base code or EAN):</span><br>'+rel.slice(0,24).map(function(j){return '<button type="button" data-j="'+j+'" title="'+esc(P[j][1])+'"><span class="mono">'+esc(P[j][0])+'</span> · '+n0(st.tot[j])+'</button>'}).join("")+(rel.length>24?' <span class="mut">+'+(rel.length-24)+' more</span>':"")+
+  '<label class="lk-tg"><input type="checkbox" id="lkgrp"'+(st.grp?" checked":"")+'> Add the '+rel.length+' related SKU'+(rel.length===1?"":"s")+' into the numbers below</label></div>'}
+ h+='</div>';
+ h+='<div class="seg" id="lkper">'+PER.map(function(x){return '<button type="button" data-p="'+x[0]+'" class="'+(st.per===x[0]?"on":"")+'">'+x[1]+'</button>'}).join("")+'</div>';
+ if(st.per==="c"){var mn=iso(Math.floor(st.first/DAYM)),mx=iso(T);
+  h+='<div class="lk-cus"><label>From <input type="date" id="lkf" min="'+mn+'" max="'+mx+'" value="'+esc(iso(a))+'"></label><label>To <input type="date" id="lkt" min="'+mn+'" max="'+mx+'" value="'+esc(iso(b))+'"></label></div>'}
+ var lastDay=Math.floor(st.last/DAYM);
+ h+='<div class="cnt">'+(a===b?esc(dstr(a)):esc(dstr(a))+' – '+esc(dstr(b)))+(b>=lastDay?' · orders up to '+esc(tstr(st.last))+' UK':'')+(st.grp?' · '+ids.length+' SKUs combined':'')+'</div>';
+ h+='<div class="sumg"><div class="sc"><b>'+n0(u)+'</b><span>Units</span></div><div class="sc"><b>'+m2(s)+'</b><span>Sales (incl. VAT)</span></div><div class="sc"><b>'+n0(no)+'</b><span>Orders</span></div><div class="sc"><b>'+(u?m2(s/u):"–")+'</b><span>Avg price per unit</span></div></div>';
+ var days=[];for(var d=b;d>=a;d--)days.push(d);
+ if(b-a+1<=400){var mxu=0;days.forEach(function(d){if(day[d]&&day[d].u>mxu)mxu=day[d].u});var n=days.length,W=Math.max(300,n*12),H=150,bw=W/n;
+  var bars=days.slice().reverse().map(function(d,k){var v=day[d]?day[d].u:0,bh=mxu?Math.round(v/mxu*(H-26)):0;
+   return '<rect x="'+(k*bw+bw*0.15).toFixed(1)+'" y="'+(H-14-bh)+'" width="'+(bw*0.7).toFixed(1)+'" height="'+bh+'" fill="#FF6600"><title>'+esc(dshort(d))+': '+v+' units</title></rect>'+
+    (n<=15&&v?'<text x="'+(k*bw+bw/2).toFixed(1)+'" y="'+(H-17-bh)+'" font-size="11" text-anchor="middle" fill="#0F172A">'+v+'</text>':"")}).join("");
+  var lab=days.slice().reverse().map(function(d,k){var step=Math.ceil(n/8);return(k%step===0||n<=8)?'<text x="'+(k*bw+bw/2).toFixed(1)+'" y="'+(H-2)+'" font-size="10" text-anchor="middle" fill="#64748B">'+esc(dshort(d))+'</text>':""}).join("");
+  h+='<div class="lk-ch"><div class="mut" style="font-size:13px;margin-bottom:4px">Units per day'+(mxu?' (highest '+mxu+')':'')+'</div><svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" role="img" aria-label="Units per day">'+bars+lab+'</svg></div>'}
+ h+='<h2>Day by day</h2><div class="tw"><table class="bt" id="lkdays"><thead><tr><th>Date</th><th>Units</th><th>Sales</th><th>Orders</th></tr></thead><tbody>'+
+  days.map(function(d){var v=day[d];return '<tr><td>'+esc(dstr(d))+'</td><td class="n">'+(v?n0(v.u):0)+'</td><td class="n">'+(v?m2(v.s):"£0.00")+'</td><td class="n">'+(v?Object.keys(v.o).length:0)+'</td></tr>'}).join("")+
+  '</tbody><tfoot><tr><th>Total</th><th class="n">'+n0(u)+'</th><th class="n">'+m2(s)+'</th><th class="n">'+n0(no)+'</th></tr></tfoot></table></div>';
+ h+='<h2>Order lines</h2>'+(lines.length?'<div class="cnt">Newest first · '+n0(lines.length)+' line'+(lines.length===1?"":"s")+' in this period</div><div class="tw"><table class="bt" id="lklines"><thead><tr><th>Created (UK)</th><th>Order</th><th>SKU</th><th>Qty</th><th>Line £</th><th>Each</th><th>Status</th></tr></thead><tbody>'+
+  lines.slice(0,st.n).map(function(x){var l=L[x];return '<tr><td>'+esc(tstr(l[1]))+'</td><td class="mono">'+esc(l[2])+'</td><td class="mono">'+esc(P[l[0]][0])+'</td><td class="n">'+n0(l[3])+'</td><td class="n">'+m2(l[4])+'</td><td class="n">'+(l[3]?m2(l[4]/l[3]):"–")+'</td><td>'+esc(S[l[5]])+'</td></tr>'}).join("")+'</tbody></table></div>'+
+  (lines.length>st.n?'<button class="more" type="button" id="lkmore">Show more ('+(lines.length-st.n)+' left)</button>':""):'<div class="box note">No orders for this product in this period'+(b>=lastDay?' (orders up to '+esc(tstr(st.last))+' UK)':'')+'.</div>');
+ el.innerHTML=h;
+ Array.prototype.forEach.call(el.querySelectorAll("[data-p]"),function(x){x.onclick=function(){st.per=x.getAttribute("data-p");if(st.per==="c"&&!st.cf){st.cf=iso(a);st.ct=iso(b)}st.n=PAGE;detail()}});
+ Array.prototype.forEach.call(el.querySelectorAll("[data-j]"),function(x){x.onclick=function(){st.sel=+x.getAttribute("data-j");st.grp=false;st.n=PAGE;detail()}});
+ var g=$("lkgrp");if(g&&g.id==="lkgrp")g.onchange=function(){st.grp=g.checked;st.n=PAGE;detail()};
+ var f=$("lkf"),t=$("lkt");if(st.per==="c"){f.onchange=function(){st.cf=f.value;detail()};t.onchange=function(){st.ct=t.value;detail()}}
+ var mo=$("lkmore");if(mo&&mo.id==="lkmore")mo.onclick=function(){st.n+=200;detail()};
+ st.view={ids:ids,from:a,to:b,units:u,sales:Math.round(s*100)/100,orders:no,lines:lines.length,days:days.map(function(d){var v=day[d];return[iso(d),v?v.u:0,v?Math.round(v.s*100)/100:0,v?Object.keys(v.o).length:0]})}}
+BQTabs.add("lookup",{title:"Individual sales",render:function(body){return render(body)}});
+window.BQLookup={state:function(){return st},search:function(q){return search(q)},ukToday:ukToday};
+})();
+</script>
+<script>
+(function(){
+"use strict";
+/* B&Q dashboard – Calculator tab (8th card). ALL maths comes from the shared engine bq_price.js (window.BQP):
+   BQP.postInfo (postage rules incl. the special fixed list), BQP.multOf, BQP.fixedCost, BQP.calc, BQP.floorPrice, BQP.priceMax, BQP.rnd, BQP.num.
+   Nothing is re-implemented here. Optional SKU look-up reads lookup.enc (Access cost / supplier / weight / postage / title), decrypted in this browser.
+   Saved postage per SKU lives only in this browser (localStorage), never sent anywhere; Export gives a CSV. */
+if(!window.BQTabs||!window.BQP)return;
+var K=BQTabs.kit,$=K.$,esc=K.esc,E=window.BQP,LS="bq_calc_saved_postage_v1";
+var CSS='#ckw .ckf{background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:12px;margin-bottom:10px}'+
+ '#ckw label.ckl{display:block;font-weight:700;font-size:15px;margin-bottom:6px;color:#0F172A}#ckw label.ckl span{font-weight:400;color:#64748B;font-size:13px}'+
+ '#ckw input[type=text]{width:100%;font-size:17px;padding:11px 12px;border-radius:10px;border:1px solid #CBD5E1;background:#fff;color:#0F172A}'+
+ '#ckw input.ov{border-color:#FF6600;background:#FFF7ED}#ckw .row2{display:flex;gap:8px;align-items:center}#ckw .row2 input{flex:1 1 auto}'+
+ '#ckw .seg{margin:0}#ckw select{font-size:15px;padding:10px;border-radius:10px;border:1px solid #CBD5E1;background:#fff;color:#0F172A;width:100%;margin-top:8px}'+
+ '#ckw .ckm{font-size:13px;color:#64748B;margin-top:6px;line-height:1.45}#ckw .ckb{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}'+
+ '#ckw .ckb button{padding:9px 12px;border-radius:10px;background:#0F172A;color:#fff;font-size:14px;font-weight:600}#ckw .ckb button.l{background:#E2E8F0;color:#0F172A}#ckw .ckb button:disabled{opacity:.45}'+
+ '#ckw table.ckt{width:100%;border-collapse:collapse;font-size:15px}#ckw .ckt td{padding:7px 4px;border-bottom:1px solid #F1F5F9}#ckw .ckt td.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}'+
+ '#ckw .ckt tr.tot td{font-weight:800;border-top:2px solid #0F172A;border-bottom:0}#ckw .big2{font-size:26px;font-weight:800}#ckw .pos{color:#166534}#ckw .neg{color:#991B1B}'+
+ '#ckw .ckg{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}#ckw .ckg>div{background:#F8FAFC;border-radius:10px;padding:10px;border-left:5px solid #FF6600}#ckw .ckg b{display:block;font-size:22px}#ckw .ckg span{font-size:13px;color:#64748B}'+
+ '#ckw .ckp{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid #F1F5F9}#ckw .ckp:last-child{border-bottom:0}#ckw .ckp b.v{font-size:22px}';
+var st=null;
+function m2(v){return v==null||isNaN(v)?"–":(v<0?"−":"")+"£"+Math.abs(E.rnd(v,2)).toFixed(2)}
+function pct(v){return v==null||isNaN(v)?"–":(Math.round(v*1000)/10).toFixed(1)+"%"}
+function today(){try{return new Date().toLocaleDateString("en-CA",{timeZone:"Europe/London"})}catch(e){return new Date().toISOString().slice(0,10)}}
+function loadSaved(){try{var o=JSON.parse(localStorage.getItem(LS)||"{}");return o&&typeof o==="object"?o:{}}catch(e){return{}}}
+function storeSaved(o){try{localStorage.setItem(LS,JSON.stringify(o));return true}catch(e){return false}}
+function skuKey(){return String($("cksku").value||"").trim().toUpperCase()}
+function val(id){return String($(id).value||"").trim()}
+function findP(q){if(!st.D||!q)return null;q=q.toUpperCase();var P=st.D.P,i,hit=null;
+ for(i=0;i<P.length;i++)if(String(P[i][0]).toUpperCase()===q){hit=P[i];break}
+ if(!hit)for(i=0;i<P.length;i++)if(P[i][2]&&String(P[i][2])===q&&P[i][10]!=null){hit=P[i];break}
+ if(!hit)for(i=0;i<P.length;i++)if(P[i][3]&&String(P[i][3]).toUpperCase()===q&&P[i][10]!=null){hit=P[i];break}
+ return hit}
+function render(body){
+ if(!document.getElementById("ck-css")){var s=document.createElement("style");s.id="ck-css";s.textContent=CSS;document.head.appendChild(s)}
+ st={china:false,unit:"g",prod:null,ovSrc:"",D:null,lastSku:""};
+ var spec=Object.keys(E.SPECIAL).map(function(k){return '<option value="'+k+'">'+esc(E.SPECIAL[k][0])+' – £'+E.SPECIAL[k][1].toFixed(2)+'</option>'}).join("");
+ body.innerHTML='<div class="src">One product: cost → postage → B&amp;Q fee → total cost → profit. Uses the same price engine as the Sales, Orders and Pricing tabs (<span class="mono">'+esc(E.VERSION)+'</span>). '+
+  'Total cost = cost + company cost (×1 more for China/Ashian, ×0.5 more for UK) + 15% B&amp;Q fee on the selling price + postage (+ collab fee if any). Profit % is on cost. No separate VAT line – the engine and Diva\'s Master File work on the selling price as it is.</div>'+
+  '<div id="ckw">'+
+  '<div class="ckf"><label class="ckl" for="cksku">SKU <span>(optional – fills cost, UK/China, weight and special postage from Access; needed to save postage)</span></label><input type="text" id="cksku" placeholder="e.g. XMA-GAR-GRE-1 or an EAN" autocomplete="off" autocapitalize="characters" spellcheck="false"><div class="ckm" id="ckskui">Loading the SKU list…</div></div>'+
+  '<div class="ckf"><label class="ckl" for="ckcost">1 · Base / estimated cost £</label><input type="text" id="ckcost" inputmode="decimal" placeholder="e.g. 1.67" autocomplete="off"></div>'+
+  '<div class="ckf"><label class="ckl">2 · Product from</label><div class="seg" id="ckorg"><button type="button" data-o="uk" class="on">UK</button><button type="button" data-o="cn">China (Ashian)</button></div><div class="ckm" id="ckorgm"></div></div>'+
+  '<div class="ckf"><label class="ckl" for="ckwt">3 · Weight <span>(our postage rules use grams; a multi-pack is one parcel – use the pack weight)</span></label><div class="row2"><input type="text" id="ckwt" inputmode="decimal" placeholder="e.g. 850" autocomplete="off"><div class="seg" id="ckun"><button type="button" data-u="g" class="on">g</button><button type="button" data-u="kg">kg</button></div></div></div>'+
+  '<div class="ckf"><label class="ckl" for="ckpost">Postage £ <span>(blank = our rules; type to override)</span></label><input type="text" id="ckpost" inputmode="decimal" autocomplete="off" placeholder="our rules">'+
+  '<select id="ckspec" aria-label="Special postage category"><option value="">Special postage category… (fills the postage)</option>'+spec+'</select>'+
+  '<div class="ckm" id="ckpm"></div><div class="ckb"><button type="button" id="cksave">Save postage for this SKU</button><button type="button" class="l" id="ckdel">Remove saved postage</button><button type="button" class="l" id="ckclr">Use our rules</button></div></div>'+
+  '<div class="ckf"><div class="ckl">Total cost</div><div id="ckbd" class="ckm">Type the cost and weight.</div></div>'+
+  '<div class="ckf"><label class="ckl" for="ckprice">Selling price £ <span>(B&amp;Q price, as listed)</span></label><input type="text" id="ckprice" inputmode="decimal" placeholder="e.g. 8.99" autocomplete="off"><div id="ckres" style="margin-top:10px"></div></div>'+
+  '<div class="ckf" id="ckfl"></div>'+
+  '<div class="ckf"><div class="ckl">Postage you saved on this device</div><div id="cksv"></div><div class="ckb"><button type="button" id="ckexp">Export saved postage (CSV)</button></div><div class="ckm">Saved only in this browser on this device. Precedence: your saved postage → built-in special list → Access postage → weight bands. Export it so it can be added to the main special postage rules.</div></div>'+
+  '</div>';
+ var on=function(id,ev,f){$(id).addEventListener(ev,f)};
+ on("cksku","input",function(){skuChanged(false)});on("cksku","change",function(){skuChanged(true)});
+ ["ckcost","ckwt","ckprice"].forEach(function(id){on(id,"input",compute)});
+ on("ckpost","input",function(){st.ovSrc=val("ckpost")?"typed":"";$("ckspec").value="";compute()});
+ on("ckspec","change",function(){var k=$("ckspec").value;if(!k)return;$("ckpost").value=E.SPECIAL[k][1].toFixed(2);st.ovSrc="special:"+k;compute()});
+ on("ckclr","click",function(){$("ckpost").value="";$("ckspec").value="";st.ovSrc="";compute()});
+ on("cksave","click",savePost);on("ckdel","click",delPost);on("ckexp","click",exportCSV);
+ Array.prototype.forEach.call($("ckorg").querySelectorAll("button"),function(b){b.onclick=function(){st.china=b.getAttribute("data-o")==="cn";segs();compute()}});
+ Array.prototype.forEach.call($("ckun").querySelectorAll("button"),function(b){b.onclick=function(){var u=b.getAttribute("data-u");if(u===st.unit)return;var w=E.num(val("ckwt"));
+  if(w!=null)$("ckwt").value=String(u==="kg"?Number((w/1000).toFixed(6)):Number((w*1000).toFixed(3)));st.unit=u;segs();compute()}});
+ segs();listSaved();compute();
+ return K.getJSON("lookup.enc").then(function(D){st.D=D;$("ckskui").textContent="Type an offer SKU, EAN or OrderWise code. Access file: "+(D.meta.access||"–")+".";if(val("cksku"))skuChanged(true)},
+  function(e){$("ckskui").textContent="SKU look-up not available ("+(e&&e.message==="notyet"?"not published yet":"could not load")+") – type the cost and weight yourself. Saving postage still works.";})}
+function segs(){Array.prototype.forEach.call($("ckorg").querySelectorAll("button"),function(b){b.className=(b.getAttribute("data-o")==="cn")===st.china?"on":""});
+ Array.prototype.forEach.call($("ckun").querySelectorAll("button"),function(b){b.className=b.getAttribute("data-u")===st.unit?"on":""});
+ $("ckorgm").textContent=st.china?"China (Ashian Homeware): company cost ×1 more on cost · floor 100% on cost":"UK: company cost ×0.5 more on cost · floor 50% on cost · cap 80%"}
+function skuChanged(force){var k=skuKey();if(k===st.lastSku&&!force)return;st.lastSku=k;var p=findP(k),sv=loadSaved()[k];st.prod=null;
+ if(p&&p[10]!=null){st.prod={sku:p[0],title:p[15]||p[1]||"",pc:p[13],collab:p[14],codes:[p[0],p[3]],cost:p[10],china:p[11]===1,w:p[12],price:p[6]!=null?p[6]:p[4],name:p[1]};
+  $("ckcost").value=String(p[10]);st.china=p[11]===1;st.unit="g";$("ckwt").value=p[12]!=null?String(p[12]):"";if(st.prod.price!=null)$("ckprice").value=Number(st.prod.price).toFixed(2);segs();
+  $("ckskui").innerHTML='<b>'+esc(p[0])+'</b> – '+esc(st.prod.title)+'<br>Access: cost £'+esc(p[10])+' · '+(st.china?"China (Ashian)":"UK")+' · '+(p[12]!=null?esc(p[12])+" g":"no weight")+' · Access postage '+(p[13]!=null?"£"+Number(p[13]).toFixed(2):"–")+(p[6]!=null?' · B&amp;Q price now £'+Number(p[6]).toFixed(2):"")}
+ else if(k){$("ckskui").textContent=st.D?(p?"Found "+p[0]+" but it is not in the Access file – type the cost and weight.":"SKU not found in Access/offers – type the cost and weight yourself (postage can still be saved for it)."):"SKU look-up not loaded – type the cost and weight yourself."}
+ else $("ckskui").textContent=st.D?"Type an offer SKU, EAN or OrderWise code.":"";
+ if(sv){$("ckpost").value=Number(sv.p).toFixed(2);st.ovSrc="saved"}else if(st.ovSrc==="saved"){$("ckpost").value="";st.ovSrc=""}
+ $("ckspec").value="";compute()}
+/* the one place postage is decided: BQP.postInfo with (Access postage, weight g, Access title, [sku, variant code], typed postage) */
+function post(){var pr=st.prod,w=E.num(val("ckwt"));if(w!=null&&st.unit==="kg")w=Number((w*1000).toFixed(6));
+ var args=[pr?pr.pc:null,w,pr?pr.title:"",pr?pr.codes:[]],auto=E.postInfo.apply(null,args),ty=E.num(val("ckpost")),PI=auto,src=auto.src;
+ if(val("ckpost")&&ty!=null&&ty>=0){PI=E.postInfo.apply(null,args.concat([ty]));src=st.ovSrc==="saved"?"Your saved postage for "+skuKey():st.ovSrc.indexOf("special:")===0?"Special: "+E.SPECIAL[st.ovSrc.slice(8)][0]+" (picked)":"Your postage (typed)"}
+ return{p:PI.p,src:src,auto:auto,w:w,over:PI!==auto}}
+function compute(){if(!st)return null;var cost=E.num(val("ckcost")),P=post(),price=E.num(val("ckprice")),R={cost:cost,china:st.china,post:P.p,postSrc:P.src,w:P.w};
+ $("ckpost").className=P.over?"ov":"";$("ckpost").placeholder=P.auto.p!=null?"our rules: "+P.auto.p.toFixed(2):"our rules";
+ $("ckpm").innerHTML=(P.over?'Using <b>'+esc(P.src)+'</b>: £'+P.p.toFixed(2)+' · our rules would give '+(P.auto.p!=null?'£'+P.auto.p.toFixed(2)+' ('+esc(P.auto.src)+')':'nothing')
+  :P.p!=null?'Our rules: <b>£'+P.p.toFixed(2)+'</b> – '+esc(P.src):'Type the weight (or a postage) to get postage.');
+ var k=skuKey(),sv=loadSaved()[k];$("cksave").disabled=!k||!(E.num(val("ckpost"))>=0)||!val("ckpost");$("ckdel").disabled=!sv;
+ if(sv)$("ckpm").innerHTML+='<br>Saved for '+esc(k)+': £'+Number(sv.p).toFixed(2)+' on '+esc(sv.d);
+ if(!(cost>0)||P.p==null){$("ckbd").innerHTML=!(cost>0)?"Type the cost (more than £0).":"Type the weight or a postage.";$("ckres").innerHTML="";$("ckfl").innerHTML="";st.R=R;return R}
+ var a={cost:cost,mult:E.multOf(st.china?"Ashian Homeware":""),post:P.p,collab:st.prod&&st.prod.collab?st.prod.collab:0},fixed=E.fixedCost(a),C=price>0?E.calc(a,price):null;
+ R.a=a;R.fixed=fixed;
+ var rows=[["Cost",cost],["Company cost ("+(st.china?"×1, China":"×0.5, UK")+")",cost*(a.mult-1)],["Postage",P.p]];if(a.collab)rows.push(["Collab fee",E.num(a.collab)]);
+ rows.push(["Total before B&Q fee",fixed]);
+ $("ckbd").innerHTML='<table class="ckt">'+rows.map(function(r,i){return '<tr'+(i===rows.length-1?' style="font-weight:700"':'')+'><td>'+esc(r[0])+'</td><td class="n">'+m2(r[1])+'</td></tr>'}).join("")+
+  '<tr><td>B&amp;Q fee 15% of selling price</td><td class="n">'+(C?m2(C.fee):"type a selling price")+'</td></tr><tr class="tot"><td>Total cost</td><td class="n">'+(C?m2(C.total):"–")+'</td></tr></table>';
+ if(C){R.price=price;R.fee=C.fee;R.total=C.total;R.profit=C.profit;R.pc=C.pc;R.margin=C.pr/price;
+  $("ckres").innerHTML='<div class="ckg"><div><b class="'+(C.profit>0?"pos":"neg")+'">'+m2(C.profit)+'</b><span>Profit</span></div><div><b>'+pct(C.pc)+'</b><span>Profit % on cost</span></div><div><b>'+pct(C.pr/price)+'</b><span>Margin (profit ÷ price)</span></div><div><b>'+m2(C.total)+'</b><span>Total cost at this price</span></div></div>'+
+   (C.profit<=0?'<div class="ckm neg"><b>Loss at this price.</b></div>':C.pc<(st.china?E.CHINA_FLOOR:E.SAFE_MIN)-1e-9?'<div class="ckm neg"><b>Under the '+(st.china?"100% China":"50%")+' floor.</b></div>':!st.china&&C.pc>E.UK_MAX+1e-9?'<div class="ckm">Above the 80% UK cap.</div>':'')}
+ else $("ckres").innerHTML='<div class="ckm">Type a selling price to see profit.</div>';
+ var f=st.china?E.CHINA_FLOOR:E.SAFE_MIN,fl=E.floorPrice(a,f,st.china),Cf=E.calc(a,fl),h='';R.floor=fl;R.floorProfit=Cf.profit;R.floorPc=Cf.pc;
+ h+='<div class="ckp"><div><div class="ckl" style="margin:0">Base profit selling price</div><div class="ckm" style="margin:0">lowest safe price · '+(st.china?"100%":"50%")+' on cost · rounded up to the penny</div></div><div><b class="v">£'+fl.toFixed(2)+'</b> <span class="ckm">profit '+m2(Cf.profit)+' · '+pct(Cf.pc)+'</span></div><div class="ckb" style="margin:0"><button type="button" class="l" data-use="'+fl.toFixed(2)+'">Use</button></div></div>';
+ if(!st.china){var cp=E.priceMax(a,E.UK_MAX),Cc=E.calc(a,cp);R.cap=cp;R.capProfit=Cc.profit;R.capPc=Cc.pc;
+  h+='<div class="ckp"><div><div class="ckl" style="margin:0">Highest profit selling price</div><div class="ckm" style="margin:0">80% UK cap · rounded down to the penny</div></div><div><b class="v">£'+cp.toFixed(2)+'</b> <span class="ckm">profit '+m2(Cc.profit)+' · '+pct(Cc.pc)+'</span></div><div class="ckb" style="margin:0"><button type="button" class="l" data-use="'+cp.toFixed(2)+'">Use</button></div></div>'}
+ else{R.cap=null;h+='<div class="ckp"><div><div class="ckl" style="margin:0">Highest profit selling price</div><div class="ckm" style="margin:0">No cap for China products – the engine has no China cap rule (China = 100% floor, then 1p under the buy box). The 80% cap is UK only.</div></div><div><b class="v">No cap</b></div></div>'}
+ h+='<div class="ckm">'+(st.china?"":"The Pricing tab uses a higher floor (60–80%) for UK items with no sales in the last 30 days and cost under £10; this calculator uses the 50% floor. ")+'Floors never give a loss.</div>';
+ $("ckfl").innerHTML=h;Array.prototype.forEach.call($("ckfl").querySelectorAll("[data-use]"),function(b){b.onclick=function(){$("ckprice").value=b.getAttribute("data-use");compute()}});
+ st.R=R;return R}
+function savePost(){var k=skuKey(),p=E.num(val("ckpost"));if(!k||p==null||p<0)return;var o=loadSaved();o[k]={p:E.rnd(p,2),d:today()};
+ if(!storeSaved(o)){alert("This browser would not save it (private mode?).");return}st.ovSrc="saved";listSaved();compute()}
+function delPost(){var k=skuKey(),o=loadSaved();if(!o[k])return;delete o[k];storeSaved(o);if(st.ovSrc==="saved"){$("ckpost").value="";st.ovSrc=""}listSaved();compute()}
+function listSaved(){var o=loadSaved(),ks=Object.keys(o).sort();
+ $("cksv").innerHTML=ks.length?'<table class="ckt">'+ks.map(function(k){return '<tr><td class="mono">'+esc(k)+'</td><td class="n">£'+Number(o[k].p).toFixed(2)+'</td><td class="n mut">'+esc(o[k].d)+'</td><td class="n"><button type="button" class="btn l" data-del="'+esc(k)+'" aria-label="Remove '+esc(k)+'" style="padding:4px 9px;border-radius:8px;background:#E2E8F0">✕</button></td></tr>'}).join("")+'</table>':'<div class="ckm">None saved yet.</div>';
+ $("ckexp").disabled=!ks.length;
+ Array.prototype.forEach.call($("cksv").querySelectorAll("[data-del]"),function(b){b.onclick=function(){var o2=loadSaved();delete o2[b.getAttribute("data-del")];storeSaved(o2);if(b.getAttribute("data-del")===skuKey()&&st.ovSrc==="saved"){$("ckpost").value="";st.ovSrc=""}listSaved();compute()}})}
+function csvText(){var o=loadSaved(),e=function(v){v=String(v);return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+ return "SKU,postage,date\r\n"+Object.keys(o).sort().map(function(k){return e(k)+","+Number(o[k].p).toFixed(2)+","+e(o[k].d)}).join("\r\n")+"\r\n"}
+function exportCSV(){K.save("bq_saved_postage_"+today()+".csv",new Blob([csvText()],{type:"text/csv"}))}
+BQTabs.add("calc",{title:"Calculator",render:function(body){return render(body)}});
+window.BQCalc={state:function(){return st},compute:compute,csv:csvText,saved:loadSaved};
+})();
+</script>
+<script>
+(function(){
+"use strict";
+/* B&Q – one tab bar on every page (main dashboard page: menu, Sales, Orders, every tab; and the Listings tool pages).
+   Same list everywhere, current one highlighted, scrolls sideways on phones. No data, no keys. */
+var T=[["home","Home"],["sales","Sales"],["orders","Orders"],["listings","Listings"],["dups","Duplicates"],["access","Access file"],["pricing","Pricing"],["lookup","Individual sales"],["calc","Calculator"]];
+if(document.getElementById("bqnav"))return;
+var CSS='#bqnav{position:fixed;top:0;left:0;right:0;z-index:50;background:#0F172A;border-bottom:1px solid #1E293B;padding:env(safe-area-inset-top) 0 0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}'+
+ '#bqnav .bqn-s{display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:7px 10px;max-width:1400px;margin:0 auto}#bqnav .bqn-s::-webkit-scrollbar{display:none}'+
+ '#bqnav a{flex:none;display:inline-flex;align-items:center;min-height:36px;padding:7px 13px;border-radius:999px;background:#1E293B;color:#E2E8F0!important;font-size:14px;font-weight:600;text-decoration:none!important;white-space:nowrap;line-height:1.1;box-sizing:border-box}'+
+ '#bqnav a:hover{background:#334155}#bqnav a.on{background:#FF6600;color:#fff!important}#bqnav a:focus-visible{outline:3px solid #FDBA74;outline-offset:1px}'+
+ '@media (max-width:620px){#bqnav a{font-size:13px;padding:7px 11px}}';
+var MAIN=!!document.getElementById("menu"),cur="",nav,st;
+function add(){st=document.createElement("style");st.id="bqnav-css";st.textContent=CSS+(MAIN?
+  'body.bqn #viewer,body.bqn #tabv{top:var(--bqnh,50px)}body.bqn #menu{padding-top:calc(var(--bqnh,50px) + 8px)}body.bqn .tbar{padding-top:8px}':
+  'body{padding-top:var(--bqnh,50px)!important}');
+ document.head.appendChild(st);
+ nav=document.createElement("nav");nav.id="bqnav";nav.setAttribute("aria-label","All dashboards");
+ nav.innerHTML='<div class="bqn-s">'+T.map(function(t){return '<a href="'+href(t[0])+'" data-bqn="'+t[0]+'"'+(MAIN?'':' data-dash')+'>'+t[1]+'</a>'}).join("")+'</div>';
+ document.body.insertBefore(nav,document.body.firstChild);size();window.addEventListener("resize",size)}
+function size(){var h=nav.getBoundingClientRect().height;document.documentElement.style.setProperty("--bqnh",Math.round(h)+"px")}
+/* links: on the main page they act in place; on the Listings pages they go to the main page (#go=<tab> opens it after unlock) */
+function base(){if(MAIN)return "";if(typeof dashUrl==="function")try{return dashUrl()}catch(e){}return /\/listings\/phone\/?/.test(location.pathname)?"../../":"../"}
+function href(v){if(MAIN)return v==="listings"?"listings/":"#go="+v;return v==="listings"?"./":base()+(v==="home"?"":"#go="+v)}
+function mark(v){if(v===cur)return;cur=v;Array.prototype.forEach.call(nav.querySelectorAll("a"),function(a){var on=a.getAttribute("data-bqn")===v;a.classList.toggle("on",on);if(on){a.setAttribute("aria-current","page");try{a.scrollIntoView({block:"nearest",inline:"nearest"})}catch(e){}}else a.removeAttribute("aria-current")})}
+if(!MAIN){add();mark("listings");return}
+/* ---- main page ---- */
+var $=function(i){return document.getElementById(i)},TITLE={};
+function hidden(id){var e=$(id);return !e||e.classList.contains("hide")}
+function state(){if(!hidden("tabv")){var tt=($("ttitle")||{}).textContent||"";for(var k in TITLE)if(TITLE[k]===tt)return k;return ""}
+ if(!hidden("viewer"))return /Orders/.test(document.title)?"orders":"sales";return "home"}
+function sync(){var unl=!hidden("menu")||!hidden("viewer")||!hidden("tabv");document.body.classList.toggle("bqn",unl);nav.style.display=unl?"":"none";if(unl){size();mark(state())}
+ if(unl&&!hidden("menu")&&pend){var v=pend;pend=null;setTimeout(function(){go(v)},0)}}
+function card(v){return document.querySelector('#menu [data-d="'+v+'"],#menu [data-v="'+v+'"]')}
+function go(v){if(v==="listings"){location.href="listings/";return}
+ if(window.BQTabs&&BQTabs.close&&!hidden("tabv"))BQTabs.close();
+ if(!hidden("viewer")&&window.BQ&&BQ.back)BQ.back();
+ if(v==="home"){sync();return}
+ var c=card(v);if(c)c.click();sync()}
+var pend=null,m=/[#&]go=([a-z]+)/.exec(location.hash||"");if(m){pend=m[1];try{history.replaceState(history.state,"",location.pathname+location.search)}catch(e){}}
+add();
+setTimeout(function(){if(window.BQTabs)Object.keys(BQTabs.tabs).forEach(function(k){TITLE[k]=BQTabs.tabs[k].title})},0);
+nav.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[data-bqn]");if(!a||e.ctrlKey||e.metaKey||e.shiftKey||e.button)return;var v=a.getAttribute("data-bqn");if(v==="listings")return;e.preventDefault();go(v)});
+var mo=new MutationObserver(sync);["menu","viewer","tabv","login","ttitle"].forEach(function(id){var e=$(id);if(e)mo.observe(e,{attributes:true,attributeFilter:["class"],childList:id==="ttitle",characterData:id==="ttitle",subtree:id==="ttitle"})});
+var ot=document.querySelector("title");if(ot)mo.observe(ot,{childList:true,characterData:true,subtree:true});
+sync();
+window.BQNav={tabs:T,current:function(){return cur},go:go};
 })();
 </script>
 </body></html>
