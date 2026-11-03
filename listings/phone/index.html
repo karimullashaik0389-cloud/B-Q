@@ -2483,4 +2483,52 @@ document.addEventListener('input',sessSave,true);document.addEventListener('chan
 window.addEventListener('pagehide',function(){try{saveMode();idbSet('sess',{v:1,at:Date.now(),mode:S.mode,view:S.view,saved:S.saved});}catch(e){}});
 window.__WR=WR;window.__catFilter=function(q){return catFilter(q);};window.__catAll=function(){return catAll().length;};window.__ccList=function(){return ccList();};window.__unit=unit;window.__pcat=function(x){var p=S.P[x];return p?{cat:p.cat,mine:!!p.catMine,prev:p.catPrev||null,conf:p.catAuto&&p.catAuto.conf||null,low:catLow(p),need:catNeedConf(p),guess:catNeedConf(p)?catGuess(p):null,f:JSON.parse(JSON.stringify(p.f)),ans:JSON.parse(JSON.stringify(p.ans))}:null;};window.__catSugCalc=catSugCalc;window.__bqTxtAll=bqTxtAll;window.__noBrand=function(x){return WR.noBrand(x);};window.__bqMatch=bqMatch;window.__catSug=function(s){var p=S.P[s];return p?catSugFor(p):null;};window.__pinfo=function(s){var p=S.P[s];return p?{state:p.state,grp:p.grp,bqSku:p.bqSku||null,cat:p.cat,catBq:!!p.catBq,photos:p.photos.length,shop:(p.k||{}).bqSku||p.bqSku||s}:null;};window.__bqRow=bqRow;window.__bqRowAll=bqRowAll;window.__brandFor=brandFor;window.__bqImg=bqImg;window.__needs=function(s){return allNeeds(S.P[s]);};window.__cat=function(q,x){catIx();var r=autoCat(q,x||'');return {conf:r.conf,top:r.slice(0,6).map(function(o){return o.cat+' '+o.score.toFixed(3);}),search:catSearch(q,8)};};window.__dlAll=dlAll;window.__VARS=function(){return VARS;};window.__varFile=function(s){return varFile(s);};window.__varSrc=function(){var v=varSrc();return v&&{name:v.name,date:v.date,n:v.n};};window.__groupFor=function(s){return groupFor(s);};window.__tplGet=tplGet;window.__POOL=function(){return GPS;};window.__wrAttrs=function(x){return wrAttrs(S.P[x]);};window.__picks=function(x){var p=S.P[x],F=fInfo(p.cat);return Object.keys(F.lists).map(function(c){var k=pickFor(p,c);return k?c+': '+k.v+' | '+k.conf+' | '+k.why:null;}).filter(Boolean);};window.__opts=function(x,c){var F=fInfo(S.P[x].cat);return F.lists[c]||null;};window.__S=S;window.__titles=function(){return Object.keys(S.P).filter(function(s){return S.P[s].grp==='page';}).map(function(s){return [s,S.P[s].title.length,S.P[s].title];});};
 })();
-</script></body></html>
+</script><!--BQNAV--><script>
+(function(){
+"use strict";
+/* B&Q – one tab bar on every page (main dashboard page: menu, Sales, Orders, every tab; and the Listings tool pages).
+   Same list everywhere, current one highlighted, scrolls sideways on phones. No data, no keys. */
+var T=[["home","Home"],["sales","Sales"],["orders","Orders"],["listings","Listings"],["dups","Duplicates"],["access","Access file"],["pricing","Pricing"],["lookup","Individual sales"],["calc","Calculator"]];
+if(document.getElementById("bqnav"))return;
+var CSS='#bqnav{position:fixed;top:0;left:0;right:0;z-index:50;background:#0F172A;border-bottom:1px solid #1E293B;padding:env(safe-area-inset-top) 0 0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}'+
+ '#bqnav .bqn-s{display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:7px 10px;max-width:1400px;margin:0 auto}#bqnav .bqn-s::-webkit-scrollbar{display:none}'+
+ '#bqnav a{flex:none;display:inline-flex;align-items:center;min-height:36px;padding:7px 13px;border-radius:999px;background:#1E293B;color:#E2E8F0!important;font-size:14px;font-weight:600;text-decoration:none!important;white-space:nowrap;line-height:1.1;box-sizing:border-box}'+
+ '#bqnav a:hover{background:#334155}#bqnav a.on{background:#FF6600;color:#fff!important}#bqnav a:focus-visible{outline:3px solid #FDBA74;outline-offset:1px}'+
+ '@media (max-width:620px){#bqnav a{font-size:13px;padding:7px 11px}}';
+var MAIN=!!document.getElementById("menu"),cur="",nav,st;
+function add(){st=document.createElement("style");st.id="bqnav-css";st.textContent=CSS+(MAIN?
+  'body.bqn #viewer,body.bqn #tabv{top:var(--bqnh,50px)}body.bqn #menu{padding-top:calc(var(--bqnh,50px) + 8px)}body.bqn .tbar{padding-top:8px}':
+  'body{padding-top:var(--bqnh,50px)!important}');
+ document.head.appendChild(st);
+ nav=document.createElement("nav");nav.id="bqnav";nav.setAttribute("aria-label","All dashboards");
+ nav.innerHTML='<div class="bqn-s">'+T.map(function(t){return '<a href="'+href(t[0])+'" data-bqn="'+t[0]+'"'+(MAIN?'':' data-dash')+'>'+t[1]+'</a>'}).join("")+'</div>';
+ document.body.insertBefore(nav,document.body.firstChild);size();window.addEventListener("resize",size)}
+function size(){var h=nav.getBoundingClientRect().height;document.documentElement.style.setProperty("--bqnh",Math.round(h)+"px")}
+/* links: on the main page they act in place; on the Listings pages they go to the main page (#go=<tab> opens it after unlock) */
+function base(){if(MAIN)return "";if(typeof dashUrl==="function")try{return dashUrl()}catch(e){}return /\/listings\/phone\/?/.test(location.pathname)?"../../":"../"}
+function href(v){if(MAIN)return v==="listings"?"listings/":"#go="+v;return v==="listings"?"./":base()+(v==="home"?"":"#go="+v)}
+function mark(v){if(v===cur)return;cur=v;Array.prototype.forEach.call(nav.querySelectorAll("a"),function(a){var on=a.getAttribute("data-bqn")===v;a.classList.toggle("on",on);if(on){a.setAttribute("aria-current","page");try{a.scrollIntoView({block:"nearest",inline:"nearest"})}catch(e){}}else a.removeAttribute("aria-current")})}
+if(!MAIN){add();mark("listings");return}
+/* ---- main page ---- */
+var $=function(i){return document.getElementById(i)},TITLE={};
+function hidden(id){var e=$(id);return !e||e.classList.contains("hide")}
+function state(){if(!hidden("tabv")){var tt=($("ttitle")||{}).textContent||"";for(var k in TITLE)if(TITLE[k]===tt)return k;return ""}
+ if(!hidden("viewer"))return /Orders/.test(document.title)?"orders":"sales";return "home"}
+function sync(){var unl=!hidden("menu")||!hidden("viewer")||!hidden("tabv");document.body.classList.toggle("bqn",unl);nav.style.display=unl?"":"none";if(unl){size();mark(state())}
+ if(unl&&!hidden("menu")&&pend){var v=pend;pend=null;setTimeout(function(){go(v)},0)}}
+function card(v){return document.querySelector('#menu [data-d="'+v+'"],#menu [data-v="'+v+'"]')}
+function go(v){if(v==="listings"){location.href="listings/";return}
+ if(window.BQTabs&&BQTabs.close&&!hidden("tabv"))BQTabs.close();
+ if(!hidden("viewer")&&window.BQ&&BQ.back)BQ.back();
+ if(v==="home"){sync();return}
+ var c=card(v);if(c)c.click();sync()}
+var pend=null,m=/[#&]go=([a-z]+)/.exec(location.hash||"");if(m){pend=m[1];try{history.replaceState(history.state,"",location.pathname+location.search)}catch(e){}}
+add();
+setTimeout(function(){if(window.BQTabs)Object.keys(BQTabs.tabs).forEach(function(k){TITLE[k]=BQTabs.tabs[k].title})},0);
+nav.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[data-bqn]");if(!a||e.ctrlKey||e.metaKey||e.shiftKey||e.button)return;var v=a.getAttribute("data-bqn");if(v==="listings")return;e.preventDefault();go(v)});
+var mo=new MutationObserver(sync);["menu","viewer","tabv","login","ttitle"].forEach(function(id){var e=$(id);if(e)mo.observe(e,{attributes:true,attributeFilter:["class"],childList:id==="ttitle",characterData:id==="ttitle",subtree:id==="ttitle"})});
+var ot=document.querySelector("title");if(ot)mo.observe(ot,{childList:true,characterData:true,subtree:true});
+sync();
+window.BQNav={tabs:T,current:function(){return cur},go:go};
+})();
+</script><!--/BQNAV--></body></html>
