@@ -1,6 +1,6 @@
 # B&Q Listings – how to use (step by step)
 
-Tool version 3.5.13. Read this once, top to bottom. Every step is numbered. You only need a mouse/finger and your product names.
+Tool version 3.5.15. Read this once, top to bottom. Every step is numbered. You only need a mouse/finger and your product names.
 
 **What the tool does:** you give it SKU, EAN and product name. It writes the B&Q title (121–124 characters), 8 bullets, a 150+ word description and the key feature. It also fills the category and attributes, then gives you **one B&Q file per category**. Then **you** import those files on the B&Q portal yourself.
 
@@ -39,7 +39,7 @@ Along the top you see the steps **Add › Sort › Fill gaps › Check**. Every 
 The orange **Home** button (house icon, top left, on every screen) opens the main B&Q dashboard with the six cards. Your work is saved on this device first, so when you open Listings again you carry on where you left off. If it can't be saved (for example a private window), the tool asks before leaving. The square-grid button next to the gear goes back to this tool's own start screen (New listings / Fix existing).
 
 ### 1. Start screen
-1. Choose **New listings** (products not on B&Q yet) or **Fix existing** (products already live that you want to improve).
+1. Choose **New listings** (products not on B&Q yet), **Fix existing** (products already live that you want to improve) or **Product family** (one product in several colours, sizes or pack sizes – see section B6).
 2. New here? The small link **How to use – step by step** opens this guide.
 
 ### 2. Add
@@ -146,6 +146,28 @@ At the top of Fill gaps and Check a line says **What to do next**, e.g. *Confirm
 6. Where the files go:
    - Windows: the **Downloads** folder.
    - iPhone: Safari asks **Download?** › tap **Download**. The files are in the **Files** app › **Downloads**. If only one file appears, tap each category's own **Download** button.
+
+### 6. Product family (one product, many colours / sizes / packs)
+Use this when you sell the **same product** in different colours, sizes or pack sizes. You fill the shared details **once**, then add one short row per variant. The steps along the top are **Base › Base text › Variants › Check**.
+
+**Step 1 – Base**
+1. On the start screen tap **Product family**.
+2. Type the product name **without** the colour, size or pack, e.g. *Wooden coat hangers with trouser bar*. **Don't type the brand** – the tool puts OVOVO in the brand field (or SuperGift.com if the category doesn't allow OVOVO). If you do type a brand, the tool takes it out of the text and tells you.
+3. Tick what changes: **Colour**, **Size** and/or **Pack size**.
+4. Check the category (change it with the normal search), fill any box marked **Needs**, type the **weight of one item** and add the shared photo links. Boxes marked *set on each variant* are filled in step 3. Tap **Next**.
+
+**Step 2 – Base text**
+1. The tool writes the base title, 8 bullets, description and key feature (no brand name in them). Change anything you like. Tap **Next**.
+
+**Step 3 – Variants** (one row each)
+1. Tap **+ Add colour / + Add size / + Add pack size**, or open **Paste many rows at once** and paste lines like `Colour, Black, SKU, EAN`.
+2. Each row needs its **value** (Black, Large, 10…), **SKU** and **EAN**. The **title** is made for you (base title + value, 121–124 characters) – you can edit it. **Own photos** is optional: paste https links of that colour or pack only.
+3. If the row shows a **B&Q "Colour"/"Size" list**, check the value it chose (or pick the nearest).
+4. **Colour and Size** rows share one **Variant Group ID** – it comes from your variant file, or the tool makes one. If the category doesn't allow groups on B&Q (e.g. clothes hangers), an amber note says so and each colour goes as its own product.
+5. **Pack sizes** are separate products with **no group ID**. "Pack of 10" goes in the title and the weight is the base weight × 10 – type over it if the real pack weighs something else.
+6. **Red rows must be fixed first** – e.g. *Duplicate SKU …* or *EAN … last digit should be 0* (tap **Use correct check digit** if it's just a typo). Next stays grey until every row is right.
+
+**Step 4 – Check** works like the normal Check screen: one card per variant, each with its own first bullet and description opening. Tap **Download all files** – you get `family_<category>_<date>.xlsx`, one line per variant. Nothing is sent to B&Q – you import it yourself (section C).
 
 ---
 

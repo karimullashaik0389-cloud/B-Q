@@ -3,8 +3,8 @@ main{max-width:820px;margin:0 auto;padding:18px 16px 60px}
 .top{display:flex;align-items:center;gap:10px;margin:4px 0 14px}.logo{background:#FF6600;color:#fff;font-weight:800;border-radius:9px;padding:8px 9px;font-size:14px}
 h1{font-size:26px;margin:6px 0 10px}h2{font-size:21px;margin:28px 0 8px;color:#FF8A3D}h3{font-size:18px;margin:18px 0 6px}
 p,li{color:#E2E8F0}li{margin:5px 0}strong{color:#fff}a{color:#FF8A3D}code{background:#1E293B;color:#FDE68A;padding:1px 5px;border-radius:5px}
-blockquote{margin:12px 0;padding:10px 14px;background:#1E293B;border-left:4px solid #FF6600;border-radius:8px}hr{border:0;border-top:1px solid #334155;margin:24px 0}</style></head><body><main><div class="top"><span class="logo">B&amp;Q</span><b>Listings – how to use (v3.5.14)</b></div><h1>B&amp;Q Listings – how to use (step by step)</h1>
-<p>Tool version 3.5.13. Read this once, top to bottom. Every step is numbered. You only need a mouse/finger and your product names.</p>
+blockquote{margin:12px 0;padding:10px 14px;background:#1E293B;border-left:4px solid #FF6600;border-radius:8px}hr{border:0;border-top:1px solid #334155;margin:24px 0}</style></head><body><main><div class="top"><span class="logo">B&amp;Q</span><b>Listings – how to use (v3.5.15)</b></div><h1>B&amp;Q Listings – how to use (step by step)</h1>
+<p>Tool version 3.5.15. Read this once, top to bottom. Every step is numbered. You only need a mouse/finger and your product names.</p>
 <p><strong>What the tool does:</strong> you give it SKU, EAN and product name. It writes the B&amp;Q title (121–124 characters), 8 bullets, a 150+ word description and the key feature. It also fills the category and attributes, then gives you <strong>one B&amp;Q file per category</strong>. Then <strong>you</strong> import those files on the B&amp;Q portal yourself.</p>
 <p><strong>What it never does:</strong> it never changes anything on B&amp;Q, never uploads your photos anywhere and never fills price, stock, lead time or logistic class. Those go in your own price/stock file.</p>
 <hr />
@@ -41,7 +41,7 @@ blockquote{margin:12px 0;padding:10px 14px;background:#1E293B;border-left:4px so
 <p>The orange <strong>Home</strong> button (house icon, top left, on every screen) opens the main B&amp;Q dashboard with the six cards. Your work is saved on this device first, so when you open Listings again you carry on where you left off. If it can't be saved (for example a private window), the tool asks before leaving. The square-grid button next to the gear goes back to this tool's own start screen (New listings / Fix existing).</p>
 <h3>1. Start screen</h3>
 <ol>
-<li>Choose <strong>New listings</strong> (products not on B&amp;Q yet) or <strong>Fix existing</strong> (products already live that you want to improve).</li>
+<li>Choose <strong>New listings</strong> (products not on B&amp;Q yet), <strong>Fix existing</strong> (products already live that you want to improve) or <strong>Product family</strong> (one product in several colours, sizes or pack sizes – see section B6).</li>
 <li>New here? The small link <strong>How to use – step by step</strong> opens this guide.</li>
 </ol>
 <h3>2. Add</h3>
@@ -166,6 +166,23 @@ blockquote{margin:12px 0;padding:10px 14px;background:#1E293B;border-left:4px so
 </ul>
 </li>
 </ol>
+<h3>6. Product family (one product, many colours / sizes / packs)</h3>
+<p>Use this when you sell the <strong>same product</strong> in different colours, sizes or pack sizes. You fill the shared details <strong>once</strong>, then add one short row per variant. The steps along the top are <strong>Base › Base text › Variants › Check</strong>.</p>
+<p><strong>Step 1 – Base</strong>
+1. On the start screen tap <strong>Product family</strong>.
+2. Type the product name <strong>without</strong> the colour, size or pack, e.g. <em>Wooden coat hangers with trouser bar</em>. <strong>Don't type the brand</strong> – the tool puts OVOVO in the brand field (or SuperGift.com if the category doesn't allow OVOVO). If you do type a brand, the tool takes it out of the text and tells you.
+3. Tick what changes: <strong>Colour</strong>, <strong>Size</strong> and/or <strong>Pack size</strong>.
+4. Check the category (change it with the normal search), fill any box marked <strong>Needs</strong>, type the <strong>weight of one item</strong> and add the shared photo links. Boxes marked <em>set on each variant</em> are filled in step 3. Tap <strong>Next</strong>.</p>
+<p><strong>Step 2 – Base text</strong>
+1. The tool writes the base title, 8 bullets, description and key feature (no brand name in them). Change anything you like. Tap <strong>Next</strong>.</p>
+<p><strong>Step 3 – Variants</strong> (one row each)
+1. Tap <strong>+ Add colour / + Add size / + Add pack size</strong>, or open <strong>Paste many rows at once</strong> and paste lines like <code>Colour, Black, SKU, EAN</code>.
+2. Each row needs its <strong>value</strong> (Black, Large, 10…), <strong>SKU</strong> and <strong>EAN</strong>. The <strong>title</strong> is made for you (base title + value, 121–124 characters) – you can edit it. <strong>Own photos</strong> is optional: paste https links of that colour or pack only.
+3. If the row shows a <strong>B&amp;Q "Colour"/"Size" list</strong>, check the value it chose (or pick the nearest).
+4. <strong>Colour and Size</strong> rows share one <strong>Variant Group ID</strong> – it comes from your variant file, or the tool makes one. If the category doesn't allow groups on B&amp;Q (e.g. clothes hangers), an amber note says so and each colour goes as its own product.
+5. <strong>Pack sizes</strong> are separate products with <strong>no group ID</strong>. "Pack of 10" goes in the title and the weight is the base weight × 10 – type over it if the real pack weighs something else.
+6. <strong>Red rows must be fixed first</strong> – e.g. <em>Duplicate SKU …</em> or <em>EAN … last digit should be 0</em> (tap <strong>Use correct check digit</strong> if it's just a typo). Next stays grey until every row is right.</p>
+<p><strong>Step 4 – Check</strong> works like the normal Check screen: one card per variant, each with its own first bullet and description opening. Tap <strong>Download all files</strong> – you get <code>family_&lt;category&gt;_&lt;date&gt;.xlsx</code>, one line per variant. Nothing is sent to B&amp;Q – you import it yourself (section C).</p>
 <hr />
 <h2>C. Import on B&amp;Q (you do this yourself)</h2>
 <ol>
