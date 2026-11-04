@@ -56,7 +56,7 @@ The orange **Home** button (house icon, top left, on every screen) opens the mai
 The tool checks each EAN against your B&Q export and files.
 1. **Already on B&Q – move to Fix existing** / **Not on B&Q yet – move to New listings**: click the move button if it is right.
 2. A wrong check digit is shown in red with a button **Use correct check digit**.
-   - **EAN found in the B&Q export = it is always the live product (Improve the live page),** whatever SKU you typed. A grey ℹ note shows it, e.g. *"Found on B&Q by EAN – B&Q product SKU is XMA-HAT-RED-012 (you typed XMA-HAT-RED-12, your offer SKU)"*. The file uses B&Q's **product SKU**. If the SKU you typed is also another B&Q product, a link lets you switch to that one.
+   - **EAN found in the B&Q export = it is always the live product (Improve the live page),** whatever SKU you typed. A grey ℹ note shows it, e.g. *"Found on B&Q by EAN – B&Q product SKU is ABC-012 (you typed ABC-12, your offer SKU)"*. The file uses B&Q's **product SKU**. If the SKU you typed is also another B&Q product, a link lets you switch to that one.
    - **Only the SKU matches, the EAN is different:** an amber warning asks you to choose – **Improve the live B&Q product** (B&Q's EAN is used) or **It's a new product – keep my EAN**.
    - **"Please check category"** (amber): the live product looks like it is in the wrong B&Q category (e.g. Santa hats in Bunting). Tap **Change to …** (e.g. Christmas Headwear) or **Keep …**. Changing category on B&Q (Mirakl) means using that category's template – the download does this for you.
 3. Click **Next →**.
