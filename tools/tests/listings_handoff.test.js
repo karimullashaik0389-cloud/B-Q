@@ -38,43 +38,86 @@ assert.ok(index.indexOf('return addListingsKey(pw,nk).then(function(nk2){if(!nk2
 assert.ok(index.indexOf('goL.then(function(){location.href=$("listings")') >= 0, 'Sales/Orders open of Listings must stash first');
 assert.ok(index.indexOf('function addListingsKey(pw,nk)') >= 0);
 
-function b64(u8) {
-  return Buffer.from(u8).toString('base64');
+function grabLine(html, start, what) {
+  const i = html.indexOf(start);
+  assert.ok(i >= 0, what);
+  const end = html.indexOf('\n', i);
+  return html.slice(i, end === -1 ? html.length : end).trim();
 }
-async function listingsFile(pw) {
+function grabFn(html, start, until, what) {
+  const i = html.indexOf(start);
+  assert.ok(i >= 0, what);
+  const j = html.indexOf(until, i);
+  assert.ok(j > i, what + ' end');
+  return html.slice(i, j + until.length);
+}
+const dashB64 = grabLine(index, 'function b64(u8){', 'dashboard b64');
+const listB64 = grabLine(desk, 'function b64(u){', 'listings b64');
+const listU8 = grabLine(desk, 'function u8(s){', 'listings u8');
+const listDec = grabLine(desk, 'function dec(k,u){', 'listings dec');
+const listRead = grabFn(desk, 'function sessionListings(u){', 'dec(k,u);});}', 'sessionListings');
+const phoneRead = grabFn(phone, 'function sessionListings(u){', 'dec(k,u);});}', 'phone sessionListings');
+assert.strictEqual(listRead, phoneRead, 'phone and desktop must read the same session shape');
+const stashAssign = 'inner[d]={salt:b64(keys[d].salt),key:b64(new Uint8Array(raw))}';
+assert.ok(index.indexOf(stashAssign) >= 0, 'stashSession write');
+
+(async function () {
+  const pw = 'test-password-not-real';
   const salt = crypto.randomBytes(16);
   const iv = crypto.randomBytes(12);
   const key = await crypto.webcrypto.subtle.deriveKey(
     { name: 'PBKDF2', hash: 'SHA-256', salt: salt, iterations: 1000 },
     await crypto.webcrypto.subtle.importKey('raw', Buffer.from(pw), 'PBKDF2', false, ['deriveKey']),
     { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
-  const raw = await crypto.webcrypto.subtle.exportKey('raw', key);
+  const raw = new Uint8Array(await crypto.webcrypto.subtle.exportKey('raw', key));
   const ct = new Uint8Array(await crypto.webcrypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, Buffer.from('{"ok":1}')));
-  const out = new Uint8Array(32 + ct.length);
-  out.set(Buffer.from('BQE1'), 0); out.set(salt, 4); out.set(iv, 20); out.set(ct, 32);
-  return { out: out, salt: salt, raw: new Uint8Array(raw) };
-}
-function sessionListingsWouldAccept(session, file) {
-  const L = session && session.inner && session.inner.listings;
-  if (!L || !L.key || !L.s) return false;
-  return L.s === b64(file.out.subarray(4, 20));
-}
-(async function () {
-  const pw = 'test-password-not-real';
-  const file = await listingsFile(pw);
-  const without = { v: 1, inner: { sales: { salt: 'aa', key: 'bb' }, orders: { salt: 'aa', key: 'bb' }, aux: { salt: 'aa', key: 'bb' } } };
-  assert.strictEqual(sessionListingsWouldAccept(without, file), false, 'session with no listings key must not skip the password');
-  const withKey = { v: 1, inner: { listings: { s: b64(file.salt), key: b64(file.raw) } } };
-  assert.strictEqual(sessionListingsWouldAccept(withKey, file), true);
-  const key = await crypto.webcrypto.subtle.importKey('raw', file.raw, { name: 'AES-GCM' }, false, ['decrypt']);
-  const plain = Buffer.from(await crypto.webcrypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: file.out.subarray(20, 32) }, key, file.out.subarray(32))).toString();
-  assert.strictEqual(plain, '{"ok":1}');
-  const bad = await crypto.webcrypto.subtle.importKey('raw', crypto.randomBytes(32), { name: 'AES-GCM' }, false, ['decrypt']);
-  let rejected = false;
-  try {
-    await crypto.webcrypto.subtle.decrypt({ name: 'AES-GCM', iv: file.out.subarray(20, 32) }, bad, file.out.subarray(32));
-  } catch (e) { rejected = true; }
-  assert.ok(rejected, 'a wrong key must not open the file');
+  const file = new Uint8Array(32 + ct.length);
+  file.set(Buffer.from('BQE1'), 0); file.set(salt, 4); file.set(iv, 20); file.set(ct, 32);
+
+  const written = { v: 1, inner: {} };
+  const vm = require('vm');
+  const btoa = function (s) { return Buffer.from(s, 'binary').toString('base64'); };
+  const writer = vm.createContext({ keys: { listings: { salt: salt } }, raw: raw, inner: written.inner, d: 'listings', Uint8Array: Uint8Array, btoa: btoa });
+  vm.runInContext(dashB64 + '\n' + stashAssign, writer);
+  const saved = written.inner.listings;
+  assert.ok(saved && saved.salt && saved.key, 'stashSession must write salt and key');
+  assert.strictEqual(saved.s, undefined, 'stashSession does not write s');
+
+  const store = { 'bqDashSession.v1': JSON.stringify(written) };
+  const readerSrc = listB64 + '\n' + listU8 + '\n' + listDec + '\n' + listRead + '\nsessionListings(file)';
+  const opened = await vm.runInNewContext(readerSrc, {
+    sessionStorage: { getItem: function (k) { return store[k] || null; } },
+    crypto: crypto.webcrypto,
+    file: file,
+    Uint8Array: Uint8Array,
+    TextDecoder: TextDecoder,
+    atob: function (s) { return Buffer.from(s, 'base64').toString('binary'); },
+    btoa: function (s) { return Buffer.from(s, 'binary').toString('base64'); }
+  });
+  assert.strictEqual(JSON.stringify(opened), '{"ok":1}', 'reader must accept the object stashSession writes');
+
+  store['bqDashSession.v1'] = JSON.stringify({ v: 1, inner: { sales: { salt: 'aa', key: 'bb' } } });
+  let missing = false;
+  try { await vm.runInNewContext(readerSrc, {
+    sessionStorage: { getItem: function (k) { return store[k] || null; } },
+    crypto: crypto.webcrypto, file: file, Uint8Array: Uint8Array, TextDecoder: TextDecoder,
+    atob: function (s) { return Buffer.from(s, 'base64').toString('binary'); },
+    btoa: function (s) { return Buffer.from(s, 'binary').toString('base64'); }
+  }); } catch (e) { missing = true; }
+  assert.ok(missing, 'a session with no listings key must not skip the password');
+
+  const badRaw = crypto.randomBytes(32);
+  const badInner = { v: 1, inner: {} };
+  const badWriter = vm.createContext({ keys: { listings: { salt: salt } }, raw: badRaw, inner: badInner.inner, d: 'listings', Uint8Array: Uint8Array, btoa: btoa });
+  vm.runInContext(dashB64 + '\n' + stashAssign, badWriter);
+  store['bqDashSession.v1'] = JSON.stringify(badInner);
+  let wrong = false;
+  try { await vm.runInNewContext(readerSrc, {
+    sessionStorage: { getItem: function (k) { return store[k] || null; } },
+    crypto: crypto.webcrypto, file: file, Uint8Array: Uint8Array, TextDecoder: TextDecoder,
+    atob: function (s) { return Buffer.from(s, 'base64').toString('binary'); },
+    btoa: function (s) { return Buffer.from(s, 'binary').toString('base64'); }
+  }); } catch (e) { wrong = true; }
+  assert.ok(wrong, 'a wrong key must not open the file');
   console.log('listings_handoff.test.js passed');
 })().catch(function (e) { console.error(e); process.exit(1); });

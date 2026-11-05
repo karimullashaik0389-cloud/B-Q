@@ -2851,7 +2851,7 @@ function ui(u,msg){var a=document.getElementById('app');
     .catch(function(){go.disabled=false;pw.value='';document.getElementById('lockmsg').textContent='That password didn’t work. Try again.';});}
   go.onclick=tryIt;pw.onkeydown=function(e){if(e.key==='Enter')tryIt();};pw.focus();}
 window.__lockForget=function(){try{localStorage.removeItem(LS);}catch(e){}};
-function sessionListings(u){var o=null;try{o=JSON.parse(sessionStorage.getItem('bqDashSession.v1')||'null');}catch(e){}var L=o&&o.inner&&o.inner.listings;if(!L||L.s!==b64(u.subarray(4,20))||!L.key)return Promise.reject();
+function sessionListings(u){var o=null;try{o=JSON.parse(sessionStorage.getItem('bqDashSession.v1')||'null');}catch(e){}var L=o&&o.inner&&o.inner.listings;var salt=L&&(L.salt||L.s);if(!L||!L.key||salt!==b64(u.subarray(4,20)))return Promise.reject();
   return crypto.subtle.importKey('raw',u8(L.key),{name:'AES-GCM'},false,['decrypt']).then(function(k){return dec(k,u);});}
 getEnc().then(function(u){return sessionListings(u).then(start,function(){var o=null;try{o=JSON.parse(localStorage.getItem(LS)||'null');}catch(e){}
   if(o&&o.k&&o.s===b64(u.subarray(4,20)))return crypto.subtle.importKey('raw',u8(o.k),{name:'AES-GCM'},false,['decrypt']).then(function(k){return dec(k,u);}).then(start,function(){window.__lockForget();ui(u,'');});
