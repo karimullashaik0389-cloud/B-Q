@@ -1707,7 +1707,7 @@ function checkCard(s){var p=S.P[s],k=p.k||{},h='<div class="card" id="cc-'+esc(s
     if(S.cmp[s])h+='<div class="cmp"><div><h4>Old (live now)</h4><b>'+esc(L.name||'')+'</b><br><span class="tiny">'+(L.name||'').length+' characters</span><p>'+ob.length+' bullets · '+words(L['Body Copy'])+' words<br>Category: '+esc((L.category||'').split('/').pop())+'<br>Weight: '+oldWeight(L,p)+(sizeTxt(function(x){return oldDim(L,p,x);})?'<br>'+sizeTxt(function(x){return oldDim(L,p,x);}):'')+'</p><p class="tiny">'+esc((ob[0]||'').slice(0,140))+'…</p></div>'+
       '<div><h4>New</h4><b>'+esc(p.title)+'</b><br><span class="tiny">'+p.title.length+' characters</span><p>'+nb+' bullets · '+wd+' words<br>Category: '+esc(p.cat.split('/').pop())+'<br>Weight: '+esc(weightVal(p).v)+' '+unit(p.cat)+(sizeTxt(function(x){return dimV(p,x);})?'<br>'+sizeTxt(function(x){return dimV(p,x);}):'')+'</p><p class="tiny">'+esc((p.bul[0]||'').slice(0,140))+'…</p></div></div>';}
   return h+'</div>';}
-function fileGroups(){var by={},left=[];S.order.forEach(function(s){var p=S.P[s];if(p.grp!=='page')return;if(allNeeds(p).length){left.push(s);return;}(by[p.cat]=by[p.cat]||[]).push(s);});
+function fileGroups(){var by={},left=[];S.order.forEach(function(s){var p=S.P[s];if(p.grp!=='page')return;var need=allNeeds(p),tl=String(p.title||'').trim().length;if(tl>=1&&tl<=130)need=need.filter(function(x){return x!=='title length';});if(need.length){left.push(s);return;}(by[p.cat]=by[p.cat]||[]).push(s);});
   return {by:by,left:left};}
 function fname(cat){return (S.mode==='fix'?'fix_':S.mode==='ffix'?'fixfamily_':FM()?'family_':'new_')+cat.split('/').pop().toLowerCase().replace(/[^a-z0-9]+/g,'_')+'_'+TODAY+'.xlsx';}
 function ccBlock(){var n=ccList().length;return n?'<div class="note r" data-ccblock>Needs: confirm category – '+n+' product'+(n>1?'s':'')+' still '+(n>1?'have':'has')+' a guessed category. Download is blocked until every category is confirmed. <button class="lnk" data-act="ccgo">Go to Category check</button></div>':'';}
@@ -2744,11 +2744,11 @@ var SESST=null;function sessSave(){clearTimeout(SESST);SESST=setTimeout(function
 /* v3.5.6: a reload or closing the tab within 0.7 s of a change still keeps it */
 /* v3.5.9: Home = the main B&Q dashboard (six cards). Work here is saved on this device first, so it is still here when you come back; if saving fails you are asked before leaving. */
 
-function dashUrl(){if(location.protocol==='file:')return 'https://karimullashaik0389-cloud.github.io/B-Q/';return /\/listings\/phone\/?/.test(location.pathname)?'../../':'../';}
+function dashUrl(){if(location.protocol==='file:')return 'https://karimullashaik0389-cloud.github.io/B-Q/';var p=location.pathname,i=p.indexOf('/listings/');if(i>=0)return p.slice(0,i+1);return p.replace(/\/listings(\/index\.html)?\/?$/,'/')||'/';}
 function hasWork(){saveMode();return Object.keys(S.saved||{}).some(function(m){var o=S.saved[m];return o&&(o.rows&&o.rows.some(function(r){return (r.sku||'').trim();})||o.fam&&String(o.fam.name||'').trim());});}
 var DLEAVE=false;async function goDash(u){var ok=false;try{clearTimeout(SESST);SESST=null;saveMode();ok=await idbSet('sess',{v:1,at:Date.now(),mode:S.mode,view:S.view,saved:S.saved});}catch(e){ok=false;}
   if(!ok&&hasWork()&&!confirm('Your listing work could not be saved on this device. If you go to Home now, the products you added and your edits are lost (files you already downloaded are fine). Go to Home anyway?'))return;
-  DLEAVE=true;if(ok&&hasWork())toast('Saved – your work will be here when you come back.',3000);location.href=u;}
+  DLEAVE=true;try{sessionStorage.setItem('bqDashReturn','1');}catch(e){}if(ok&&hasWork())toast('Saved – your work will be here when you come back.',3000);location.href=u;}
 document.addEventListener('click',function(e){var a=e.target&&e.target.closest&&e.target.closest('[data-dash]');if(!a||e.ctrlKey||e.metaKey||e.shiftKey||e.button)return;e.preventDefault();e.stopPropagation();goDash(a.getAttribute('href'));},true);
 function sessFlush(){if(!SESST)return;clearTimeout(SESST);SESST=null;try{saveMode();idbSet('sess',{v:1,at:Date.now(),mode:S.mode,view:S.view,saved:S.saved}).catch(function(){});}catch(e){}}
 window.addEventListener('pagehide',sessFlush);document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')sessFlush();});
@@ -2844,8 +2844,10 @@ function ui(u,msg){var a=document.getElementById('app');
     .catch(function(){go.disabled=false;pw.value='';document.getElementById('lockmsg').textContent='That password didn’t work. Try again.';});}
   go.onclick=tryIt;pw.onkeydown=function(e){if(e.key==='Enter')tryIt();};pw.focus();}
 window.__lockForget=function(){try{localStorage.removeItem(LS);}catch(e){}};
-getEnc().then(function(u){var o=null;try{o=JSON.parse(localStorage.getItem(LS)||'null');}catch(e){}
+function sessionListings(u){var o=null;try{o=JSON.parse(sessionStorage.getItem('bqDashSession.v1')||'null');}catch(e){}var L=o&&o.inner&&o.inner.listings;if(!L||L.s!==b64(u.subarray(4,20))||!L.key)return Promise.reject();
+  return crypto.subtle.importKey('raw',u8(L.key),{name:'AES-GCM'},false,['decrypt']).then(function(k){return dec(k,u);});}
+getEnc().then(function(u){return sessionListings(u).then(start,function(){var o=null;try{o=JSON.parse(localStorage.getItem(LS)||'null');}catch(e){}
   if(o&&o.k&&o.s===b64(u.subarray(4,20)))return crypto.subtle.importKey('raw',u8(o.k),{name:'AES-GCM'},false,['decrypt']).then(function(k){return dec(k,u);}).then(start,function(){window.__lockForget();ui(u,'');});
-  ui(u,'');},function(){ui(null,'');});
+  ui(u,'');});},function(){ui(null,'');});
 })();
-</script></body></html>
+</script><script src="../../bqnav.js"></script></body></html>
