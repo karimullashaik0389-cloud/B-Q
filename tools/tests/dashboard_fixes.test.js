@@ -16,8 +16,10 @@ tabs.forEach(function (name) {
 });
 assert.ok(nav.indexOf('flex-wrap:wrap') >= 0, 'mobile bar should wrap so later tabs stay on screen');
 assert.ok(index.indexOf('src="bqnav.js"') >= 0, 'dashboard should use the shared bar');
-assert.ok(list.indexOf('src="../bqnav.js"') >= 0, 'listings desktop should use the shared bar');
-assert.ok(phone.indexOf('src="../../bqnav.js"') >= 0, 'listings phone should use the shared bar');
+assert.ok(list.indexOf('function toListings') >= 0, 'listings desktop inlines the bar (external script is blocked)');
+assert.ok(phone.indexOf('function toListings') >= 0, 'listings phone inlines the bar');
+assert.strictEqual(list.indexOf('src="../bqnav.js"'), -1);
+assert.strictEqual(phone.indexOf('src="../../bqnav.js"'), -1);
 
 assert.ok(index.indexOf('bqDashReturn') >= 0, 'dashboard restores a listings return');
 assert.ok(index.indexOf('function stashSession') >= 0);

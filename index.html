@@ -120,11 +120,14 @@ function forget(){try{localStorage.removeItem(LS2);localStorage.removeItem(LS1)}
 function tryMain(pw){var nk={};
  return Promise.all(Object.keys(FILES).map(function(d){return getBuf(d).then(function(b){var p=parts(b);
   return kdf(pw,p.salt,true,["decrypt"]).then(function(k){nk[d]={key:k,salt:p.salt.slice()};return decrypt(k,p)})})}))
- .then(function(){return kdf(pw,auxSalt(),true,["encrypt","decrypt"])}).then(function(k){nk.aux={key:k,salt:auxSalt()};return nk})
- .then(function(nk){return fetch("listings/data.enc",{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error("net");return r.arrayBuffer()}).then(function(b){
-   var u=new Uint8Array(b);if(u.length<48||String.fromCharCode(u[0],u[1],u[2],u[3])!=="BQE1")throw new Error("badfile");
-   var salt=u.subarray(4,20);return kdf(pw,salt,true,["decrypt"]).then(function(k){return crypto.subtle.decrypt({name:"AES-GCM",iv:u.subarray(20,32)},k,u.subarray(32)).then(function(){nk.listings={key:k,salt:salt.slice()};return nk})})
-  }).catch(function(){return nk})})}
+ .then(function(){return kdf(pw,auxSalt(),true,["encrypt","decrypt"])}).then(function(k){nk.aux={key:k,salt:auxSalt()};return addListingsKey(pw,nk)})}
+/* Listings uses the same password with its own file salt. A remembered login often has no listings key yet, so derive it from the password just typed. A wrong password for that file leaves the dashboard unlocked and Listings asks on its own. */
+function addListingsKey(pw,nk){if(!pw||(nk&&nk.listings))return Promise.resolve(nk);
+ return fetch("listings/data.enc",{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error("net");return r.arrayBuffer()}).then(function(b){
+  var u=new Uint8Array(b);if(u.length<48||String.fromCharCode(u[0],u[1],u[2],u[3])!=="BQE1")throw new Error("badfile");
+  var salt=new Uint8Array(u.subarray(4,20));
+  return kdf(pw,salt,true,["decrypt"]).then(function(k){return crypto.subtle.decrypt({name:"AES-GCM",iv:u.subarray(20,32)},k,u.subarray(32)).then(function(){nk.listings={key:k,salt:salt};return nk})})
+ }).catch(function(){return nk})}
 /* wrap the file keys with a device password and keep only the wrapped copy */
 function wrapStore(pw,ks){var inner={},ds=Object.keys(FILES).concat(ks.aux?["aux"]:[]).concat(ks.listings?["listings"]:[]),salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));
  return Promise.all(ds.map(function(d){return crypto.subtle.exportKey("raw",ks[d].key).then(function(raw){inner[d]={salt:b64(ks[d].salt),key:b64(new Uint8Array(raw))}})}))
@@ -155,7 +158,8 @@ $("lf").addEventListener("submit",function(ev){ev.preventDefault();
  $("msg").textContent="";$("go").disabled=true;$("go").textContent="Checking…";
  var p;
  if(mode==="device"){
-  p=unwrap(pw).then(function(nk){return fresh(nk).then(function(ok){if(ok)return nk;throw new Error("stale")})})
+  p=unwrap(pw).then(function(nk){return fresh(nk).then(function(ok){if(!ok)throw new Error("stale");if(nk.listings)return nk;
+    return addListingsKey(pw,nk).then(function(nk2){if(!nk2.listings)return nk2;return wrapStore(pw,nk2).then(function(){return nk2})})})})
    .catch(function(e){if(e&&e.message==="net")throw e;var stale=e&&e.message==="stale";
     return tryMain(pw).then(function(nk){return wrapStore(pw,nk).then(function(){return nk})},function(e2){
      if(e2&&(e2.message==="net"||e2.name==="TypeError"))throw e2;
@@ -211,7 +215,7 @@ window.addEventListener("message",function(e){var f=$("frame");
  if(m.bq==="lock"){reply({ok:true});lock("Locked. This device no longer remembers you.");return}
  /* Home cards inside Sales/Orders: open another dashboard (Listings = the listing tool page, the rest = tabs on this page) */
  if(m.bq==="open"){var v=String(m.v||"");reply({ok:true});
-  if(v==="listings"){location.href=$("listings").getAttribute("href");return}
+  if(v==="listings"){var goL=window.BQ&&BQ.stashSession?BQ.stashSession():Promise.resolve();goL.then(function(){location.href=$("listings").getAttribute("href")});return}
   if(v==="sales"||v==="orders"){open(v);return}
   if(window.BQTabs&&BQTabs.tabs[v]){back();BQTabs.open(v)}return}
  if(m.bq==="rewrap"){var o=String(m.old||""),n=String(m.nw||"");
