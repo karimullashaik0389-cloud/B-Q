@@ -1,9 +1,9 @@
 @echo off
-rem B&Q Listings v3.5.18 - opens the tool in Chrome (or Edge) so it can read the B&Q templates
+rem B&Q Listings v3.5.19 - opens the tool in Chrome (or Edge) so it can read the B&Q templates
 rem in ..\listings\templates. Keep the folders from the ZIP as they are. It only opens your browser.
 setlocal
 set "HERE=%~dp0"
-set "FILE=%HERE%BQ_Listings_v3.5.18_Windows.html"
+set "FILE=%HERE%BQ_Listings_v3.5.19_Windows.html"
 set "PROF=%LOCALAPPDATA%\BQListings\browser"
 if not exist "%FILE%" echo Cannot find %FILE% & pause & goto :eof
 set "B=%ProgramFiles%\Google\Chrome\Application\chrome.exe"
