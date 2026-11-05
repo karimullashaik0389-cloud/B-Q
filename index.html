@@ -186,7 +186,7 @@ function open(d){busy(true);
 function setFrame(u){var f=$("frame");try{f.contentWindow.location.replace(u)}catch(e){f.src=u}}
 function back(){$("viewer").classList.add("hide");setFrame("about:blank");
  if(curUrl){URL.revokeObjectURL(curUrl);curUrl=null}document.title="B&Q Dashboards"}
-function clearSession(){try{sessionStorage.removeItem("bqDashSession.v1");sessionStorage.removeItem("bqDashReturn");localStorage.removeItem("bqListKey.v1")}catch(e){}}
+function clearSession(){try{sessionStorage.removeItem("bqDashSession.v1");sessionStorage.removeItem("bqDashReturn");sessionStorage.removeItem("bqDashGo");localStorage.removeItem("bqListKey.v1")}catch(e){}}
 function lock(msg){clearSession();forget();keys={};bufs={};back();if(window.BQTabs)BQTabs.close();setMode("main",msg||"")}
 /* Same-tab handoff for the Listings page only. Cleared by Lock. A normal reload still asks for the password. */
 function stashSession(){if(!keys||!keys.aux)return Promise.resolve();
