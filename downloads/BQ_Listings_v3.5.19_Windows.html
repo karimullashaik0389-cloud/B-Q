@@ -1220,10 +1220,13 @@ function ruleTitle(ph){ph=(ph||[]).map(function(x){return String(x).trim().repla
     if(t.length>=TMIN&&t.length<=TMAX&&!titleRep(t)&&m>best){best=m;bt=t;}}
   if(bt)return bt;
   var t=head;opt.forEach(function(x){var c=t+', '+x;if(c.length<=TMAX&&!titleRep(c))t=c;});return t;}
+function bannedWord(s){var m=String(s==null?'':s).match(/\b(excrements?|aerosols?)\b/i);return m?m[1]:'';}
 function textNeeds(p){var n=[],t=p.title.trim();
   if(!t)n.push('title');else{if(t.length<TMIN||t.length>TMAX)n.push('title length');if(/[?\/|\\_]/.test(t))n.push('no ? / | \\ _ in title');
-    if(/supergift|ovovo|true\s*-?\s*gifts?/i.test(t))n.push('no SuperGift/OVOVO in title');}
-  if(/supergift|ovovo|true\s*-?\s*gifts?/i.test(p.bul.join(' ')+' '+(p.desc||'')))n.push('no SuperGift/OVOVO in bullets/description');{
+    if(/supergift|ovovo|true\s*-?\s*gifts?/i.test(t))n.push('no SuperGift/OVOVO in title');var bwT=bannedWord(t);if(bwT)n.push('banned word “'+bwT+'” in the title');}
+  if(/supergift|ovovo|true\s*-?\s*gifts?/i.test(p.bul.join(' ')+' '+(p.desc||'')))n.push('no SuperGift/OVOVO in bullets/description');
+  var bwB=bannedWord((p.bul||[]).join('\n'));if(bwB)n.push('banned word “'+bwB+'” in the bullets');
+  var bwD=bannedWord(p.desc);if(bwD)n.push('banned word “'+bwD+'” in the description');{
     var seen={},rep=false;t.toLowerCase().replace(/[(),]/g,' ').split(/\s+/).forEach(function(w){if(w.length>3){if(seen[w])rep=true;seen[w]=1;}});if(rep)n.push('no repeated words in title');
     if(t.split(/\s+/).some(function(w){w=w.replace(/[^A-Za-z]/g,'');return w.length>3&&w===w.toUpperCase();}))n.push('no ALL CAPS words');
     var dup=S.order.some(function(s){var q=S.P[s];return q!==p&&q.grp==='page'&&q.title.trim().toLowerCase()===t.toLowerCase();});if(dup)n.push('a different title (same as another)');}
@@ -1600,7 +1603,7 @@ function writeAll(){S.order.forEach(function(s){var p=S.P[s];if(p.grp!=='page'||
     if(!p.edited&&fixGaps(p).length)autoFix(p,s);});
   S.written=true;gemQueue();}
 /* gaps Auto-fix can fill */
-function fixGaps(p){return textNeeds(p).filter(function(x){return !/different title/.test(x);});}
+function fixGaps(p){return textNeeds(p).filter(function(x){return !/different title|banned word/.test(x);});}
 function okT(t){return t.length>=TMIN&&t.length<=TMAX&&!titleRep(t)&&!/[?\/|\\_]/.test(t)&&!/supergift|ovovo|true\s*-?\s*gifts?/i.test(t)&&!capsW(t)&&!/[,;:&\-–]\s*$|\b(and|or|for|with|of|to|in|the)\s*$/i.test(t);}
 function capsW(t){var r='';String(t||'').split(/\s+/).some(function(w){var a=w.replace(/[^A-Za-z]/g,'');if(a.length>3&&a===a.toUpperCase()){r=w;return true;}return false;});return r;}
 function repW(t){var seen={},r='';String(t||'').toLowerCase().replace(/[(),]/g,' ').split(/\s+/).some(function(w){if(w.length>3){if(seen[w]){r=w;return true;}seen[w]=1;}return false;});return r;}
@@ -1658,6 +1661,7 @@ function needMsg(p,x){var t=p.title.trim(),n=t.length,nb=p.bul.filter(function(b
   if(x==='title length')return n<TMIN?'Title is '+n+' characters – add '+(TMIN-n)+' more (aim for '+TMIN+'–'+TMAX+': size, material, colour, use or room)'+AF:'Title is '+n+' characters – remove '+(n-TMAX)+' (aim for '+TMIN+'–'+TMAX+')'+AF;
   if(/in title$/.test(x)&&/\?/.test(x))return 'Title has ? / | \\ or _ – take them out'+AF;
   if(x==='no SuperGift/OVOVO in title')return 'Title has SuperGift or OVOVO – take it out (B&amp;Q shows the brand itself)'+AF;
+  if(/^banned word/.test(x))return 'Take that banned word out of the title, bullets or description. The file is not made while it is there.';
   if(/SuperGift\/OVOVO in (bullets|text)/.test(x))return 'Bullets or description mention SuperGift or OVOVO – take it out'+AF;
   if(x==='no SuperGift/OVOVO in key feature')return 'Key feature mentions SuperGift or OVOVO – take it out'+AF;
   if(x==='no repeated words in title')return 'Title uses “'+esc(repW(t))+'” twice – change one of them'+AF;
@@ -2074,9 +2078,12 @@ function preCheck(c,heads,rows,skus){ensureCat(c);var K=CATOK[c],F=fInfo(c),hd=h
     if(String(V.name||'').length>130)blk.push(s+': title is '+String(V.name).length+' characters (max 130)');
     if(String(V.Key_Feature||'').length>30)blk.push(s+': key feature is over 30 characters');
     var bre=/\b(ovovo|super\s*gift(\.com)?)\b/i,tx=['name','Body Copy','Key_Feature','Selling Copy'].concat(hd.filter(function(h){return /^Unique Selling Point/.test(h);}));
-    tx.forEach(function(h){if(V[h]&&bre.test(String(V[h])))blk.push(s+': the brand name is in the '+(h==='name'?'title':h));});});
+    tx.forEach(function(h){if(V[h]&&bre.test(String(V[h])))blk.push(s+': the brand name is in the '+(h==='name'?'title':h));
+      var place=h==='name'?'title':/^Unique Selling Point/.test(h)?'bullets':(h==='Body Copy'||h==='Selling Copy')?'description':'';
+      if(place){var bw=bannedWord(V[h]);if(bw)blk.push(s+': banned word “'+bw+'” in the '+place);}});
+});
   return {block:blk,warn:wrn};}
-window.__preCheck=preCheck;
+window.__preCheck=preCheck;window.__bannedWord=bannedWord;
 function dlBuild(c){var f=fileGroups(),tf=VALS[c].file,tpl=TPL[tf];var seen={};f.by[c].forEach(function(s){if(seen[s])throw new Error('Same SKU twice in the '+c+' file: '+s);seen[s]=1;});var body=f.by[c].map(function(s){return productRow(s,tpl[1]);});
   var pc=preCheck(c,tpl,body,f.by[c]),nm=CATNAME[c]||c.split('/').pop();window.__lastCheck=window.__lastCheck||{};window.__lastCheck[c]=pc;
   if(pc.block.length)throw new Error(nm+' file not made – fix these first: '+pc.block.slice(0,8).join(' · ')+(pc.block.length>8?' · and '+(pc.block.length-8)+' more':''));

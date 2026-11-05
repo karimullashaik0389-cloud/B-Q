@@ -1220,10 +1220,13 @@ function ruleTitle(ph){ph=(ph||[]).map(function(x){return String(x).trim().repla
     if(t.length>=TMIN&&t.length<=TMAX&&!titleRep(t)&&m>best){best=m;bt=t;}}
   if(bt)return bt;
   var t=head;opt.forEach(function(x){var c=t+', '+x;if(c.length<=TMAX&&!titleRep(c))t=c;});return t;}
+function bannedWord(s){var m=String(s==null?'':s).match(/\b(excrements?|aerosols?)\b/i);return m?m[1]:'';}
 function textNeeds(p){var n=[],t=p.title.trim();
   if(!t)n.push('title');else{if(t.length<TMIN||t.length>TMAX)n.push('title length');if(/[?\/|\\_]/.test(t))n.push('no ? / | \\ _ in title');
-    if(/supergift|ovovo|true\s*-?\s*gifts?/i.test(t))n.push('no SuperGift/OVOVO in title');}
-  if(/supergift|ovovo|true\s*-?\s*gifts?/i.test(p.bul.join(' ')+' '+(p.desc||'')))n.push('no SuperGift/OVOVO in bullets/description');{
+    if(/supergift|ovovo|true\s*-?\s*gifts?/i.test(t))n.push('no SuperGift/OVOVO in title');var bwT=bannedWord(t);if(bwT)n.push('banned word “'+bwT+'” in the title');}
+  if(/supergift|ovovo|true\s*-?\s*gifts?/i.test(p.bul.join(' ')+' '+(p.desc||'')))n.push('no SuperGift/OVOVO in bullets/description');
+  var bwB=bannedWord((p.bul||[]).join('\n'));if(bwB)n.push('banned word “'+bwB+'” in the bullets');
+  var bwD=bannedWord(p.desc);if(bwD)n.push('banned word “'+bwD+'” in the description');{
     var seen={},rep=false;t.toLowerCase().replace(/[(),]/g,' ').split(/\s+/).forEach(function(w){if(w.length>3){if(seen[w])rep=true;seen[w]=1;}});if(rep)n.push('no repeated words in title');
     if(t.split(/\s+/).some(function(w){w=w.replace(/[^A-Za-z]/g,'');return w.length>3&&w===w.toUpperCase();}))n.push('no ALL CAPS words');
     var dup=S.order.some(function(s){var q=S.P[s];return q!==p&&q.grp==='page'&&q.title.trim().toLowerCase()===t.toLowerCase();});if(dup)n.push('a different title (same as another)');}
@@ -1600,7 +1603,7 @@ function writeAll(){S.order.forEach(function(s){var p=S.P[s];if(p.grp!=='page'||
     if(!p.edited&&fixGaps(p).length)autoFix(p,s);});
   S.written=true;gemQueue();}
 /* gaps Auto-fix can fill */
-function fixGaps(p){return textNeeds(p).filter(function(x){return !/different title/.test(x);});}
+function fixGaps(p){return textNeeds(p).filter(function(x){return !/different title|banned word/.test(x);});}
 function okT(t){return t.length>=TMIN&&t.length<=TMAX&&!titleRep(t)&&!/[?\/|\\_]/.test(t)&&!/supergift|ovovo|true\s*-?\s*gifts?/i.test(t)&&!capsW(t)&&!/[,;:&\-–]\s*$|\b(and|or|for|with|of|to|in|the)\s*$/i.test(t);}
 function capsW(t){var r='';String(t||'').split(/\s+/).some(function(w){var a=w.replace(/[^A-Za-z]/g,'');if(a.length>3&&a===a.toUpperCase()){r=w;return true;}return false;});return r;}
 function repW(t){var seen={},r='';String(t||'').toLowerCase().replace(/[(),]/g,' ').split(/\s+/).some(function(w){if(w.length>3){if(seen[w]){r=w;return true;}seen[w]=1;}return false;});return r;}
@@ -1658,6 +1661,7 @@ function needMsg(p,x){var t=p.title.trim(),n=t.length,nb=p.bul.filter(function(b
   if(x==='title length')return n<TMIN?'Title is '+n+' characters – add '+(TMIN-n)+' more (aim for '+TMIN+'–'+TMAX+': size, material, colour, use or room)'+AF:'Title is '+n+' characters – remove '+(n-TMAX)+' (aim for '+TMIN+'–'+TMAX+')'+AF;
   if(/in title$/.test(x)&&/\?/.test(x))return 'Title has ? / | \\ or _ – take them out'+AF;
   if(x==='no SuperGift/OVOVO in title')return 'Title has SuperGift or OVOVO – take it out (B&amp;Q shows the brand itself)'+AF;
+  if(/^banned word/.test(x))return 'Take that banned word out of the title, bullets or description. The file is not made while it is there.';
   if(/SuperGift\/OVOVO in (bullets|text)/.test(x))return 'Bullets or description mention SuperGift or OVOVO – take it out'+AF;
   if(x==='no SuperGift/OVOVO in key feature')return 'Key feature mentions SuperGift or OVOVO – take it out'+AF;
   if(x==='no repeated words in title')return 'Title uses “'+esc(repW(t))+'” twice – change one of them'+AF;
@@ -1707,7 +1711,7 @@ function checkCard(s){var p=S.P[s],k=p.k||{},h='<div class="card" id="cc-'+esc(s
     if(S.cmp[s])h+='<div class="cmp"><div><h4>Old (live now)</h4><b>'+esc(L.name||'')+'</b><br><span class="tiny">'+(L.name||'').length+' characters</span><p>'+ob.length+' bullets · '+words(L['Body Copy'])+' words<br>Category: '+esc((L.category||'').split('/').pop())+'<br>Weight: '+oldWeight(L,p)+(sizeTxt(function(x){return oldDim(L,p,x);})?'<br>'+sizeTxt(function(x){return oldDim(L,p,x);}):'')+'</p><p class="tiny">'+esc((ob[0]||'').slice(0,140))+'…</p></div>'+
       '<div><h4>New</h4><b>'+esc(p.title)+'</b><br><span class="tiny">'+p.title.length+' characters</span><p>'+nb+' bullets · '+wd+' words<br>Category: '+esc(p.cat.split('/').pop())+'<br>Weight: '+esc(weightVal(p).v)+' '+unit(p.cat)+(sizeTxt(function(x){return dimV(p,x);})?'<br>'+sizeTxt(function(x){return dimV(p,x);}):'')+'</p><p class="tiny">'+esc((p.bul[0]||'').slice(0,140))+'…</p></div></div>';}
   return h+'</div>';}
-function fileGroups(){var by={},left=[];S.order.forEach(function(s){var p=S.P[s];if(p.grp!=='page')return;if(allNeeds(p).length){left.push(s);return;}(by[p.cat]=by[p.cat]||[]).push(s);});
+function fileGroups(){var by={},left=[];S.order.forEach(function(s){var p=S.P[s];if(p.grp!=='page')return;var need=allNeeds(p),tl=String(p.title||'').trim().length;if(tl>=1&&tl<=130)need=need.filter(function(x){return x!=='title length';});if(need.length){left.push(s);return;}(by[p.cat]=by[p.cat]||[]).push(s);});
   return {by:by,left:left};}
 function fname(cat){return (S.mode==='fix'?'fix_':S.mode==='ffix'?'fixfamily_':FM()?'family_':'new_')+cat.split('/').pop().toLowerCase().replace(/[^a-z0-9]+/g,'_')+'_'+TODAY+'.xlsx';}
 function ccBlock(){var n=ccList().length;return n?'<div class="note r" data-ccblock>Needs: confirm category – '+n+' product'+(n>1?'s':'')+' still '+(n>1?'have':'has')+' a guessed category. Download is blocked until every category is confirmed. <button class="lnk" data-act="ccgo">Go to Category check</button></div>':'';}
@@ -2074,9 +2078,12 @@ function preCheck(c,heads,rows,skus){ensureCat(c);var K=CATOK[c],F=fInfo(c),hd=h
     if(String(V.name||'').length>130)blk.push(s+': title is '+String(V.name).length+' characters (max 130)');
     if(String(V.Key_Feature||'').length>30)blk.push(s+': key feature is over 30 characters');
     var bre=/\b(ovovo|super\s*gift(\.com)?)\b/i,tx=['name','Body Copy','Key_Feature','Selling Copy'].concat(hd.filter(function(h){return /^Unique Selling Point/.test(h);}));
-    tx.forEach(function(h){if(V[h]&&bre.test(String(V[h])))blk.push(s+': the brand name is in the '+(h==='name'?'title':h));});});
+    tx.forEach(function(h){if(V[h]&&bre.test(String(V[h])))blk.push(s+': the brand name is in the '+(h==='name'?'title':h));
+      var place=h==='name'?'title':/^Unique Selling Point/.test(h)?'bullets':(h==='Body Copy'||h==='Selling Copy')?'description':'';
+      if(place){var bw=bannedWord(V[h]);if(bw)blk.push(s+': banned word “'+bw+'” in the '+place);}});
+});
   return {block:blk,warn:wrn};}
-window.__preCheck=preCheck;
+window.__preCheck=preCheck;window.__bannedWord=bannedWord;
 function dlBuild(c){var f=fileGroups(),tf=VALS[c].file,tpl=TPL[tf];var seen={};f.by[c].forEach(function(s){if(seen[s])throw new Error('Same SKU twice in the '+c+' file: '+s);seen[s]=1;});var body=f.by[c].map(function(s){return productRow(s,tpl[1]);});
   var pc=preCheck(c,tpl,body,f.by[c]),nm=CATNAME[c]||c.split('/').pop();window.__lastCheck=window.__lastCheck||{};window.__lastCheck[c]=pc;
   if(pc.block.length)throw new Error(nm+' file not made – fix these first: '+pc.block.slice(0,8).join(' · ')+(pc.block.length>8?' · and '+(pc.block.length-8)+' more':''));
@@ -2744,11 +2751,11 @@ var SESST=null;function sessSave(){clearTimeout(SESST);SESST=setTimeout(function
 /* v3.5.6: a reload or closing the tab within 0.7 s of a change still keeps it */
 /* v3.5.9: Home = the main B&Q dashboard (six cards). Work here is saved on this device first, so it is still here when you come back; if saving fails you are asked before leaving. */
 
-function dashUrl(){if(location.protocol==='file:')return 'https://karimullashaik0389-cloud.github.io/B-Q/';return /\/listings\/phone\/?/.test(location.pathname)?'../../':'../';}
+function dashUrl(){if(location.protocol==='file:')return 'https://karimullashaik0389-cloud.github.io/B-Q/';var p=location.pathname,i=p.indexOf('/listings/');if(i>=0)return p.slice(0,i+1);return p.replace(/\/listings(\/index\.html)?\/?$/,'/')||'/';}
 function hasWork(){saveMode();return Object.keys(S.saved||{}).some(function(m){var o=S.saved[m];return o&&(o.rows&&o.rows.some(function(r){return (r.sku||'').trim();})||o.fam&&String(o.fam.name||'').trim());});}
 var DLEAVE=false;async function goDash(u){var ok=false;try{clearTimeout(SESST);SESST=null;saveMode();ok=await idbSet('sess',{v:1,at:Date.now(),mode:S.mode,view:S.view,saved:S.saved});}catch(e){ok=false;}
   if(!ok&&hasWork()&&!confirm('Your listing work could not be saved on this device. If you go to Home now, the products you added and your edits are lost (files you already downloaded are fine). Go to Home anyway?'))return;
-  DLEAVE=true;if(ok&&hasWork())toast('Saved – your work will be here when you come back.',3000);location.href=u;}
+  DLEAVE=true;try{sessionStorage.setItem('bqDashReturn','1');}catch(e){}if(ok&&hasWork())toast('Saved – your work will be here when you come back.',3000);location.href=u;}
 document.addEventListener('click',function(e){var a=e.target&&e.target.closest&&e.target.closest('[data-dash]');if(!a||e.ctrlKey||e.metaKey||e.shiftKey||e.button)return;e.preventDefault();e.stopPropagation();goDash(a.getAttribute('href'));},true);
 function sessFlush(){if(!SESST)return;clearTimeout(SESST);SESST=null;try{saveMode();idbSet('sess',{v:1,at:Date.now(),mode:S.mode,view:S.view,saved:S.saved}).catch(function(){});}catch(e){}}
 window.addEventListener('pagehide',sessFlush);document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')sessFlush();});
@@ -2844,8 +2851,10 @@ function ui(u,msg){var a=document.getElementById('app');
     .catch(function(){go.disabled=false;pw.value='';document.getElementById('lockmsg').textContent='That password didn’t work. Try again.';});}
   go.onclick=tryIt;pw.onkeydown=function(e){if(e.key==='Enter')tryIt();};pw.focus();}
 window.__lockForget=function(){try{localStorage.removeItem(LS);}catch(e){}};
-getEnc().then(function(u){var o=null;try{o=JSON.parse(localStorage.getItem(LS)||'null');}catch(e){}
+function sessionListings(u){var o=null;try{o=JSON.parse(sessionStorage.getItem('bqDashSession.v1')||'null');}catch(e){}var L=o&&o.inner&&o.inner.listings;if(!L||L.s!==b64(u.subarray(4,20))||!L.key)return Promise.reject();
+  return crypto.subtle.importKey('raw',u8(L.key),{name:'AES-GCM'},false,['decrypt']).then(function(k){return dec(k,u);});}
+getEnc().then(function(u){return sessionListings(u).then(start,function(){var o=null;try{o=JSON.parse(localStorage.getItem(LS)||'null');}catch(e){}
   if(o&&o.k&&o.s===b64(u.subarray(4,20)))return crypto.subtle.importKey('raw',u8(o.k),{name:'AES-GCM'},false,['decrypt']).then(function(k){return dec(k,u);}).then(start,function(){window.__lockForget();ui(u,'');});
-  ui(u,'');},function(){ui(null,'');});
+  ui(u,'');});},function(){ui(null,'');});
 })();
-</script></body></html>
+</script><script src="../bqnav.js"></script></body></html>
