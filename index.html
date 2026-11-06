@@ -1,7 +1,5 @@
 <!doctype html><html lang="en-GB"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="object-src 'none'; base-uri 'self'">
 <meta name="theme-color" content="#0F172A"><meta name="robots" content="noindex,nofollow">
 <meta name="apple-mobile-web-app-capable" content="yes"><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%23FF6600%22/%3E%3C/svg%3E"><title>B&amp;Q Dashboards</title>
 <style>
@@ -120,16 +118,9 @@ function forget(){try{localStorage.removeItem(LS2);localStorage.removeItem(LS1)}
 function tryMain(pw){var nk={};
  return Promise.all(Object.keys(FILES).map(function(d){return getBuf(d).then(function(b){var p=parts(b);
   return kdf(pw,p.salt,true,["decrypt"]).then(function(k){nk[d]={key:k,salt:p.salt.slice()};return decrypt(k,p)})})}))
- .then(function(){return kdf(pw,auxSalt(),true,["encrypt","decrypt"])}).then(function(k){nk.aux={key:k,salt:auxSalt()};return addListingsKey(pw,nk)})}
-/* Listings uses the same password with its own file salt. A remembered login often has no listings key yet, so derive it from the password just typed. A wrong password for that file leaves the dashboard unlocked and Listings asks on its own. */
-function addListingsKey(pw,nk){if(!pw||(nk&&nk.listings))return Promise.resolve(nk);
- return fetch("listings/data.enc",{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error("net");return r.arrayBuffer()}).then(function(b){
-  var u=new Uint8Array(b);if(u.length<48||String.fromCharCode(u[0],u[1],u[2],u[3])!=="BQE1")throw new Error("badfile");
-  var salt=new Uint8Array(u.subarray(4,20));
-  return kdf(pw,salt,true,["decrypt"]).then(function(k){return crypto.subtle.decrypt({name:"AES-GCM",iv:u.subarray(20,32)},k,u.subarray(32)).then(function(){nk.listings={key:k,salt:salt};return nk})})
- }).catch(function(){return nk})}
+ .then(function(){return kdf(pw,auxSalt(),true,["encrypt","decrypt"])}).then(function(k){nk.aux={key:k,salt:auxSalt()};return nk})}
 /* wrap the file keys with a device password and keep only the wrapped copy */
-function wrapStore(pw,ks){var inner={},ds=Object.keys(FILES).concat(ks.aux?["aux"]:[]).concat(ks.listings?["listings"]:[]),salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));
+function wrapStore(pw,ks){var inner={},ds=Object.keys(FILES).concat(ks.aux?["aux"]:[]),salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));
  return Promise.all(ds.map(function(d){return crypto.subtle.exportKey("raw",ks[d].key).then(function(raw){inner[d]={salt:b64(ks[d].salt),key:b64(new Uint8Array(raw))}})}))
  .then(function(){return kdf(pw,salt,false,["encrypt"])})
  .then(function(wk){return crypto.subtle.encrypt({name:"AES-GCM",iv:iv},wk,te2.encode(JSON.stringify(inner)))})
@@ -138,8 +129,7 @@ function unwrap(pw){var o=stored();if(!o)return Promise.reject(new Error("none")
  return kdf(pw,unb64(o.s),false,["decrypt"]).then(function(wk){return crypto.subtle.decrypt({name:"AES-GCM",iv:unb64(o.iv)},wk,unb64(o.ct))})
  .then(function(plain){var inner=JSON.parse(te.decode(plain)),nk={};
   if(!inner.aux)throw new Error("stale");   /* saved before the Duplicates/Access tabs existed */
-  var names=Object.keys(FILES).concat(["aux"]);if(inner.listings)names.push("listings");
-  return Promise.all(names.map(function(d){if(!inner[d])throw new Error("x");
+  return Promise.all(Object.keys(FILES).concat(["aux"]).map(function(d){if(!inner[d])throw new Error("x");
    return crypto.subtle.importKey("raw",unb64(inner[d].key),{name:"AES-GCM"},true,d==="aux"?["encrypt","decrypt"]:["decrypt"]).then(function(k){nk[d]={key:k,salt:unb64(inner[d].salt)}})}))
   .then(function(){return nk})})}
 /* are the saved keys still for the files on the site? */
@@ -158,8 +148,7 @@ $("lf").addEventListener("submit",function(ev){ev.preventDefault();
  $("msg").textContent="";$("go").disabled=true;$("go").textContent="Checking…";
  var p;
  if(mode==="device"){
-  p=unwrap(pw).then(function(nk){return fresh(nk).then(function(ok){if(!ok)throw new Error("stale");if(nk.listings)return nk;
-    return addListingsKey(pw,nk).then(function(nk2){if(!nk2.listings)return nk2;return wrapStore(pw,nk2).then(function(){return nk2})})})})
+  p=unwrap(pw).then(function(nk){return fresh(nk).then(function(ok){if(ok)return nk;throw new Error("stale")})})
    .catch(function(e){if(e&&e.message==="net")throw e;var stale=e&&e.message==="stale";
     return tryMain(pw).then(function(nk){return wrapStore(pw,nk).then(function(){return nk})},function(e2){
      if(e2&&(e2.message==="net"||e2.name==="TypeError"))throw e2;
@@ -186,26 +175,9 @@ function open(d){busy(true);
 function setFrame(u){var f=$("frame");try{f.contentWindow.location.replace(u)}catch(e){f.src=u}}
 function back(){$("viewer").classList.add("hide");setFrame("about:blank");
  if(curUrl){URL.revokeObjectURL(curUrl);curUrl=null}document.title="B&Q Dashboards"}
-function clearSession(){try{sessionStorage.removeItem("bqDashSession.v1");sessionStorage.removeItem("bqDashReturn");sessionStorage.removeItem("bqDashGo");localStorage.removeItem("bqListKey.v1")}catch(e){}}
-function lock(msg){clearSession();forget();keys={};bufs={};back();if(window.BQTabs)BQTabs.close();setMode("main",msg||"")}
-/* Same-tab handoff for the Listings page only. Cleared by Lock. A normal reload still asks for the password. */
-function stashSession(){if(!keys||!keys.aux)return Promise.resolve();
- var ds=Object.keys(FILES).concat(["aux"]).concat(keys.listings?["listings"]:[]),inner={};
- return Promise.all(ds.map(function(d){return crypto.subtle.exportKey("raw",keys[d].key).then(function(raw){inner[d]={salt:b64(keys[d].salt),key:b64(new Uint8Array(raw))}})}))
-  .then(function(){try{sessionStorage.setItem("bqDashSession.v1",JSON.stringify({v:1,inner:inner}))}catch(e){}})}
-function restoreSession(){var flag=null;try{flag=sessionStorage.getItem("bqDashReturn")}catch(e){}
- if(flag!=="1")return Promise.resolve(false);
- try{sessionStorage.removeItem("bqDashReturn")}catch(e){}
- var o=null;try{o=JSON.parse(sessionStorage.getItem("bqDashSession.v1")||"null")}catch(e){}
- if(!o||o.v!==1||!o.inner||!o.inner.aux||!o.inner.sales||!o.inner.orders)return Promise.resolve(false);
- var nk={},names=Object.keys(FILES).concat(["aux"]).concat(o.inner.listings?["listings"]:[]);
- return Promise.all(names.map(function(d){if(!o.inner[d])throw new Error("x");
-  return crypto.subtle.importKey("raw",unb64(o.inner[d].key),{name:"AES-GCM"},true,d==="aux"?["encrypt","decrypt"]:["decrypt"]).then(function(k){nk[d]={key:k,salt:unb64(o.inner[d].salt)}})}))
-  .then(function(){return fresh(nk)}).then(function(ok){if(!ok)return false;
-   return getBuf("sales").then(function(b){return decrypt(nk.sales.key,parts(b)).then(function(){keys=nk;return true})})})
-  .catch(function(){return false})}
+function lock(msg){forget();keys={};bufs={};back();if(window.BQTabs)BQTabs.close();setMode("main",msg||"")}
 /* used by tabs_v1.js (same page) */
-window.BQ={aux:function(){return keys.aux?keys.aux.key:null},lock:lock,busy:busy,back:back,stashSession:stashSession};
+window.BQ={aux:function(){return keys.aux?keys.aux.key:null},lock:lock,busy:busy,back:back};
 /* messages from the app inside the frame */
 window.addEventListener("message",function(e){var f=$("frame");
  if(!f||e.source!==f.contentWindow||!e.data||typeof e.data.bq!=="string")return;
@@ -215,7 +187,7 @@ window.addEventListener("message",function(e){var f=$("frame");
  if(m.bq==="lock"){reply({ok:true});lock("Locked. This device no longer remembers you.");return}
  /* Home cards inside Sales/Orders: open another dashboard (Listings = the listing tool page, the rest = tabs on this page) */
  if(m.bq==="open"){var v=String(m.v||"");reply({ok:true});
-  if(v==="listings"){var goL=window.BQ&&BQ.stashSession?BQ.stashSession():Promise.resolve();goL.then(function(){location.href=$("listings").getAttribute("href")});return}
+  if(v==="listings"){location.href=$("listings").getAttribute("href");return}
   if(v==="sales"||v==="orders"){open(v);return}
   if(window.BQTabs&&BQTabs.tabs[v]){back();BQTabs.open(v)}return}
  if(m.bq==="rewrap"){var o=String(m.old||""),n=String(m.nw||"");
@@ -226,11 +198,10 @@ window.addEventListener("message",function(e){var f=$("frame");
  }});
 document.querySelectorAll("[data-d]").forEach(function(b){b.addEventListener("click",function(){open(b.getAttribute("data-d"))})});
 $("lock").addEventListener("click",function(){lock("Locked. This device no longer remembers you.")});
-$("forget").addEventListener("click",function(){clearSession();forget();setMode("main","This device has forgotten the saved login.")});
+$("forget").addEventListener("click",function(){forget();setMode("main","This device has forgotten the saved login.")});
 if(!window.crypto||!crypto.subtle){$("msg").textContent="This browser can’t unlock the dashboards (needs HTTPS and a modern browser).";$("go").disabled=true}
 else{var had1=false;try{had1=!!localStorage.getItem(LS1);localStorage.removeItem(LS1)}catch(e){}
- restoreSession().then(function(back){if(back){show("menu");return}
-  if(stored())setMode("device");else setMode("main",had1?"For extra safety, please type the password once more. Saved logins are now protected by your password.":"")});}
+ if(stored())setMode("device");else setMode("main",had1?"For extra safety, please type the password once more. Saved logins are now protected by your password.":"");}
 })();
 </script>
 <script>
@@ -268,14 +239,8 @@ function getEnc(url){return fetch(url,{cache:"no-cache"}).then(function(r){if(r.
 function getJSON(url){return getEnc(url).then(function(u){return JSON.parse(te.decode(u))})}
 function why(e){var m=e&&e.message;return m==="notyet"?"Not published yet.":m==="net"||(e&&e.name==="TypeError")?"Couldn’t load it – check your connection and tap Back, then open the card again.":
  m==="otherkey"?"This file was made with a different password.":m==="nokey"?"Please unlock again.":"Something went wrong ("+esc(m||e)+")."}
-function save(name,blob){var a=document.createElement("a"),u=URL.createObjectURL(blob);a.href=u;a.download=name;a.rel="noopener";document.body.appendChild(a);a.click();
- setTimeout(function(){URL.revokeObjectURL(u);a.remove()},120000)}
-/* Desktop Chrome can revoke a blob download before the file is written, so the phone then skips a corrupt upload.
-   Where the browser can write the bytes itself, do that. The name must stay a locked .enc file. */
-function saveLocked(name,blob){if(!/^(all_variant|codes)_\d{4}-\d{2}-\d{2}_\d{6}\.enc$/.test(name)){alert("That file name cannot be published.");return}
- if(window.showSaveFilePicker){window.showSaveFilePicker({suggestedName:name,types:[{description:"Encrypted file",accept:{"application/octet-stream":[".enc"]}}]}).then(function(h){
-  return h.createWritable().then(function(w){return w.write(blob).then(function(){return w.close()})})}).catch(function(e){if(e&&e.name==="AbortError")return;save(name,blob)});return}
- save(name,blob)}
+function save(name,blob){var a=document.createElement("a"),u=URL.createObjectURL(blob);a.href=u;a.download=name;document.body.appendChild(a);a.click();
+ setTimeout(function(){URL.revokeObjectURL(u);a.remove()},4000)}
 var xlsxP=null;
 function xlsx(){if(window.XLSX)return Promise.resolve(window.XLSX);if(xlsxP)return xlsxP;
  xlsxP=new Promise(function(ok,no){var s=document.createElement("script");s.src=XLSX_LIB;s.onload=function(){ok(window.XLSX)};s.onerror=function(){xlsxP=null;no(new Error("net"))};document.head.appendChild(s)});return xlsxP}
@@ -372,12 +337,11 @@ function dups(){return getJSON("duplicates.enc").then(function(doc){
  draw()})}
 
 /* ---------- Access ---------- */
-function encName(n){return String(n||"").replace(/\.txt$/i,"")}
-function newest(list,prefix){return list.filter(function(f){var n=encName(f.name);return f.type==="file"&&n.indexOf(prefix)===0&&/\.enc$/i.test(n)}).sort(function(a,b){return encName(a.name)<encName(b.name)?1:-1})}
+function newest(list,prefix){return list.filter(function(f){return f.type==="file"&&f.name.indexOf(prefix)===0&&/\.enc$/.test(f.name)}).sort(function(a,b){return a.name<b.name?1:-1})}
 function metaOf(f,kind){return fetch(f.download_url,{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error("net");return r.arrayBuffer()}).then(decrypt).then(function(u){
  if(kind==="av"){var h=te.decode(u.subarray(0,6));if(h!=="BQAV1\n")throw new Error("badfile");var nl=u.indexOf(10,6);return JSON.parse(te.decode(u.subarray(6,nl)))}
  return JSON.parse(te.decode(u)).meta})}
-function bestMeta(files,kind){var c=files.slice(0,8);return Promise.all(c.map(function(f){return metaOf(f,kind).then(function(m){m._file=f.name;return m},function(){return null})}))
+function bestMeta(files,kind){var c=files.slice(0,3);return Promise.all(c.map(function(f){return metaOf(f,kind).then(function(m){m._file=f.name;return m},function(){return null})}))
  .then(function(ms){ms=ms.filter(Boolean);ms.sort(function(a,b){return(a.created||"")<(b.created||"")?1:-1});return ms[0]||null})}
 function access(){
  var h='<h2>Buy box</h2><div class="box" id="arun">Checking the last run…</div><div class="box" id="ago"></div>'+
@@ -447,7 +411,7 @@ function readBook(file){return xlsx().then(function(X){return file.arrayBuffer()
  try{wb=X.read(new Uint8Array(buf),{type:"array",dense:false})}catch(e){throw new Error("notexcel")}return{X:X,wb:wb,buf:new Uint8Array(buf)}})})}
 function steps(prefix,name,blob,what){var s2=$(prefix+"step2"),s3=$(prefix+"step3");
  s2.innerHTML='<button class="btn o" type="button" id="'+prefix+'save">2. Save the locked file</button> <span class="mut mono">'+esc(name)+'</span>';s2.classList.remove("hide");s3.classList.add("hide");
- $(prefix+"save").onclick=function(){saveLocked(name,blob);
+ $(prefix+"save").onclick=function(){save(name,blob);
   s3.innerHTML='<a class="btn o" href="'+UPLOAD+'" target="_blank" rel="noopener">3. Open GitHub upload</a><div class="note">On GitHub tap <b>choose your files</b>, pick <b>'+esc(name)+'</b> (in Downloads), then tap the green <b>Commit changes</b>. Done – '+what+'</div>';
   s3.classList.remove("hide")}}
 function pickAV(file){var msg=$("avmsg");msg.innerHTML="Reading "+esc(file.name)+"…";$("avstep2").classList.add("hide");$("avstep3").classList.add("hide");
@@ -1530,7 +1494,7 @@ function b7draw(){var B=window.BQBook,R=st.bbr||[];if(!$("pzb7"))return;if(!B||!
  $("pzb7c").innerHTML=t.map(function(a){return '<span class="pz-b7t"><b>'+esc(a[1])+'</b>'+esc(a[0])+'</span>'}).join("");
  $("pzb7src").textContent=st.src==="file"?"· from your Access file "+(st.file||""):"· from the published Access file "+(st.file||"");$("pzb7dl").disabled=false}
 function b7input(){return{bbr:st.bbr,aoa:st.aoa,settings:b7opt(),template:(st.doc&&st.doc.template)||TPL}}
-function saveBytes(bytes,name){var bl=new Blob([bytes],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),u=URL.createObjectURL(bl),a=document.createElement("a");a.href=u;a.download=name;document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(u);a.remove()},120000)}
+function saveBytes(bytes,name){var bl=new Blob([bytes],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),u=URL.createObjectURL(bl),a=document.createElement("a");a.href=u;a.download=name;document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(u);a.remove()},4000)}
 function book7(){var b=$("pzb7dl");if(!window.BQBook||!st.bbr)return;b.disabled=true;var old=b.innerHTML;b.textContent="Preparing…";
  K.xlsx().then(function(X){var out=window.BQBook.build(X,P,b7input());st.b7=out.counts;saveBytes(out.bytes,"B&Q Pricing 8 tabs "+(st.accessDate||"")+" made "+today()+".xlsx");
   $("pzb7n").textContent=" Saved – tab 7 has "+out.counts.t7+" price"+(out.counts.t7===1?"":"s")+" ready.";}).catch(function(e){alert(K.why(e))}).then(function(){b.disabled=false;b.innerHTML=old})}
@@ -1901,5 +1865,53 @@ BQTabs.add("calc",{title:"Calculator",render:function(body){return render(body)}
 window.BQCalc={state:function(){return st},compute:compute,csv:csvText,saved:loadSaved,open:function(c){open(c)},choose:function(){choose()}};
 })();
 </script>
-<script src="bqnav.js"></script>
+<script>
+(function(){
+"use strict";
+/* B&Q – one tab bar on every page (main dashboard page: menu, Sales, Orders, every tab; and the Listings tool pages).
+   Same list everywhere, current one highlighted, scrolls sideways on phones. No data, no keys. */
+var T=[["home","Home"],["sales","Sales"],["orders","Orders"],["listings","Listings"],["dups","Duplicates"],["access","Access file"],["pricing","Pricing"],["lookup","Individual sales"],["calc","Calculator"]];
+if(document.getElementById("bqnav"))return;
+var CSS='#bqnav{position:fixed;top:0;left:0;right:0;z-index:50;background:#0F172A;border-bottom:1px solid #1E293B;padding:env(safe-area-inset-top) 0 0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}'+
+ '#bqnav .bqn-s{display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:7px 10px;max-width:1400px;margin:0 auto}#bqnav .bqn-s::-webkit-scrollbar{display:none}'+
+ '#bqnav a{flex:none;display:inline-flex;align-items:center;min-height:36px;padding:7px 13px;border-radius:999px;background:#1E293B;color:#E2E8F0!important;font-size:14px;font-weight:600;text-decoration:none!important;white-space:nowrap;line-height:1.1;box-sizing:border-box}'+
+ '#bqnav a:hover{background:#334155}#bqnav a.on{background:#FF6600;color:#fff!important}#bqnav a:focus-visible{outline:3px solid #FDBA74;outline-offset:1px}'+
+ '@media (max-width:620px){#bqnav a{font-size:13px;padding:7px 11px}}';
+var MAIN=!!document.getElementById("menu"),cur="",nav,st;
+function add(){st=document.createElement("style");st.id="bqnav-css";st.textContent=CSS+(MAIN?
+  'body.bqn #viewer,body.bqn #tabv{top:var(--bqnh,50px)}body.bqn #menu{padding-top:calc(var(--bqnh,50px) + 8px)}body.bqn .tbar{padding-top:8px}':
+  'body{padding-top:var(--bqnh,50px)!important}');
+ document.head.appendChild(st);
+ nav=document.createElement("nav");nav.id="bqnav";nav.setAttribute("aria-label","All dashboards");
+ nav.innerHTML='<div class="bqn-s">'+T.map(function(t){return '<a href="'+href(t[0])+'" data-bqn="'+t[0]+'"'+(MAIN?'':' data-dash')+'>'+t[1]+'</a>'}).join("")+'</div>';
+ document.body.insertBefore(nav,document.body.firstChild);size();window.addEventListener("resize",size)}
+function size(){var h=nav.getBoundingClientRect().height;document.documentElement.style.setProperty("--bqnh",Math.round(h)+"px")}
+/* links: on the main page they act in place; on the Listings pages they go to the main page (#go=<tab> opens it after unlock) */
+function base(){if(MAIN)return "";if(typeof dashUrl==="function")try{return dashUrl()}catch(e){}return /\/listings\/phone\/?/.test(location.pathname)?"../../":"../"}
+function href(v){if(MAIN)return v==="listings"?"listings/":"#go="+v;return v==="listings"?"./":base()+(v==="home"?"":"#go="+v)}
+function mark(v){if(v===cur)return;cur=v;Array.prototype.forEach.call(nav.querySelectorAll("a"),function(a){var on=a.getAttribute("data-bqn")===v;a.classList.toggle("on",on);if(on){a.setAttribute("aria-current","page");try{a.scrollIntoView({block:"nearest",inline:"nearest"})}catch(e){}}else a.removeAttribute("aria-current")})}
+if(!MAIN){add();mark("listings");return}
+/* ---- main page ---- */
+var $=function(i){return document.getElementById(i)},TITLE={};
+function hidden(id){var e=$(id);return !e||e.classList.contains("hide")}
+function state(){if(!hidden("tabv")){var tt=($("ttitle")||{}).textContent||"";for(var k in TITLE)if(TITLE[k]===tt)return k;return ""}
+ if(!hidden("viewer"))return /Orders/.test(document.title)?"orders":"sales";return "home"}
+function sync(){var unl=!hidden("menu")||!hidden("viewer")||!hidden("tabv");document.body.classList.toggle("bqn",unl);nav.style.display=unl?"":"none";if(unl){size();mark(state())}
+ if(unl&&!hidden("menu")&&pend){var v=pend;pend=null;setTimeout(function(){go(v)},0)}}
+function card(v){return document.querySelector('#menu [data-d="'+v+'"],#menu [data-v="'+v+'"]')}
+function go(v){if(v==="listings"){location.href="listings/";return}
+ if(window.BQTabs&&BQTabs.close&&!hidden("tabv"))BQTabs.close();
+ if(!hidden("viewer")&&window.BQ&&BQ.back)BQ.back();
+ if(v==="home"){sync();return}
+ var c=card(v);if(c)c.click();sync()}
+var pend=null,m=/[#&]go=([a-z]+)/.exec(location.hash||"");if(m){pend=m[1];try{history.replaceState(history.state,"",location.pathname+location.search)}catch(e){}}
+add();
+setTimeout(function(){if(window.BQTabs)Object.keys(BQTabs.tabs).forEach(function(k){TITLE[k]=BQTabs.tabs[k].title})},0);
+nav.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[data-bqn]");if(!a||e.ctrlKey||e.metaKey||e.shiftKey||e.button)return;var v=a.getAttribute("data-bqn");if(v==="listings")return;e.preventDefault();go(v)});
+var mo=new MutationObserver(sync);["menu","viewer","tabv","login","ttitle"].forEach(function(id){var e=$(id);if(e)mo.observe(e,{attributes:true,attributeFilter:["class"],childList:id==="ttitle",characterData:id==="ttitle",subtree:id==="ttitle"})});
+var ot=document.querySelector("title");if(ot)mo.observe(ot,{childList:true,characterData:true,subtree:true});
+sync();
+window.BQNav={tabs:T,current:function(){return cur},go:go};
+})();
+</script>
 </body></html>
