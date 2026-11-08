@@ -57,7 +57,7 @@ table.bt{border-collapse:collapse;width:100%;font-size:14px}.bt th,.bt td{paddin
 .box ol{margin:8px 0 0;padding-left:22px}.box li{margin-bottom:8px}.ok{color:#166534;font-weight:700}.bad{color:#991B1B;font-weight:700}
 .note{font-size:14px;color:#475569}
 #busy{position:fixed;inset:0;z-index:7;background:rgba(15,23,42,.88);display:flex;align-items:center;justify-content:center;font-size:16px;color:#F8FAFC}
-</style></head><body>
+</style></head><body data-open="">
 <div class="wrap" id="login">
  <div class="logo">B&amp;Q</div><h1 id="lh">Dashboards</h1><p class="sub" id="lsub">Diva Package · private</p>
  <form id="lf" autocomplete="on">
@@ -71,9 +71,12 @@ table.bt{border-collapse:collapse;width:100%;font-size:14px}.bt th,.bt td{paddin
  </form>
 </div>
 <div class="wrap hide" id="menu">
- <div class="logo">B&amp;Q</div><h1>Choose a dashboard</h1><p class="sub">Tap Home in any dashboard to see all eight here again. Your phone’s back gesture also returns here.</p>
- <button class="big" data-d="sales"><b>Sales</b><span>Sales, orders, units and profit · best sellers · calculator</span></button>
- <button class="big" data-d="orders"><b>Orders</b><span>Every order with profit, incl. cancelled · needs fixing</span></button>
+ <div class="logo">B&amp;Q</div><h1>Choose a dashboard</h1><p class="sub">Sales and Orders open as their own pages. Tap Home to see all dashboards here again. Your phone’s back gesture also returns here.</p>
+
+ <a class="big" href="sales.html"><b>Sales</b><span>Revenue, units and profit · All / B&amp;Q GMV / B&amp;Q cash · calculator</span></a>
+ <a class="big" href="orders.html"><b>Orders</b><span>Order count and details · status filters · search</span></a>
+ <button class="big hide" data-d="sales" type="button" aria-hidden="true"><b>Sales</b></button>
+ <button class="big hide" data-d="orders" type="button" aria-hidden="true"><b>Orders</b></button>
  <a class="big" id="listings" href="listings/"><b>Listings</b><span>Create and fix B&amp;Q listings · templates · download files</span></a>
  <button class="big" data-v="dups"><b>Duplicates</b><span>Same product listed twice · delete, fix and check lists</span></button>
  <button class="big" data-v="access"><b>Access</b><span>Buy box winners · run buy box · update All variant</span></button>
@@ -85,8 +88,7 @@ table.bt{border-collapse:collapse;width:100%;font-size:14px}.bt th,.bt td{paddin
 <div id="viewer" class="hide"><iframe id="frame" title="Dashboard" allow="clipboard-write"></iframe></div>
 <div id="tabv" class="hide"><div class="tbar"><button id="tback" type="button" aria-label="Home – all dashboards"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Home</button><b id="ttitle"></b></div><div id="tbody"></div></div>
 <div id="busy" class="hide">Opening…</div>
-<script>
-(function(){
+<script>(function(){
 "use strict";
 /* B&Q v5 login. Files are AES-GCM encrypted (key = PBKDF2-SHA256, 600k, from the main password).
    "Remember me" keeps the file keys on this device, but only wrapped (encrypted) with a device password,
@@ -97,6 +99,7 @@ var $=function(i){return document.getElementById(i)};
 /* aux = one extra key (shared salt AUX_HEX) for the Duplicates / Access tab files and for encrypting uploads */
 function auxSalt(){var u=new Uint8Array(16);for(var i=0;i<16;i++)u[i]=parseInt(AUX_HEX.substr(i*2,2),16);return u}
 var keys={},bufs={},curUrl=null,te=new TextDecoder(),te2=new TextEncoder(),mode="main";
+var OPEN=(document.body.getAttribute("data-open")||"").trim(); if(OPEN!=="sales"&&OPEN!=="orders") OPEN="";
 function b64(u8){var s="";for(var i=0;i<u8.length;i+=8192)s+=String.fromCharCode.apply(null,u8.subarray(i,i+8192));return btoa(s)}
 function unb64(s){var b=atob(s),u=new Uint8Array(b.length);for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u}
 function show(id){["login","menu"].forEach(function(x){$(x).classList.toggle("hide",x!==id)})}
@@ -156,7 +159,7 @@ $("lf").addEventListener("submit",function(ev){ev.preventDefault();
  }else{
   p=tryMain(pw).then(function(nk){return($("rem").checked?wrapStore(pw,nk):Promise.resolve(forget())).then(function(){return nk})});
  }
- p.then(function(nk){keys=nk;$("pw").value="";$("msg").textContent="";show("menu")})
+ p.then(function(nk){keys=nk;$("pw").value="";$("msg").textContent="";show("menu");if(OPEN)open(OPEN)})
  .catch(function(e){fail(e,e&&e.message==="stale2"?"The dashboards were updated, so this device’s saved login has expired. Please type the main password.":"That password isn’t right — please try again.")})
  .then(function(){$("go").disabled=false;$("go").textContent="Unlock"})});
 
@@ -173,11 +176,12 @@ function open(d){busy(true);
   lock("Please enter the main password again (the dashboards were updated).")})}
 /* location.replace: frame changes add no browser-history entries, so phone Back returns to the cards */
 function setFrame(u){var f=$("frame");try{f.contentWindow.location.replace(u)}catch(e){f.src=u}}
-function back(){$("viewer").classList.add("hide");setFrame("about:blank");
+function back(){if(OPEN){location.href="index.html";return}
+ $("viewer").classList.add("hide");setFrame("about:blank");
  if(curUrl){URL.revokeObjectURL(curUrl);curUrl=null}document.title="B&Q Dashboards"}
 function lock(msg){forget();keys={};bufs={};back();if(window.BQTabs)BQTabs.close();setMode("main",msg||"")}
 /* used by tabs_v1.js (same page) */
-window.BQ={aux:function(){return keys.aux?keys.aux.key:null},lock:lock,busy:busy,back:back};
+window.BQ={aux:function(){return keys.aux?keys.aux.key:null},lock:lock,busy:busy,back:back,forced:OPEN||null,openDash:open};
 /* messages from the app inside the frame */
 window.addEventListener("message",function(e){var f=$("frame");
  if(!f||e.source!==f.contentWindow||!e.data||typeof e.data.bq!=="string")return;
@@ -185,11 +189,7 @@ window.addEventListener("message",function(e){var f=$("frame");
  var m=e.data,reply=function(o){o.re=m.id;try{e.source.postMessage(o,location.origin!=="null"?location.origin:"*")}catch(x){}};
  if(m.bq==="hello"){reply({ok:true,remembered:!!stored()});return}
  if(m.bq==="lock"){reply({ok:true});lock("Locked. This device no longer remembers you.");return}
- /* Home cards inside Sales/Orders: open another dashboard (Listings = the listing tool page, the rest = tabs on this page) */
- if(m.bq==="open"){var v=String(m.v||"");reply({ok:true});
-  if(v==="listings"){location.href=$("listings").getAttribute("href");return}
-  if(v==="sales"||v==="orders"){open(v);return}
-  if(window.BQTabs&&BQTabs.tabs[v]){back();BQTabs.open(v)}return}
+ if(m.bq==="nav"){var v=String(m.v||"");reply({ok:true});if(v==="sales"||v==="orders")location.href=v+".html";else if(v==="home")location.href="index.html";return}
  if(m.bq==="rewrap"){var o=String(m.old||""),n=String(m.nw||"");
   if(n.length<8){reply({ok:false,err:"New password needs at least 8 characters"});return}
   var chk=stored()?unwrap(o).catch(function(){return tryMain(o)}):tryMain(o);
@@ -201,6 +201,7 @@ $("lock").addEventListener("click",function(){lock("Locked. This device no longe
 $("forget").addEventListener("click",function(){forget();setMode("main","This device has forgotten the saved login.")});
 if(!window.crypto||!crypto.subtle){$("msg").textContent="This browser can’t unlock the dashboards (needs HTTPS and a modern browser).";$("go").disabled=true}
 else{var had1=false;try{had1=!!localStorage.getItem(LS1);localStorage.removeItem(LS1)}catch(e){}
+ if(OPEN){document.title=OPEN==="sales"?"B&Q Sales":"B&Q Orders";$("lh").textContent=OPEN==="sales"?"Sales":"Orders";}
  if(stored())setMode("device");else setMode("main",had1?"For extra safety, please type the password once more. Saved logins are now protected by your password.":"");}
 })();
 </script>
@@ -1865,53 +1866,69 @@ BQTabs.add("calc",{title:"Calculator",render:function(body){return render(body)}
 window.BQCalc={state:function(){return st},compute:compute,csv:csvText,saved:loadSaved,open:function(c){open(c)},choose:function(){choose()}};
 })();
 </script>
-<script>
+<script>/* Same tab bar on every dashboard section and on the Listings pages.
+   Eight sections, plus Home (returns to the menu without a new login while this tab is already unlocked).
+   No keys and no catalogue data in this file. */
 (function(){
 "use strict";
-/* B&Q – one tab bar on every page (main dashboard page: menu, Sales, Orders, every tab; and the Listings tool pages).
-   Same list everywhere, current one highlighted, scrolls sideways on phones. No data, no keys. */
-var T=[["home","Home"],["sales","Sales"],["orders","Orders"],["listings","Listings"],["dups","Duplicates"],["access","Access file"],["pricing","Pricing"],["lookup","Individual sales"],["calc","Calculator"]];
+var T=[["home","Home"],["sales","Sales"],["orders","Orders"],["listings","Listings"],["dups","Duplicates"],["access","Access"],["pricing","Pricing"],["lookup","Individual sales"],["calc","Calculator"]];
 if(document.getElementById("bqnav"))return;
-var CSS='#bqnav{position:fixed;top:0;left:0;right:0;z-index:50;background:#0F172A;border-bottom:1px solid #1E293B;padding:env(safe-area-inset-top) 0 0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}'+
- '#bqnav .bqn-s{display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:7px 10px;max-width:1400px;margin:0 auto}#bqnav .bqn-s::-webkit-scrollbar{display:none}'+
- '#bqnav a{flex:none;display:inline-flex;align-items:center;min-height:36px;padding:7px 13px;border-radius:999px;background:#1E293B;color:#E2E8F0!important;font-size:14px;font-weight:600;text-decoration:none!important;white-space:nowrap;line-height:1.1;box-sizing:border-box}'+
+var CSS='#bqnav{position:fixed;top:0;left:0;right:0;width:100%;max-width:100%;box-sizing:border-box;z-index:80;background:#0F172A;border-bottom:1px solid #1E293B;padding:env(safe-area-inset-top) 0 0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;overflow:hidden}'+
+ '#bqnav .bqn-s{display:flex;flex-wrap:wrap;align-items:center;gap:6px;width:100%;max-width:1400px;box-sizing:border-box;margin:0 auto;padding:7px 10px}'+
+ '#bqnav a{flex:0 1 auto;display:inline-flex;align-items:center;min-height:36px;padding:7px 13px;border-radius:999px;background:#1E293B;color:#E2E8F0!important;font-size:14px;font-weight:600;text-decoration:none!important;white-space:nowrap;line-height:1.1;box-sizing:border-box}'+
  '#bqnav a:hover{background:#334155}#bqnav a.on{background:#FF6600;color:#fff!important}#bqnav a:focus-visible{outline:3px solid #FDBA74;outline-offset:1px}'+
- '@media (max-width:620px){#bqnav a{font-size:13px;padding:7px 11px}}';
-var MAIN=!!document.getElementById("menu"),cur="",nav,st;
-function add(){st=document.createElement("style");st.id="bqnav-css";st.textContent=CSS+(MAIN?
+ '@media (max-width:620px){#bqnav a{font-size:12px;padding:6px 8px;min-height:32px}}';
+var MAIN=!!document.getElementById("menu"),cur="",nav;
+function add(){
+ var st=document.createElement("style");st.id="bqnav-css";st.textContent=CSS+(MAIN?
   'body.bqn #viewer,body.bqn #tabv{top:var(--bqnh,50px)}body.bqn #menu{padding-top:calc(var(--bqnh,50px) + 8px)}body.bqn .tbar{padding-top:8px}':
   'body{padding-top:var(--bqnh,50px)!important}');
  document.head.appendChild(st);
  nav=document.createElement("nav");nav.id="bqnav";nav.setAttribute("aria-label","All dashboards");
  nav.innerHTML='<div class="bqn-s">'+T.map(function(t){return '<a href="'+href(t[0])+'" data-bqn="'+t[0]+'"'+(MAIN?'':' data-dash')+'>'+t[1]+'</a>'}).join("")+'</div>';
  document.body.insertBefore(nav,document.body.firstChild);size();window.addEventListener("resize",size)}
-function size(){var h=nav.getBoundingClientRect().height;document.documentElement.style.setProperty("--bqnh",Math.round(h)+"px")}
-/* links: on the main page they act in place; on the Listings pages they go to the main page (#go=<tab> opens it after unlock) */
-function base(){if(MAIN)return "";if(typeof dashUrl==="function")try{return dashUrl()}catch(e){}return /\/listings\/phone\/?/.test(location.pathname)?"../../":"../"}
-function href(v){if(MAIN)return v==="listings"?"listings/":"#go="+v;return v==="listings"?"./":base()+(v==="home"?"":"#go="+v)}
-function mark(v){if(v===cur)return;cur=v;Array.prototype.forEach.call(nav.querySelectorAll("a"),function(a){var on=a.getAttribute("data-bqn")===v;a.classList.toggle("on",on);if(on){a.setAttribute("aria-current","page");try{a.scrollIntoView({block:"nearest",inline:"nearest"})}catch(e){}}else a.removeAttribute("aria-current")})}
-if(!MAIN){add();mark("listings");return}
-/* ---- main page ---- */
+function size(){if(!nav)return;var h=nav.getBoundingClientRect().height;document.documentElement.style.setProperty("--bqnh",Math.round(h)+"px")}
+function base(){if(MAIN)return "";
+ if(typeof dashUrl==="function")try{return dashUrl()}catch(e){}
+ var p=location.pathname,i=p.indexOf("/listings/");
+ if(i>=0)return p.slice(0,i+1);
+ return p.replace(/\/listings(\/index\.html)?\/?$/,"/")||"/"}
+function href(v){if(MAIN){if(v==="listings")return"listings/";if(v==="sales")return"sales.html";if(v==="orders")return"orders.html";if(v==="home")return"index.html";return"#go="+v;}return v==="listings"?"./":base()+(v==="home"?"":v==="sales"?"sales.html":v==="orders"?"orders.html":"#go="+v)}
+function mark(v){if(v===cur)return;cur=v;Array.prototype.forEach.call(nav.querySelectorAll("a"),function(a){var on=a.getAttribute("data-bqn")===v;a.classList.toggle("on",on);if(on)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current")})}
+function toListings(){var p=window.BQ&&BQ.stashSession?BQ.stashSession():Promise.resolve();p.then(function(){location.href="listings/"})}
+var ALLOW={home:1,sales:1,orders:1,listings:1,dups:1,access:1,pricing:1,lookup:1,calc:1};
+function readGo(){var h=/[#&]go=([a-z]+)/.exec(location.hash||""),s=null;try{s=sessionStorage.getItem("bqDashGo")}catch(e){}
+ var hv=h&&ALLOW[h[1]]?h[1]:"",sv=s&&ALLOW[s]?s:"";return hv||sv||""}
+function clearGo(){try{sessionStorage.removeItem("bqDashGo")}catch(e){}
+ if(/[#&]go=/.test(location.hash||"")){try{history.replaceState(history.state,"",location.pathname+location.search)}catch(e){}}}
+if(!MAIN){add();mark("listings");
+ nav.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[data-bqn]");if(!a||e.ctrlKey||e.metaKey||e.shiftKey||e.button)return;var v=a.getAttribute("data-bqn");if(v==="listings")return;try{sessionStorage.setItem("bqDashReturn","1");if(v&&v!=="home"&&ALLOW[v])sessionStorage.setItem("bqDashGo",v);else sessionStorage.removeItem("bqDashGo")}catch(err){}});
+ window.BQNav={tabs:T,current:function(){return cur},go:function(){},readGo:readGo,clearGo:clearGo};return}
 var $=function(i){return document.getElementById(i)},TITLE={};
 function hidden(id){var e=$(id);return !e||e.classList.contains("hide")}
-function state(){if(!hidden("tabv")){var tt=($("ttitle")||{}).textContent||"";for(var k in TITLE)if(TITLE[k]===tt)return k;return ""}
+function state(){if(window.BQ&&BQ.forced)return BQ.forced;
+ if(!hidden("tabv")){var tt=($("ttitle")||{}).textContent||"";for(var k in TITLE)if(TITLE[k]===tt)return k;return ""}
  if(!hidden("viewer"))return /Orders/.test(document.title)?"orders":"sales";return "home"}
+var sent=false;
 function sync(){var unl=!hidden("menu")||!hidden("viewer")||!hidden("tabv");document.body.classList.toggle("bqn",unl);nav.style.display=unl?"":"none";if(unl){size();mark(state())}
- if(unl&&!hidden("menu")&&pend){var v=pend;pend=null;setTimeout(function(){go(v)},0)}}
+ if(unl&&!hidden("menu")&&!sent){var v=readGo();if(v){sent=true;clearGo();if(v!=="home")setTimeout(function(){go(v)},0)}}}
 function card(v){return document.querySelector('#menu [data-d="'+v+'"],#menu [data-v="'+v+'"]')}
-function go(v){if(v==="listings"){location.href="listings/";return}
+function go(v){if(v==="listings"){toListings();return}
+ if(v==="sales"||v==="orders"){location.href=v+".html";return}
+ if(v==="home"){location.href="index.html";return}
  if(window.BQTabs&&BQTabs.close&&!hidden("tabv"))BQTabs.close();
  if(!hidden("viewer")&&window.BQ&&BQ.back)BQ.back();
- if(v==="home"){sync();return}
  var c=card(v);if(c)c.click();sync()}
-var pend=null,m=/[#&]go=([a-z]+)/.exec(location.hash||"");if(m){pend=m[1];try{history.replaceState(history.state,"",location.pathname+location.search)}catch(e){}}
 add();
 setTimeout(function(){if(window.BQTabs)Object.keys(BQTabs.tabs).forEach(function(k){TITLE[k]=BQTabs.tabs[k].title})},0);
-nav.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[data-bqn]");if(!a||e.ctrlKey||e.metaKey||e.shiftKey||e.button)return;var v=a.getAttribute("data-bqn");if(v==="listings")return;e.preventDefault();go(v)});
+nav.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[data-bqn]");if(!a||e.ctrlKey||e.metaKey||e.shiftKey||e.button)return;var v=a.getAttribute("data-bqn");if(v==="listings"){e.preventDefault();toListings();return}e.preventDefault();go(v)});
+var listingCard=$("listings");
+if(listingCard)listingCard.addEventListener("click",function(e){if(e.ctrlKey||e.metaKey||e.shiftKey||e.altKey||e.button)return;e.preventDefault();toListings()});
 var mo=new MutationObserver(sync);["menu","viewer","tabv","login","ttitle"].forEach(function(id){var e=$(id);if(e)mo.observe(e,{attributes:true,attributeFilter:["class"],childList:id==="ttitle",characterData:id==="ttitle",subtree:id==="ttitle"})});
 var ot=document.querySelector("title");if(ot)mo.observe(ot,{childList:true,characterData:true,subtree:true});
 sync();
 window.BQNav={tabs:T,current:function(){return cur},go:go};
 })();
 </script>
+<script src="entry_pages.js"></script>
 </body></html>
