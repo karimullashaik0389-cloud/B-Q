@@ -59,11 +59,11 @@ table.bt{border-collapse:collapse;width:100%;font-size:14px}.bt th,.bt td{paddin
 #busy{position:fixed;inset:0;z-index:7;background:rgba(15,23,42,.88);display:flex;align-items:center;justify-content:center;font-size:16px;color:#F8FAFC}
 </style></head><body data-open="">
 <div class="wrap" id="login">
- <div class="logo">B&amp;Q</div><h1 id="lh">Dashboards</h1><p class="sub" id="lsub">Diva Package · private</p>
+ <div class="logo">B&amp;Q</div><h1 id="lh">B&amp;Q Dashboards</h1><p class="sub" id="lsub">Enter the password once. Sales, Orders, Listings and the other tabs stay unlocked in this browser tab.</p>
  <form id="lf" autocomplete="on">
   <label class="f" for="pw" id="pwl">Password</label>
   <input type="password" id="pw" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" required>
-  <label class="row" id="remrow"><input type="checkbox" id="rem" checked> Remember me on this device</label>
+  <label class="row" id="remrow"><input type="checkbox" id="rem" checked> Remember on this device (optional)</label>
   <button class="primary" id="go" type="submit">Unlock</button>
   <div class="msg" id="msg" role="alert"></div>
   <p class="hint hide" id="dhint">Saved on this device and protected by your password. The main password works too.</p>
@@ -90,13 +90,12 @@ table.bt{border-collapse:collapse;width:100%;font-size:14px}.bt th,.bt td{paddin
 <div id="busy" class="hide">Opening…</div>
 <script>(function(){
 "use strict";
-/* B&Q v5 login. Files are AES-GCM encrypted (key = PBKDF2-SHA256, 600k, from the main password).
-   "Remember me" keeps the file keys on this device, but only wrapped (encrypted) with a device password,
-   never in plain form. The device password starts as the password typed at login and can be changed
-   from the app's Settings; that change applies to this device only. */
+/* B&Q v5 login – one password for every dashboard page in this browser tab.
+   Keys are kept in sessionStorage (bqDashSession.v1) so sales.html, orders.html,
+   Listings and the hub tabs open without asking again. Optional “Remember me”
+   still wraps keys in localStorage for this device. Password never printed. */
 var FILES={sales:"sales.enc",orders:"orders.enc"},ITER=600000,AUX_HEX="94ccba845e4963161cceda2f070f59d4",LS1="bqDashKeys.v1",LS2="bqDashKeys.v2";
 var $=function(i){return document.getElementById(i)};
-/* aux = one extra key (shared salt AUX_HEX) for the Duplicates / Access tab files and for encrypting uploads */
 function auxSalt(){var u=new Uint8Array(16);for(var i=0;i<16;i++)u[i]=parseInt(AUX_HEX.substr(i*2,2),16);return u}
 var keys={},bufs={},curUrl=null,te=new TextDecoder(),te2=new TextEncoder(),mode="main";
 var OPEN=(document.body.getAttribute("data-open")||"").trim(); if(OPEN!=="sales"&&OPEN!=="orders") OPEN="";
@@ -117,13 +116,17 @@ function decrypt(key,p){return crypto.subtle.decrypt({name:"AES-GCM",iv:p.iv},ke
 function sameSalt(a,b){if(a.length!==b.length)return false;for(var i=0;i<a.length;i++)if(a[i]!==b[i])return false;return true}
 function stored(){try{var o=JSON.parse(localStorage.getItem(LS2)||"null");return o&&o.v===2&&o.s&&o.iv&&o.ct?o:null}catch(e){return null}}
 function forget(){try{localStorage.removeItem(LS2);localStorage.removeItem(LS1)}catch(e){}}
-/* main password: derive each file key from its own salt and prove it by decrypting the file */
 function tryMain(pw){var nk={};
  return Promise.all(Object.keys(FILES).map(function(d){return getBuf(d).then(function(b){var p=parts(b);
   return kdf(pw,p.salt,true,["decrypt"]).then(function(k){nk[d]={key:k,salt:p.salt.slice()};return decrypt(k,p)})})}))
- .then(function(){return kdf(pw,auxSalt(),true,["encrypt","decrypt"])}).then(function(k){nk.aux={key:k,salt:auxSalt()};return nk})}
-/* wrap the file keys with a device password and keep only the wrapped copy */
-function wrapStore(pw,ks){var inner={},ds=Object.keys(FILES).concat(ks.aux?["aux"]:[]),salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));
+ .then(function(){return kdf(pw,auxSalt(),true,["encrypt","decrypt"])}).then(function(k){nk.aux={key:k,salt:auxSalt()};return addListingsKey(pw,nk)})}
+function addListingsKey(pw,nk){if(!pw||(nk&&nk.listings))return Promise.resolve(nk);
+ return fetch("listings/data.enc",{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error("net");return r.arrayBuffer()}).then(function(b){
+  var u=new Uint8Array(b);if(u.length<48||String.fromCharCode(u[0],u[1],u[2],u[3])!=="BQE1")throw new Error("badfile");
+  var salt=new Uint8Array(u.subarray(4,20));
+  return kdf(pw,salt,true,["decrypt"]).then(function(k){return crypto.subtle.decrypt({name:"AES-GCM",iv:u.subarray(20,32)},k,u.subarray(32)).then(function(){nk.listings={key:k,salt:salt};return nk})})
+ }).catch(function(){return nk})}
+function wrapStore(pw,ks){var inner={},ds=Object.keys(FILES).concat(ks.aux?["aux"]:[]).concat(ks.listings?["listings"]:[]),salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));
  return Promise.all(ds.map(function(d){return crypto.subtle.exportKey("raw",ks[d].key).then(function(raw){inner[d]={salt:b64(ks[d].salt),key:b64(new Uint8Array(raw))}})}))
  .then(function(){return kdf(pw,salt,false,["encrypt"])})
  .then(function(wk){return crypto.subtle.encrypt({name:"AES-GCM",iv:iv},wk,te2.encode(JSON.stringify(inner)))})
@@ -131,35 +134,45 @@ function wrapStore(pw,ks){var inner={},ds=Object.keys(FILES).concat(ks.aux?["aux
 function unwrap(pw){var o=stored();if(!o)return Promise.reject(new Error("none"));
  return kdf(pw,unb64(o.s),false,["decrypt"]).then(function(wk){return crypto.subtle.decrypt({name:"AES-GCM",iv:unb64(o.iv)},wk,unb64(o.ct))})
  .then(function(plain){var inner=JSON.parse(te.decode(plain)),nk={};
-  if(!inner.aux)throw new Error("stale");   /* saved before the Duplicates/Access tabs existed */
-  return Promise.all(Object.keys(FILES).concat(["aux"]).map(function(d){if(!inner[d])throw new Error("x");
+  if(!inner.aux)throw new Error("stale");
+  var names=Object.keys(FILES).concat(["aux"]);if(inner.listings)names.push("listings");
+  return Promise.all(names.map(function(d){if(!inner[d])throw new Error("x");
    return crypto.subtle.importKey("raw",unb64(inner[d].key),{name:"AES-GCM"},true,d==="aux"?["encrypt","decrypt"]:["decrypt"]).then(function(k){nk[d]={key:k,salt:unb64(inner[d].salt)}})}))
   .then(function(){return nk})})}
-/* are the saved keys still for the files on the site? */
 function fresh(nk){return Promise.all(Object.keys(FILES).map(function(d){return getBuf(d).then(function(b){return sameSalt(nk[d].salt,parts(b).salt)})}))
  .then(function(r){return r.every(Boolean)})}
-function setMode(m,msg){mode=m;var dev=m==="device";
- $("lh").textContent=dev?"Welcome back":"Dashboards";
- $("pwl").textContent=dev?"Password for this device":"Password";
- $("remrow").classList.toggle("hide",dev);$("dhint").classList.toggle("hide",!dev);$("forget").classList.toggle("hide",!dev);
+function setMode(m,msg){mode=m;
+ $("lh").textContent=OPEN?(OPEN==="sales"?"Sales":"Orders"):"B&Q Dashboards";
+ $("pwl").textContent="Password";
+ /* one simple screen: keep Remember me available but quiet */
+ if($("remrow"))$("remrow").classList.toggle("hide",false);
+ if($("dhint"))$("dhint").classList.add("hide");
+ if($("forget"))$("forget").classList.toggle("hide",m!=="device"&&!stored());
  $("msg").textContent=msg||"";show("login")}
 function fail(e,txt){var net=e&&(e.message==="net"||e.name==="TypeError");
  $("msg").textContent=net?"Couldn’t load the dashboards. Check your connection and try again.":txt;$("pw").select()}
+function afterUnlock(nk){keys=nk;$("pw").value="";$("msg").textContent="";
+ return stashSession().then(function(){
+  var n=null;try{n=new URLSearchParams(location.search).get("next")}catch(e){}
+  if(n&&/^[\w./\-]+$/.test(n)&&n.indexOf("..")<0&&n.charAt(0)!=="/"&&n.indexOf(":")<0){location.href=n;return}
+  show("menu");if(OPEN)open(OPEN);
+ })}
 
 $("lf").addEventListener("submit",function(ev){ev.preventDefault();
  var pw=$("pw").value;if(!pw){$("msg").textContent="Please type the password.";return}
  $("msg").textContent="";$("go").disabled=true;$("go").textContent="Checking…";
- var p;
+ var p, rem=$("rem")?$("rem").checked:true;
  if(mode==="device"){
-  p=unwrap(pw).then(function(nk){return fresh(nk).then(function(ok){if(ok)return nk;throw new Error("stale")})})
+  p=unwrap(pw).then(function(nk){return fresh(nk).then(function(ok){if(!ok)throw new Error("stale");if(nk.listings)return nk;
+    return addListingsKey(pw,nk).then(function(nk2){if(!nk2.listings)return nk2;return wrapStore(pw,nk2).then(function(){return nk2})})})})
    .catch(function(e){if(e&&e.message==="net")throw e;var stale=e&&e.message==="stale";
     return tryMain(pw).then(function(nk){return wrapStore(pw,nk).then(function(){return nk})},function(e2){
      if(e2&&(e2.message==="net"||e2.name==="TypeError"))throw e2;
      if(stale){forget();setMode("main");throw new Error("stale2")}throw e2})});
  }else{
-  p=tryMain(pw).then(function(nk){return($("rem").checked?wrapStore(pw,nk):Promise.resolve(forget())).then(function(){return nk})});
+  p=tryMain(pw).then(function(nk){return(rem?wrapStore(pw,nk):Promise.resolve(forget())).then(function(){return nk})});
  }
- p.then(function(nk){keys=nk;$("pw").value="";$("msg").textContent="";show("menu");if(OPEN)open(OPEN)})
+ p.then(afterUnlock)
  .catch(function(e){fail(e,e&&e.message==="stale2"?"The dashboards were updated, so this device’s saved login has expired. Please type the main password.":"That password isn’t right — please try again.")})
  .then(function(){$("go").disabled=false;$("go").textContent="Unlock"})});
 
@@ -174,22 +187,40 @@ function open(d){busy(true);
  .catch(function(e){busy(false);
   if(e&&e.message==="net"){alert("Couldn’t load the dashboard. Check your connection.");return}
   lock("Please enter the main password again (the dashboards were updated).")})}
-/* location.replace: frame changes add no browser-history entries, so phone Back returns to the cards */
 function setFrame(u){var f=$("frame");try{f.contentWindow.location.replace(u)}catch(e){f.src=u}}
 function back(){if(OPEN){location.href="index.html";return}
  $("viewer").classList.add("hide");setFrame("about:blank");
  if(curUrl){URL.revokeObjectURL(curUrl);curUrl=null}document.title="B&Q Dashboards"}
-function lock(msg){forget();keys={};bufs={};back();if(window.BQTabs)BQTabs.close();setMode("main",msg||"")}
-/* used by tabs_v1.js (same page) */
-window.BQ={aux:function(){return keys.aux?keys.aux.key:null},lock:lock,busy:busy,back:back,forced:OPEN||null,openDash:open};
-/* messages from the app inside the frame */
+function clearSession(){try{sessionStorage.removeItem("bqDashSession.v1");sessionStorage.removeItem("bqDashReturn");sessionStorage.removeItem("bqDashGo");localStorage.removeItem("bqListKey.v1")}catch(e){}}
+function lock(msg){clearSession();forget();keys={};bufs={};back();if(window.BQTabs)BQTabs.close();setMode("main",msg||"")}
+function stashSession(){if(!keys||!keys.aux)return Promise.resolve();
+ var ds=Object.keys(FILES).concat(["aux"]).concat(keys.listings?["listings"]:[]),inner={};
+ return Promise.all(ds.map(function(d){return crypto.subtle.exportKey("raw",keys[d].key).then(function(raw){inner[d]={salt:b64(keys[d].salt),key:b64(new Uint8Array(raw))}})}))
+  .then(function(){try{sessionStorage.setItem("bqDashSession.v1",JSON.stringify({v:1,inner:inner}))}catch(e){}})}
+/* Restore unlocked keys for this tab (sales.html / orders.html / return from Listings). */
+function restoreSession(){
+ var o=null;try{o=JSON.parse(sessionStorage.getItem("bqDashSession.v1")||"null")}catch(e){}
+ try{sessionStorage.removeItem("bqDashReturn")}catch(e){}
+ if(!o||o.v!==1||!o.inner||!o.inner.aux||!o.inner.sales||!o.inner.orders)return Promise.resolve(false);
+ var nk={},names=Object.keys(FILES).concat(["aux"]).concat(o.inner.listings?["listings"]:[]);
+ return Promise.all(names.map(function(d){if(!o.inner[d])throw new Error("x");
+  return crypto.subtle.importKey("raw",unb64(o.inner[d].key),{name:"AES-GCM"},true,d==="aux"?["encrypt","decrypt"]:["decrypt"]).then(function(k){nk[d]={key:k,salt:unb64(o.inner[d].salt)}})}))
+  .then(function(){return fresh(nk)}).then(function(ok){if(!ok)return false;
+   return getBuf("sales").then(function(b){return decrypt(nk.sales.key,parts(b)).then(function(){keys=nk;return true})})})
+  .catch(function(){return false})}
+window.BQ={aux:function(){return keys.aux?keys.aux.key:null},lock:lock,busy:busy,back:back,stashSession:stashSession,forced:OPEN||null,openDash:open};
 window.addEventListener("message",function(e){var f=$("frame");
  if(!f||e.source!==f.contentWindow||!e.data||typeof e.data.bq!=="string")return;
  if(location.origin!=="null"&&e.origin!==location.origin)return;
  var m=e.data,reply=function(o){o.re=m.id;try{e.source.postMessage(o,location.origin!=="null"?location.origin:"*")}catch(x){}};
  if(m.bq==="hello"){reply({ok:true,remembered:!!stored()});return}
  if(m.bq==="lock"){reply({ok:true});lock("Locked. This device no longer remembers you.");return}
- if(m.bq==="nav"){var v=String(m.v||"");reply({ok:true});if(v==="sales"||v==="orders")location.href=v+".html";else if(v==="home")location.href="index.html";return}
+ if(m.bq==="nav"){var nv=String(m.v||"");reply({ok:true});
+  stashSession().then(function(){if(nv==="sales"||nv==="orders")location.href=nv+".html";else if(nv==="home")location.href="index.html"});return}
+ if(m.bq==="open"){var v=String(m.v||"");reply({ok:true});
+  if(v==="listings"){var goL=window.BQ&&BQ.stashSession?BQ.stashSession():Promise.resolve();goL.then(function(){location.href=$("listings").getAttribute("href")});return}
+  if(v==="sales"||v==="orders"){if(OPEN&&v!==OPEN){stashSession().then(function(){location.href=v+".html"});return}open(v);return}
+  if(window.BQTabs&&BQTabs.tabs[v]){back();BQTabs.open(v)}return}
  if(m.bq==="rewrap"){var o=String(m.old||""),n=String(m.nw||"");
   if(n.length<8){reply({ok:false,err:"New password needs at least 8 characters"});return}
   var chk=stored()?unwrap(o).catch(function(){return tryMain(o)}):tryMain(o);
@@ -198,11 +229,12 @@ window.addEventListener("message",function(e){var f=$("frame");
  }});
 document.querySelectorAll("[data-d]").forEach(function(b){b.addEventListener("click",function(){open(b.getAttribute("data-d"))})});
 $("lock").addEventListener("click",function(){lock("Locked. This device no longer remembers you.")});
-$("forget").addEventListener("click",function(){forget();setMode("main","This device has forgotten the saved login.")});
+if($("forget"))$("forget").addEventListener("click",function(){clearSession();forget();setMode("main","This device has forgotten the saved login.")});
 if(!window.crypto||!crypto.subtle){$("msg").textContent="This browser can’t unlock the dashboards (needs HTTPS and a modern browser).";$("go").disabled=true}
 else{var had1=false;try{had1=!!localStorage.getItem(LS1);localStorage.removeItem(LS1)}catch(e){}
- if(OPEN){document.title=OPEN==="sales"?"B&Q Sales":"B&Q Orders";$("lh").textContent=OPEN==="sales"?"Sales":"Orders";}
- if(stored())setMode("device");else setMode("main",had1?"For extra safety, please type the password once more. Saved logins are now protected by your password.":"");}
+ if(OPEN){document.title=OPEN==="sales"?"B&Q Sales":"B&Q Orders"}
+ restoreSession().then(function(ok){if(ok){afterUnlock(keys);return}
+  if(stored())setMode("device");else setMode("main","")});}
 })();
 </script>
 <script>
@@ -1914,8 +1946,8 @@ function sync(){var unl=!hidden("menu")||!hidden("viewer")||!hidden("tabv");docu
  if(unl&&!hidden("menu")&&!sent){var v=readGo();if(v){sent=true;clearGo();if(v!=="home")setTimeout(function(){go(v)},0)}}}
 function card(v){return document.querySelector('#menu [data-d="'+v+'"],#menu [data-v="'+v+'"]')}
 function go(v){if(v==="listings"){toListings();return}
- if(v==="sales"||v==="orders"){location.href=v+".html";return}
- if(v==="home"){location.href="index.html";return}
+ if(v==="sales"||v==="orders"){var p=window.BQ&&BQ.stashSession?BQ.stashSession():Promise.resolve();p.then(function(){location.href=v+".html"});return}
+ if(v==="home"){var p2=window.BQ&&BQ.stashSession?BQ.stashSession():Promise.resolve();p2.then(function(){location.href="index.html"});return}
  if(window.BQTabs&&BQTabs.close&&!hidden("tabv"))BQTabs.close();
  if(!hidden("viewer")&&window.BQ&&BQ.back)BQ.back();
  var c=card(v);if(c)c.click();sync()}
@@ -1931,4 +1963,5 @@ window.BQNav={tabs:T,current:function(){return cur},go:go};
 })();
 </script>
 <script src="entry_pages.js"></script>
+<script src="bqnav.js"></script>
 </body></html>

@@ -2871,11 +2871,12 @@ function publishDashSession(pw,listSalt,listRaw){if(!pw||haveDashKeys())return P
 function sessionListings(u){var o=null;try{o=JSON.parse(sessionStorage.getItem('bqDashSession.v1')||'null');}catch(e){}var L=o&&o.inner&&o.inner.listings;var salt=L&&(L.salt||L.s);if(!L||!L.key||salt!==b64(u.subarray(4,20)))return Promise.reject();
   return crypto.subtle.importKey('raw',u8(L.key),{name:'AES-GCM'},false,['decrypt']).then(function(k){return dec(k,u);});}
 getEnc().then(function(u){return sessionListings(u).then(start,function(){var o=null;try{o=JSON.parse(localStorage.getItem(LS)||'null');}catch(e){}
-  if(o&&o.k&&o.s===b64(u.subarray(4,20)))return crypto.subtle.importKey('raw',u8(o.k),{name:'AES-GCM'},false,['decrypt']).then(function(k){return dec(k,u);}).then(start,function(){window.__lockForget();ui(u,'');});
-  ui(u,'');});},function(){ui(null,'');});
+  if(o&&o.k&&o.s===b64(u.subarray(4,20)))return crypto.subtle.importKey('raw',u8(o.k),{name:'AES-GCM'},false,['decrypt']).then(function(k){return dec(k,u);}).then(start,function(){window.__lockForget();goHubLogin();});
+  goHubLogin();});},function(){goHubLogin();});
+function goHubLogin(){try{sessionStorage.setItem('bqDashReturn','1');}catch(e){}
+  location.replace(dashRoot()+'index.html?next='+encodeURIComponent(location.pathname.indexOf('/phone/')>=0?'listings/phone/':'listings/'));}
 })();
-</script><script>
-/* Same tab bar on every dashboard section and on the Listings pages.
+</script><script>/* Same tab bar on every dashboard section and on the Listings pages.
    Eight sections, plus Home (returns to the menu without a new login while this tab is already unlocked).
    No keys and no catalogue data in this file. */
 (function(){
@@ -2902,7 +2903,7 @@ function base(){if(MAIN)return "";
  var p=location.pathname,i=p.indexOf("/listings/");
  if(i>=0)return p.slice(0,i+1);
  return p.replace(/\/listings(\/index\.html)?\/?$/,"/")||"/"}
-function href(v){if(MAIN)return v==="listings"?"listings/":"#go="+v;return v==="listings"?"./":base()+(v==="home"?"":"#go="+v)}
+function href(v){if(MAIN){if(v==="listings")return"listings/";if(v==="sales")return"sales.html";if(v==="orders")return"orders.html";if(v==="home")return"index.html";return"#go="+v;}return v==="listings"?"./":base()+(v==="home"?"":v==="sales"?"sales.html":v==="orders"?"orders.html":"#go="+v)}
 function mark(v){if(v===cur)return;cur=v;Array.prototype.forEach.call(nav.querySelectorAll("a"),function(a){var on=a.getAttribute("data-bqn")===v;a.classList.toggle("on",on);if(on)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current")})}
 function toListings(){var p=window.BQ&&BQ.stashSession?BQ.stashSession():Promise.resolve();p.then(function(){location.href="listings/"})}
 var ALLOW={home:1,sales:1,orders:1,listings:1,dups:1,access:1,pricing:1,lookup:1,calc:1};
@@ -2915,16 +2916,18 @@ if(!MAIN){add();mark("listings");
  window.BQNav={tabs:T,current:function(){return cur},go:function(){},readGo:readGo,clearGo:clearGo};return}
 var $=function(i){return document.getElementById(i)},TITLE={};
 function hidden(id){var e=$(id);return !e||e.classList.contains("hide")}
-function state(){if(!hidden("tabv")){var tt=($("ttitle")||{}).textContent||"";for(var k in TITLE)if(TITLE[k]===tt)return k;return ""}
+function state(){if(window.BQ&&BQ.forced)return BQ.forced;
+ if(!hidden("tabv")){var tt=($("ttitle")||{}).textContent||"";for(var k in TITLE)if(TITLE[k]===tt)return k;return ""}
  if(!hidden("viewer"))return /Orders/.test(document.title)?"orders":"sales";return "home"}
 var sent=false;
 function sync(){var unl=!hidden("menu")||!hidden("viewer")||!hidden("tabv");document.body.classList.toggle("bqn",unl);nav.style.display=unl?"":"none";if(unl){size();mark(state())}
  if(unl&&!hidden("menu")&&!sent){var v=readGo();if(v){sent=true;clearGo();if(v!=="home")setTimeout(function(){go(v)},0)}}}
 function card(v){return document.querySelector('#menu [data-d="'+v+'"],#menu [data-v="'+v+'"]')}
 function go(v){if(v==="listings"){toListings();return}
+ if(v==="sales"||v==="orders"){var p=window.BQ&&BQ.stashSession?BQ.stashSession():Promise.resolve();p.then(function(){location.href=v+".html"});return}
+ if(v==="home"){var p2=window.BQ&&BQ.stashSession?BQ.stashSession():Promise.resolve();p2.then(function(){location.href="index.html"});return}
  if(window.BQTabs&&BQTabs.close&&!hidden("tabv"))BQTabs.close();
  if(!hidden("viewer")&&window.BQ&&BQ.back)BQ.back();
- if(v==="home"){sync();return}
  var c=card(v);if(c)c.click();sync()}
 add();
 setTimeout(function(){if(window.BQTabs)Object.keys(BQTabs.tabs).forEach(function(k){TITLE[k]=BQTabs.tabs[k].title})},0);
@@ -2936,5 +2939,4 @@ var ot=document.querySelector("title");if(ot)mo.observe(ot,{childList:true,chara
 sync();
 window.BQNav={tabs:T,current:function(){return cur},go:go};
 })();
-
 </script></body></html>

@@ -46,8 +46,8 @@ function sync(){var unl=!hidden("menu")||!hidden("viewer")||!hidden("tabv");docu
  if(unl&&!hidden("menu")&&!sent){var v=readGo();if(v){sent=true;clearGo();if(v!=="home")setTimeout(function(){go(v)},0)}}}
 function card(v){return document.querySelector('#menu [data-d="'+v+'"],#menu [data-v="'+v+'"]')}
 function go(v){if(v==="listings"){toListings();return}
- if(v==="sales"||v==="orders"){location.href=v+".html";return}
- if(v==="home"){location.href="index.html";return}
+ if(v==="sales"||v==="orders"){var p=window.BQ&&BQ.stashSession?BQ.stashSession():Promise.resolve();p.then(function(){location.href=v+".html"});return}
+ if(v==="home"){var p2=window.BQ&&BQ.stashSession?BQ.stashSession():Promise.resolve();p2.then(function(){location.href="index.html"});return}
  if(window.BQTabs&&BQTabs.close&&!hidden("tabv"))BQTabs.close();
  if(!hidden("viewer")&&window.BQ&&BQ.back)BQ.back();
  var c=card(v);if(c)c.click();sync()}
