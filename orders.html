@@ -849,7 +849,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
   }
   return { FEE: FEE, sales30: sales30, bbMap: bbMap, ukTime: ukTime, fromAccess: fromAccess, eanOf: eanOf, HDR: HDR, ASHIAN: ASHIAN, OTHER: OTHER, UK_MAX: UK_MAX, SAFE_MIN: SAFE_MIN, CHINA_FLOOR: CHINA_FLOOR, CHINA_CUT: CHINA_CUT, RAISE_AT: RAISE_AT, BANDS: BANDS, OVER: OVER,
     num: num, rnd: rnd, ceil2: ceil2, band: band, postage: postage, postageSrc: postageSrc, postInfo: postInfo, specialRule: specialRule, heavyCode: heavyCode, SPECIAL: SPECIAL, HEAVY: HEAVY, isChina: isChina, multOf: multOf, fixedCost: fixedCost,
-    TRIM: TRIM, end9: end9, calc: calc, priceFor: priceFor, priceMax: priceMax, floorPrice: floorPrice, floor2: floor2, floorOf: floorOf, packN: packN, checkPost: checkPost, decide: decide, decideAll: decideAll, buyBox: buyBox, buyBoxAll: buyBoxAll, bbFromScrape: bbFromScrape, BB_DEFAULT: BB_DEFAULT, isSeasonal: isSeasonal, isXmasTree: isXmasTree, bbStep: bbStep, VERSION: 'bq_price v5 2026-11-04 buy box' };
+    TRIM: TRIM, end9: end9, calc: calc, priceFor: priceFor, priceMax: priceMax, floorPrice: floorPrice, floor2: floor2, floorOf: floorOf, packN: packN, checkPost: checkPost, decide: decide, decideAll: decideAll, buyBox: buyBox, buyBoxAll: buyBoxAll, bbFromScrape: bbFromScrape, BB_DEFAULT: BB_DEFAULT, isSeasonal: isSeasonal, isXmasTree: isXmasTree, bbStep: bbStep, VERSION: 'bq_price v5 2026-11-09 tab5-uk60' };
 });
 
 </script>
@@ -988,10 +988,13 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
    All maths comes from bq_price.js (window.BQP / require). No data, keys or passwords in this file. Nothing is sent anywhere. */
 (function (root, f) { var m = f(); if (typeof module === 'object' && module.exports) module.exports = m; else root.BQBook = m; })(this, function () {
   'use strict';
-  var VERSION = 'bq_book 2026-11-09 quarter-gap + 7a/7b';
+  var VERSION = 'bq_book 2026-11-09 tab5-uk60 weekly';
   var MIN_CHANGE = 0.10;      /* a suggested change must move the price by at least 10p (same 10p minimum as the buy box view) */
   var T3_BUF = 0.05;          /* tab 3: never below the floor + 5% of the floor price (rounded UP to the penny) */
-  var T5_CUT = 0.05;          /* tab 5: 5% off the price now, but never below the floor */
+  var T5_CUT = 0.05;          /* tab 5: 5% off the price now */
+  var T5_UK_FLOOR = 0.60;     /* tab 5 UK only (9 Nov): special 60% floor on cost */
+  var T5_UK_MIN = 0.65;       /* tab 5 UK: never below floor+5pp = 65% on cost */
+  var WEEKLY_DAYS = 7;        /* tab 5 UK: no second cut within 7 days of last price change */
   var NAMES = ['1 All', '2 Winning in range', '3 Winning 0 sales', '4 Can win buy box', '5 Margin too low', '6 Combined upload', '7a Final upload UK', '7b Final upload China', '8 Sells elsewhere not B&Q'];
   var REVIEW_CHINA = 'China raises (review only)';
   var START = 'Start here';
@@ -1004,7 +1007,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
   var STK = ['neg', 'under', 'blue', 'amber', 'green'], ST = { neg: { fill: 'FFD32F2F', font: 'FFFFFFFF' }, under: { fill: 'FFF8BBD0' }, blue: { fill: 'FFBBDEFB' }, amber: { fill: 'FFFFE082' }, green: { fill: 'FFC8E6C9' } };
   var LEGEND = 'Colours on profit cells: SOLID RED = loss (below £0) · PINK = under the floor · AMBER = within 5 points above the floor % · GREEN = floor + 5 up to the cap · BLUE = over the 80% cap. Header bands: grey = estimated cost, blue = selling price, green = profit £, purple = profit %.';
   var RULE3 = 'We win but sold 0 on B&Q in 30 days. Suggested = price now minus a quarter of the gap to the floor (selling − (selling − floor)/4), rounded to the penny, but never below the floor + 5% (rounded up), never over the 80% cap, and only if the price drops by at least 10p. Projected profit and % are at that price.';
-  var RULE5 = 'OPTIONAL – we cannot win the buy box without going under the floor. Suggested = 5% off the price now (rounded to the penny) or the floor price, whichever is HIGHER, never over the 80% cap, and only if the price drops by at least 10p. It does not win the buy box – it only makes the price more attractive.';
+  var RULE5 = 'OPTIONAL – Margin too low. UK (9 Nov 2026): uses a 60% floor on cost for this cut only (other tabs keep the normal cost-band floors); suggested = 5% off price now, rounded to the penny, never below the 65% price (floor + 5 points), never over the 80% cap, only if the drop is at least 10p, and not if the price changed in the last 7 days (weekly). China: 5% off, never below the normal 100% floor. Does not win the buy box – it only makes the price more attractive.';
   var M = '£#,##0.00', PC = '0.0%', IN = '#,##0', EAN = '0', HDRF = '@', YESF = '0;-0;0;@', YOURF = '"£"#,##0.00';
 
   function cls(P, r, S) {
@@ -1023,9 +1026,28 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
     if (r.act === 'Lower to win') { x.cat = 't4'; x.tab = 4; x.sugg = r.sugg; x.label = 'Can win the buy box'; if (chk) x.inc = 'No'; return x; }
     if (r.act === "Can't win (floor)") {
       x.cat = 't5'; x.tab = 5; x.label = 'Margin too low (optional cut)';
-      var s5 = Math.max(fl, P.rnd(cur * (1 - T5_CUT), 2)); if (cap != null && s5 > cap) s5 = cap; s5 = P.rnd(s5, 2);
-      if (cur - s5 >= MIN_CHANGE - 1e-9 && s5 >= fl - 1e-9 && ok(P, o, s5)) { x.sugg = s5; x.why = 'OPTIONAL – ' + (s5 === P.rnd(fl, 2) ? 'down to the floor' : '5% off') + ' to attract sales (does not win the buy box). ' + r.why; }
-      else x.why = 'No cut suggested – the price now is already within 10p of the floor (or under it). ' + r.why;
+      /* UK tab 5 only (9 Nov): 60% floor for this cut, never below 65% on cost, weekly 7-day hold. China keeps prior rule. */
+      var chLog = (S.priceChanges && S.priceChanges[o.sku]) || null;
+      x.lastChange = chLog ? chLog.date : '';
+      if (!o.china && o.a) {
+        var fl60 = P.floorPrice(o.a, T5_UK_FLOOR, false), fb = P.floorPrice(o.a, T5_UK_MIN, false);
+        x.t5Floor = fl60; x.t5Min = fb;
+        var need = r.need != null ? P.rnd(r.need, 2) : (o.bb != null ? P.rnd(o.bb - 0.01, 2) : null);
+        if (need != null && need >= fb - 1e-9) x.couldWinAt50 = true; /* flag: 1p-under would clear the tab-5 min (reported; stay on tab 5) */
+        if (chLog && S.asOf && daysBetween(chLog.date, S.asOf) < WEEKLY_DAYS) {
+          x.weeklyHold = true; x.inc = 'No'; x.sugg = null;
+          x.why = 'Changed ' + chLog.date + ' – next change after ' + addDays(chLog.date, WEEKLY_DAYS) + ' (weekly rule for Margin too low UK). ' + r.why;
+        } else {
+          var s5 = Math.max(fb, P.rnd(cur * (1 - T5_CUT), 2)); if (cap != null && s5 > cap) s5 = cap; s5 = P.rnd(s5, 2);
+          if (cur - s5 >= MIN_CHANGE - 1e-9 && s5 >= fb - 1e-9 && okAt(P, o, s5, fb)) {
+            x.sugg = s5; x.why = 'OPTIONAL UK – 5% off using 60% floor (min 65% on cost)' + (s5 === P.rnd(fb, 2) ? ', at the 65% minimum' : '') + '. Does not win the buy box. ' + r.why;
+          } else x.why = 'No cut suggested – already within 10p of the 65% minimum (or under it). ' + r.why;
+        }
+      } else {
+        var s5c = Math.max(fl, P.rnd(cur * (1 - T5_CUT), 2)); if (cap != null && s5c > cap) s5c = cap; s5c = P.rnd(s5c, 2);
+        if (cur - s5c >= MIN_CHANGE - 1e-9 && s5c >= fl - 1e-9 && ok(P, o, s5c)) { x.sugg = s5c; x.why = 'OPTIONAL – ' + (s5c === P.rnd(fl, 2) ? 'down to the floor' : '5% off') + ' to attract sales (does not win the buy box). ' + r.why; }
+        else x.why = 'No cut suggested – the price now is already within 10p of the floor (or under it). ' + r.why;
+      }
       if (chk) x.inc = 'No'; return x;
     }
     /* Keep rows */
@@ -1048,20 +1070,31 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
   function ok(P, o, p) {
     var c = P.calc(o.a, p); return p > 0 && c.profit > 0 && p >= o.floor - 1e-9 && (o.china || o.ceil == null || p <= o.ceil + 1e-9) && c.pc >= P.SAFE_MIN - 1e-9 && (!o.china || c.pc >= P.CHINA_FLOOR - 1e-9);
   }
+  /* like ok(), but the minimum price is minFl (tab 5 UK 65% price) instead of o.floor */
+  function okAt(P, o, p, minFl) {
+    var c = P.calc(o.a, p); return p > 0 && c.profit > 0 && p >= minFl - 1e-9 && (o.china || o.ceil == null || p <= o.ceil + 1e-9) && c.pc >= P.SAFE_MIN - 1e-9 && (!o.china || c.pc >= P.CHINA_FLOOR - 1e-9);
+  }
+  function parseYMD(d) { var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(d || '')); return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])) : null; }
+  function daysBetween(a, b) { var A = parseYMD(a), B = parseYMD(b); if (!A || !B) return 9999; return Math.round((B - A) / 864e5); }
+  function addDays(d, n) { var A = parseYMD(d); if (!A) return d; A.setUTCDate(A.getUTCDate() + n); return A.toISOString().slice(0, 10); }
   function shortOf(P, x, S) {
     var o = x.o, k = x.cat, s;
     if (o.dup) s = 'Duplicate SKU row – not priced';
     else if (x.label === 'No data') s = 'No buy box data';
     else if (k === 'raise') s = o.china ? 'China raise – review only (never in Final upload)' : (o.pc != null && o.floorPct != null && o.pc < o.floorPct - 1e-9 ? 'Raise to floor (profit under floor %)' : 'Raise: winning with room to the cap');
     else if (k === 't4') s = 'Win buy box: 1p under ' + (o.seller || 'rival');
-    else if (k === 't5') s = x.sugg != null ? 'Optional: ' + (x.sugg === P.rnd(o.floor, 2) ? 'down to the floor' : '5% off') + ' to attract sales' : "Can't win above floor – no change";
+    else if (k === 't5') {
+      if (x.weeklyHold) s = 'Margin too low UK – weekly hold until ' + addDays(x.lastChange, WEEKLY_DAYS);
+      else if (x.sugg != null) s = !o.china ? ('Optional UK: 5% off (60% floor, min 65%)') : ('Optional: ' + (x.sugg === P.rnd(o.floor, 2) ? 'down to the floor' : '5% off') + ' to attract sales');
+      else s = "Can't win above floor – no change";
+    }
     else if (k === 't3') s = x.sugg != null ? '0 B&Q sales: quarter-gap cut toward the floor' : '0 B&Q sales: already near the floor';
     else if (k === 't2') s = 'Winning, in range – no change';
     else s = x.label || 'Keep';
     if (o.check && !S.checkPost && x.sugg != null) s += ' · check postage (' + o.check + ')';
     return s;
   }
-  function classify(P, R, S) { S = S || {}; return R.map(function (r) { var x = cls(P, r, S); x.short = shortOf(P, x, S); return x; }); }
+  function classify(P, R, S) { S = S || {}; return R.map(function (r) { var x = cls(P, r, S); if (!x.lastChange && S.priceChanges && S.priceChanges[x.o.sku]) x.lastChange = S.priceChanges[x.o.sku].date; x.short = shortOf(P, x, S); return x; }); }
 
   /* Access text numbers -> real numbers ("£3.32" -> 3.32, "260" -> 260); leading-zero / long codes stay text */
   var TXT = { 'Variant code': 1, 'Variant description': 1, 'sku': 1, 'Main supplier name': 1, 'seller': 1, 'product_url': 1 };
@@ -1124,7 +1157,8 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
 
   /* build the sheet specs: {name, top: note row, cols:[[header, fmt, width?, 'hide'?]], rows:[[cell...]], freeze:{x,y}, filter, notes:{col:text}, cf} */
   function sheets(P, input) {
-    var S = input.settings || {}, R = input.bbr, aoa = input.aoa || [], X = classify(P, R, S), hd = (aoa[0] || []).map(function (h) { return h == null ? '' : String(h); });
+    var S = Object.assign({}, input.settings || {}); if (input.priceChanges) S.priceChanges = input.priceChanges; if (input.asOf) S.asOf = input.asOf;
+    var R = input.bbr, aoa = input.aoa || [], X = classify(P, R, S), hd = (aoa[0] || []).map(function (h) { return h == null ? '' : String(h); });
     var byTab = { 2: [], 3: [], 4: [], 5: [] }, comb = [];
     X.forEach(function (x) { if (byTab[x.tab]) byTab[x.tab].push(x); });
     var cs = function (v, z, s) { var q = c(v, z); if (q && s) q.st = s; return q; };
@@ -1147,24 +1181,25 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
       sugg: [['Suggested price', M, 10], function (x) { return c(x.sugg, M); }],
       np: [['New profit £', M, 10], function (x) { return at(x.o, x.sugg)[0]; }],
       npc: [['New profit %', PC, 9], function (x) { return at(x.o, x.sugg)[1]; }],
-      why: [['Reason', null, 44], function (x) { return c(x.short); }]
+      why: [['Reason', null, 44], function (x) { return c(x.short); }],
+      lastCh: [['Last price change', null, 14], function (x) { return c(x.lastChange || ''); }]
     };
     var lean = function (keys, xs, over) { return { cols: keys.map(function (k) { return (over && over[k]) || L[k][0]; }), rows: xs.map(function (x) { return keys.map(function (k) { return L[k][1](x); }); }) }; };
     var ALLK = ['sku', 'prod', 'uk', 'cost', 'post', 'stock', 'sales', 'price', 'pnow', 'pcnow', 'bb', 'seller', 'floor', 'sugg', 'np', 'npc', 'why'];
     /* ---- 1 All: Access columns as pasted + 6 ---- */
-    var calcH = [['Postage used', M, 9], ['Price now', M, 10], ['Profit now £', M, 10], ['Profit now %', PC, 9], ['Floor price', M, 10], ['Action', null, 40]];
+    var calcH = [['Postage used', M, 9], ['Price now', M, 10], ['Profit now £', M, 10], ['Profit now %', PC, 9], ['Floor price', M, 10], ['Action', null, 40], ['Last price change', null, 14]];
     var cols1 = hd.map(function (h) { return [h || ' ', null, 'raw']; }).concat(calcH);
     var seenIx = {}, rows1 = [];
     X.forEach(function (x) {
       var o = x.o, raw = aoa[o.ix] || [], pn = now(o); seenIx[o.ix] = 1;
-      rows1.push(hd.map(function (h, j) { return cellOf(h, raw[j]); }).concat([c(o.post, M), c(o.priceBlank ? null : o.price, M), pn[0], pn[1], c(o.floor, M), c(x.short)]));
+      rows1.push(hd.map(function (h, j) { return cellOf(h, raw[j]); }).concat([c(o.post, M), c(o.priceBlank ? null : o.price, M), pn[0], pn[1], c(o.floor, M), c(x.short), c(x.lastChange || '')]));
     });
     for (var j = 1; j < aoa.length; j++) { var rw = aoa[j] || []; if (seenIx[j] || rw.every(function (v) { return v == null || v === ''; })) continue;
-      rows1.push(hd.map(function (h, k) { return cellOf(h, rw[k]); }).concat([null, null, null, null, null, c('No SKU – skipped')])); }
+      rows1.push(hd.map(function (h, k) { return cellOf(h, rw[k]); }).concat([null, null, null, null, null, c('No SKU – skipped'), null])); }
     var t2 = lean(ALLK, byTab[2]);
     var t3 = lean(ALLK, byTab[3]);
     var t4 = lean(ALLK, byTab[4]);
-    var t5 = lean(ALLK, byTab[5]);
+    var t5 = lean(ALLK.concat(['lastCh']), byTab[5]);
     /* ---- 6 Combined upload: lean set + Your price / Final / Check / Include, helpers hidden at the right ----
        China raises (Ashian, under floor → raise to floor) are NOT in Combined / Final upload – they go to the review-only tab. */
     var chinaRaises = X.filter(function (x) { return x.cat === 'raise' && x.o.china; });
@@ -1172,17 +1207,22 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
     var F = P.FEE, base6 = ALLK.slice(0, 14), H0 = 2;   /* row 1 note, row 2 header, data from row 3 */
     var h6 = base6.map(function (k) { return L[k][0]; }).concat([['Your price', YOURF, 10], L.np[0], L.npc[0], L.why[0], ['Include? (Yes/No)', YESF, 9], ['Final price', M, 10, 'hide'], ['Check', null, 14, 'hide'],
       ['Upload UK # (helper)', IN, 8, 'hide'], ['Fixed costs (helper)', M, 8, 'hide'], ['Cap price (helper)', M, 8, 'hide'], ['Floor % (helper)', PC, 8, 'hide'], ['Check postage (helper)', null, 8, 'hide'],
-      ['Upload China # (helper)', IN, 8, 'hide']]);
+      ['Upload China # (helper)', IN, 8, 'hide'], ['Last price change', null, 14]]);
     var okUK = 0, okCN = 0, rows6 = comb.map(function (x, i) {
       var o = x.o, n = i + H0 + 1, A = o.a, fixed = A.cost * A.mult + A.post + (P.num(A.collab) || 0);
       var J = x.sugg, k = P.calc(A, J), prof = P.rnd(P.rnd(J * (1 - F) - fixed, 6), 2), pc = (J * (1 - F) - fixed) / A.cost, s = status(o, J, prof, pc);
-      var chk = J == null || !(J > 0) ? 'NO PRICE' : o.check && !S.checkPost ? 'CHECK POSTAGE' : J < o.floor - 1e-5 ? 'UNDER FLOOR' : prof <= 0 ? 'LOSS' : (!o.china && o.ceil != null && J > o.ceil + 1e-5) ? 'OVER CAP' : P.rnd(J, 2) === P.rnd(o.price, 2) ? 'NO CHANGE' : 'OK';
+      var floorRef = x.t5Min != null ? x.t5Min : o.floor;
+      var chk = J == null || !(J > 0) ? 'NO PRICE' : o.check && !S.checkPost ? 'CHECK POSTAGE' : J < floorRef - 1e-5 ? 'UNDER FLOOR' : prof <= 0 ? 'LOSS' : (!o.china && o.ceil != null && J > o.ceil + 1e-5) ? 'OVER CAP' : P.rnd(J, 2) === P.rnd(o.price, 2) ? 'NO CHANGE' : 'OK';
       var up = x.inc === 'Yes' && chk === 'OK', upU = up && !o.china, upC = up && !!o.china;
       if (upU) okUK++; if (upC) okCN++;
       var f = function (q) { return q.replace(/#/g, n); };
       var UPF = f('IF(AND(S#="Yes",U#="OK",C#="UK"),COUNTIFS($S$3:S#,"Yes",$U$3:U#,"OK",$C$3:C#,"UK"),"")');
       var CNF = f('IF(AND(S#="Yes",U#="OK",C#="China"),COUNTIFS($S$3:S#,"Yes",$U$3:U#,"OK",$C$3:C#,"China"),"")');
-      return base6.map(function (key) { return key === 'cost' ? c(A.cost, M) : L[key][1](x); }).concat([null,
+      return base6.map(function (key) {
+        if (key === 'cost') return c(A.cost, M);
+        if (key === 'floor' && x.t5Min != null) return c(x.t5Min, M); /* tab5 UK: show 65% minimum used for the cut */
+        return L[key][1](x);
+      }).concat([null,
         { t: 'n', v: prof, f: f('IFERROR(ROUND(ROUND(T#*(1-' + F + ')-W#,6),2),"")'), z: M, st: s },
         { t: 'n', v: pc, f: f('IFERROR((T#*(1-' + F + ')-W#)/D#,"")'), z: PC, st: s },
         c(x.short), { t: 's', v: x.inc, z: YESF },
@@ -1190,7 +1230,8 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
         { t: 's', v: chk, f: f('IF(ISERROR(T#),"BAD PRICE",IF(OR(T#="",T#<=0),"NO PRICE",IF(Z#<>"","CHECK POSTAGE",IF(T#<M#-0.00001,"UNDER FLOOR",IF(P#<=0,"LOSS",IF(AND(X#<>"",T#>X#+0.00001),"OVER CAP",IF(ROUND(T#,2)=ROUND(H#,2),"NO CHANGE","OK")))))))') },
         upU ? { t: 'n', v: okUK, f: UPF, z: IN } : { t: 's', v: '', f: UPF },
         c(fixed, M), o.china ? null : c(o.ceil, M), c(o.floorPct, PC), c(o.check && !S.checkPost ? o.check : ''),
-        upC ? { t: 'n', v: okCN, f: CNF, z: IN } : { t: 's', v: '', f: CNF }]);
+        upC ? { t: 'n', v: okCN, f: CNF, z: IN } : { t: 's', v: '', f: CNF },
+        c(x.lastChange || '')]);
     });
     var last6 = H0 + rows6.length, cf6 = rows6.length ? { sqref: 'P3:Q' + last6, rules: [
       ['neg', 'AND(ISNUMBER($P3),$P3<0)'], ['under', 'AND(ISNUMBER($T3),$T3<$M3-0.00001)'], ['blue', 'AND(ISNUMBER($T3),$X3<>"",$T3>$X3+0.00001)'],
@@ -1215,7 +1256,8 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
         /* mirror Check=OK using same rules as rows6 seed */
         var J = x.sugg, A = o.a, fixed = A.cost * A.mult + A.post + (P.num(A.collab) || 0);
         var prof = P.rnd(P.rnd(J * (1 - F) - fixed, 6), 2);
-        var chk = J == null || !(J > 0) ? 'NO PRICE' : o.check && !S.checkPost ? 'CHECK POSTAGE' : J < o.floor - 1e-5 ? 'UNDER FLOOR' : prof <= 0 ? 'LOSS' : (!o.china && o.ceil != null && J > o.ceil + 1e-5) ? 'OVER CAP' : P.rnd(J, 2) === P.rnd(o.price, 2) ? 'NO CHANGE' : 'OK';
+        var floorRef = x.t5Min != null ? x.t5Min : o.floor;
+      var chk = J == null || !(J > 0) ? 'NO PRICE' : o.check && !S.checkPost ? 'CHECK POSTAGE' : J < floorRef - 1e-5 ? 'UNDER FLOOR' : prof <= 0 ? 'LOSS' : (!o.china && o.ceil != null && J > o.ceil + 1e-5) ? 'OVER CAP' : P.rnd(J, 2) === P.rnd(o.price, 2) ? 'NO CHANGE' : 'OK';
         if (chk !== 'OK') return;
         if (seq < rows.length) { rows[seq][0].v = o.sku; rows[seq][1].v = J; rows[seq][1].t = 'n'; }
         seq++;
@@ -1235,7 +1277,10 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
     var rows8 = E8.map(function (e) { var x = e.x; return ALLK.map(function (k) { return k === 'why' ? c(e.why) : L[k][1](x); }).concat([c(e.s.other, IN)]); });
     var why8 = {}; REASONS8.forEach(function (k) { why8[k] = 0; }); E8.forEach(function (e) { why8[e.key]++; });
     var t8inComb = E8.filter(function (e) { return inComb[e.x.o.sku]; }).length;
+    var t5uk = byTab[5].filter(function (x) { return !x.o.china; });
     var counts = { all: rows1.length, t2: t2.rows.length, t3: t3.rows.length, t3sugg: byTab[3].filter(function (x) { return x.sugg != null; }).length, t4: t4.rows.length, t5: t5.rows.length, t5sugg: byTab[5].filter(function (x) { return x.sugg != null; }).length,
+      t5uk: t5uk.length, t5weeklyHold: t5uk.filter(function (x) { return !!x.weeklyHold; }).length,
+      t5couldWinAt65: t5uk.filter(function (x) { return !!x.couldWinAt50; }).length, /* name kept; means 1p-under >= tab5 min (65%) */
       raise: X.filter(function (x) { return x.cat === 'raise'; }).length, chinaRaiseHeld: chinaRaises.length,
       t6: rows6.length, t7: okUK + okCN, t7uk: okUK, t7cn: okCN, chinaRaiseReview: chinaRaises.length,
       checkPost: comb.filter(function (x) { return x.o.check && !S.checkPost; }).length, t8: rows8.length, t8why: why8, t8alsoInComb: t8inComb };
@@ -1245,7 +1290,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
       [NAMES[1], 'We hold the buy box, it sells, profit is between the floor and the 80% cap.', counts.t2, 'Nothing – no change.'],
       [NAMES[2], 'We hold the buy box but sold 0 on B&Q in 30 days.', counts.t3, 'Optional price cut (goes to tab 6). ' + RULE3],
       [NAMES[3], 'A rival holds the buy box; we can go 1p under and stay above the floor.', counts.t4, 'Suggested price = 1p under the buy box (or our 80% cap if lower), never under the floor (goes to tab 6).'],
-      [NAMES[4], 'We cannot win the buy box without going under the floor.', counts.t5, RULE5],
+      [NAMES[4], 'We cannot win the buy box under the normal floor. UK optional cut uses 60% floor (min 65%), weekly (7 days).', counts.t5, RULE5 + ' Price changes are weekly for this tab.'],
       [NAMES[5], 'Every suggested change in one list (except China raises). Type your own price in yellow "Your price" (blank = suggested); set Include Yes/No.', counts.t6, 'Rows with Include = Yes that pass the checks go to tab 7a (UK) or 7b (China). China under-floor raises are NOT here – see the review-only tab. Check-postage rows never go. Hidden helper columns do the maths – leave them.'],
       [REVIEW_CHINA, 'China (Ashian) products under the 100% floor – proposed raise to the floor. REVIEW ONLY.', counts.chinaRaiseReview, 'Never uploaded. Decide offline; do not use Include to push these into Final upload.'],
       [NAMES[6], 'B&Q price upload layout – UK SKUs only.', counts.t7uk, 'Save and upload this tab to B&Q for UK prices.'],
@@ -1260,7 +1305,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
       { name: NAMES[1], top: 'Winning and selling, profit in range – no change.', key: ky, cols: t2.cols, rows: t2.rows, freeze: fz, filter: true },
       { name: NAMES[2], top: 'Winning but 0 B&Q sales – optional cut a quarter of the gap toward the floor.', key: ky, cols: t3.cols, rows: t3.rows, freeze: fz, filter: true },
       { name: NAMES[3], top: 'Rival has the buy box – suggested = 1p under them.', key: ky, cols: t4.cols, rows: t4.rows, freeze: fz, filter: true },
-      { name: NAMES[4], top: 'Cannot win above the floor – optional 5% cut.', key: ky, cols: t5.cols, rows: t5.rows, freeze: fz, filter: true },
+      { name: NAMES[4], top: 'Margin too low – optional 5% cut. UK: 60% floor (min 65%), weekly 7-day rule. China: normal floor.', key: ky, cols: t5.cols, rows: t5.rows, freeze: fz, filter: true },
       { name: NAMES[5], top: 'All changes except China raises – type in yellow Your price, set Include; OK UK → 7a, OK China → 7b.', key: ky, cols: h6, rows: rows6, freeze: fz, filter: true, your: 14, inc: 18, cf: cf6 },
       { name: REVIEW_CHINA, top: 'China raises to the 100% floor – REVIEW ONLY. Never uploaded to B&Q.', key: ky, cols: tRaise.cols, rows: tRaise.rows, freeze: fz, filter: true },
       { name: NAMES[6], cols: finalCols, head2: T[1], rows: rows7a, freeze: { x: 0, y: 2 }, filter: false, notes: finalNotesUK },
@@ -1362,7 +1407,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
     }
     return { rows: out, bad: bad };
   }
-  return { VERSION: VERSION, NAMES: NAMES, REVIEW_CHINA: REVIEW_CHINA, START: START, RULE3: RULE3, RULE5: RULE5, classify: classify, sheets: sheets, build: build, fromEdited: fromEdited, ok: ok, sells: sells, status: status, MIN_CHANGE: MIN_CHANGE, T8_MIN_OTHER: T8_MIN_OTHER, T8_MAX_SHARE: T8_MAX_SHARE, ALL_COL: ALL_COL, REASONS8: REASONS8 };
+  return { VERSION: VERSION, NAMES: NAMES, REVIEW_CHINA: REVIEW_CHINA, START: START, RULE3: RULE3, RULE5: RULE5, classify: classify, sheets: sheets, build: build, fromEdited: fromEdited, ok: ok, okAt: okAt, sells: sells, status: status, MIN_CHANGE: MIN_CHANGE, T5_UK_FLOOR: T5_UK_FLOOR, T5_UK_MIN: T5_UK_MIN, WEEKLY_DAYS: WEEKLY_DAYS, T8_MIN_OTHER: T8_MIN_OTHER, T8_MAX_SHARE: T8_MAX_SHARE, ALL_COL: ALL_COL, REASONS8: REASONS8 };
 });
 </script>
 <script>(function(){
@@ -1529,7 +1574,7 @@ var BBHTML='<div id="pzbbv" class="hide"><div class="sumg pz-sum" id="pzbsum"></
  '<div class="pz-b7g" id="pzb7c"></div>'+
  '<button class="btn o pz-big" type="button" id="pzb7dl" disabled>⬇ Pricing workbook (7a UK / 7b China)</button> '+
  '<label class="btn l" for="pzb7in" id="pzb7inl">⬆ Make B&amp;Q upload from my edited workbook</label><input type="file" id="pzb7in" accept=".xlsx" class="hide"><span class="note" id="pzb7n"></span>'+
- '<p class="note">1 All · 2 Winning, in range · 3 Winning, 0 sales (quarter-gap cut to the floor, never below floor + 5%) · 4 Can win (1p under) · 5 Margin too low (OPTIONAL 5% off) · 6 Combined upload (Your price / Include) · China raises (review only – never uploaded) · 7a Final upload UK · 7b Final upload China · 8 Sells elsewhere, not on B&amp;Q (report only; does not feed Combined or Final upload). Profit colours: red = loss, pink = under the floor, amber = near the floor, green = fine, blue = over the cap. Made on this device – nothing is uploaded.</p></div>'+
+ '<p class="note">1 All · 2 Winning, in range · 3 Winning, 0 sales (quarter-gap cut to the floor, never below floor + 5%) · 4 Can win (1p under) · 5 Margin too low (UK: 60% floor / min 65%, 5% off, weekly; China: optional 5% off) · 6 Combined upload (Your price / Include) · China raises (review only – never uploaded) · 7a Final upload UK · 7b Final upload China · 8 Sells elsewhere, not on B&amp;Q (report only; does not feed Combined or Final upload). Profit colours: red = loss, pink = under the floor, amber = near the floor, green = fine, blue = over the cap. Made on this device – nothing is uploaded.</p></div>'+
  '<details class="box" id="pzbset"><summary><b>Settings</b> <span class="mut" id="pzbsetn"></span></summary><div class="pz-set">'+
  '<label>Undercut by £ <input type="text" inputmode="decimal" id="pzbstep"></label><label>or % of the buy box price <input type="text" inputmode="decimal" id="pzbpct"></label>'+
  '<label>Smallest raise worth doing (profit £) <input type="text" inputmode="decimal" id="pzbmin"></label><label>Raise when nobody else seen (%) <input type="text" inputmode="decimal" id="pzbup"></label></div>'+
