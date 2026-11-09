@@ -34,11 +34,15 @@ t('winning with 100+ sales -> +10% step held; with toggle uploaded; max 80%', ()
   assert.strictEqual(u.newp, B.priceFor(a, Math.min(.8, pc + .1))); assert.ok(u.upload); assert.ok(u.fpc <= .8 + .01);
   const top = D({ seller: 'Diva Packages', bb: 9, price: B.priceFor(a, .8), sales: 150, cost: 2 }, { raise100: true }); assert.ok(!top.upload); });
 t('China: floor 100%, 1p under buy box', () => { const o = D({ sup: 'Ashian Homeware', sales: 2, bb: 12, seller: 'Rival', price: 13 }); assert.strictEqual(o.floorPct, 1); assert.strictEqual(o.newp, 11.99); assert.ok(o.fpc >= 1); });
-t('China buy box below floor -> Margin too low, never raised to floor', () => { const o = D({ sup: 'ashian homeware', sales: 2, bb: 5, seller: 'Rival', price: 5.5 }); assert.strictEqual(o.status, 'Margin too low'); assert.strictEqual(o.finalp, 5.5); assert.ok(!o.upload); });
-t('multi-pack and >30kg -> Check postage, not uploaded unless allowed', () => {
-  assert.strictEqual(B.checkPost('3 x Bags', 100), 'Multi-pack x3'); assert.strictEqual(B.checkPost('1 x Bag', 100), ''); assert.strictEqual(B.checkPost('Box 3x', 100), '');
-  assert.ok(/Over 30kg/.test(B.checkPost('Sand', 30001))); assert.strictEqual(B.checkPost('Sand', 30000), '');
-  const r = { title: '4 x Spray', sales: 3, bb: 8.5, seller: 'Rival', price: 9.5 }; assert.strictEqual(D(r).why, 'Check postage first'); assert.ok(D(r, { checkPost: true }).upload); });
+t('China under the 100% floor is a raise and is not uploaded', () => { const o = D({ sup: 'ashian homeware', sales: 2, bb: 5, seller: 'Rival', price: 5.5 }); assert.ok(o.chinaUp); assert.strictEqual(o.status, 'Raise – held for review'); assert.ok(!o.upload); });
+t('China already above the floor, buy box below the floor -> Margin too low, price kept', () => { const o = D({ sup: 'ashian homeware', sales: 2, bb: 5, seller: 'Rival', price: 30 }); assert.strictEqual(o.status, 'Margin too low'); assert.strictEqual(o.finalp, 30); assert.ok(!o.upload); });
+t('multi-pack check postage starts at 14999g; a light pack and a single over 30kg are not held', () => {
+  assert.strictEqual(B.checkPost('3 x Bags', 14998), ''); assert.ok(/14999/.test(B.checkPost('3 x Bags', 14999)));
+  assert.ok(/no weight/.test(B.checkPost('3 x Bags', null))); assert.strictEqual(B.checkPost('1 x Bag', 100), ''); assert.strictEqual(B.checkPost('Box 3x', 100), '');
+  assert.strictEqual(B.checkPost('Sand', 30001), ''); assert.strictEqual(B.postage(null, 30001), 15); assert.strictEqual(B.checkPost('Sand', 14999), '');
+  const light = { title: '4 x Spray', sales: 3, bb: 8.5, seller: 'Rival', price: 9.5, w: 500 }; assert.ok(D(light).upload); assert.strictEqual(D(light).check, '');
+  const heavy = { title: '4 x Spray', sales: 3, bb: 8.5, seller: 'Rival', price: 9.5, w: 14999 }; assert.strictEqual(D(heavy).why, 'Check postage first'); assert.ok(D(heavy, { checkPost: true }).upload);
+  const zero = D({ title: '4 x Spray', sales: 3, bb: 8.5, seller: 'Rival', price: 9.5, w: 14999, postYour: 0 }); assert.ok(zero.postChecked); assert.strictEqual(zero.post, 0); assert.ok(zero.upload); });
 t('your price: loss / under 50% blocked, good one uploaded', () => {
   assert.strictEqual(D({ your: 1 }).status, 'Loss – blocked'); assert.ok(!D({ your: 1 }).upload);
   const a = { cost: 2, mult: 1.5, post: 1.75 }; const p49 = B.priceFor(a, .49); assert.strictEqual(D({ your: p49 }).status, 'Under 50% – blocked');
@@ -50,7 +54,7 @@ t('fromAccess maps headers, overlays buy box run and imported prices', () => {
   const P = B.fromAccess([H, ['A', 'x', 2, 9, '£9', 'Diva Packages', 'UK', 100, '', 0, 5012345678901], ['B', 'y', 2, 9, '£8', 'R', 'UK', 100, '', 0, '5012345678902'], []],
     { bb: { '5012345678901': { seller: 'Rival', price: 7.5 }, '5012345678902': { seller: 'Diva Packages Ltd', price: 8.25 } }, bbLabel: 'run', imported: { A: 8.8 }, importedLabel: 'imp' });
   assert.strictEqual(P.rows.length, 2); assert.strictEqual(P.rows[0].price, 8.8); assert.strictEqual(P.rows[0].bb, 7.5); assert.strictEqual(P.rows[0].seller, 'Rival');
-  assert.strictEqual(P.rows[1].price, 8.25); assert.ok(/our live price/.test(P.rows[1].srcPrice)); assert.throws(() => B.fromAccess([['a', 'b']]), /not the Access/); });
+  assert.strictEqual(P.rows[1].price, 9); assert.strictEqual(P.rows[1].liveSeen, 8.25); assert.ok(!/our live price/.test(P.rows[1].srcPrice || '')); assert.throws(() => B.fromAccess([['a', 'b']]), /not the Access/); });
 t('FUZZ 50,000 random rows: nothing uploaded at a loss, under 50%, China under 100% (rule prices), dup, or check postage', () => {
   let s = 7; const R = () => (s = (s * 16807) % 2147483647) / 2147483647, pick = a => a[Math.floor(R() * a.length)];
   const rows = []; for (let i = 0; i < 50000; i++) rows.push({ sku: 'S' + Math.floor(R() * 45000), title: pick(['Bag', '2 x Bag', '10 x Tape', 'Sand']), cost: pick([null, '', 0, R() * .9, R() * 4, R() * 9, R() * 60, '£' + (R() * 9).toFixed(2)]),
