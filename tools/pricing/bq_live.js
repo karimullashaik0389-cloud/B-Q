@@ -69,20 +69,22 @@
     var names = [];
     function add(name) { names.push(name); return names.length - 1; }
     ['sku','title','uk','cost','mult','collab','w','sales','stock','bb','win','seller','basePost','basePrice','china','tree','fresh','liveSeen','offer','packN','packCheck','lastChange','rival','seasonal','engSugg','engInc','engCheck','engReason','engProfit','engPc','engFloor','engCap','engNewProfit','noData','priceCheck','weeklyEng','t5Min','engAct','cat'].forEach(add);
-    var pCols = [], rCols = [], yCols = [], iCols = [];
-    for (var s = 0; s < 7; s++) { pCols.push(add('p' + s)); rCols.push(add('r' + s)); yCols.push(add('y' + s)); iCols.push(add('i' + s)); }
+    var mCols = [], pCols = [], rCols = [], yCols = [], iCols = [];
+    for (var s = 0; s < 7; s++) { mCols.push(add('m' + s)); pCols.push(add('p' + s)); rCols.push(add('r' + s)); yCols.push(add('y' + s)); iCols.push(add('i' + s)); }
     var postN = add('postN'), postBad = add('postBad'), postMin = add('postMin'), postMax = add('postMax'), postStat = add('postStat'), postU = add('postU');
     var priceN = add('priceN'), priceBad = add('priceBad'), priceMin = add('priceMin'), priceMax = add('priceMax'), priceStat = add('priceStat'), priceU = add('priceU');
     var yourN = add('yourN'), yourBad = add('yourBad'), yourMin = add('yourMin'), yourMax = add('yourMax'), yourStat = add('yourStat'), yourU = add('yourU');
     var incN = add('incN'), incBad = add('incBad'), incFirst = add('incFirst'), incStat = add('incStat'), incVal = add('incVal');
     var fixed = add('fixed'), profitNow = add('profitNow'), pcNow = add('pcNow'), floorPct = add('floorPct'), floorP = add('floorP'), capP = add('capP'), t5MinP = add('t5MinP');
     var stepAmt = add('stepAmt'), need = add('need'), tLow = add('tLow'), eC = add('eC'), eR = add('eR'), eQ = add('eQ'), eV = add('eV'), bbSugg = add('bbSugg');
-    var raiseT = add('raiseT'), raiseC = add('raiseC'), gain = add('gain'), act = add('act'), weekly = add('weekly'), t5s = add('t5s'), t3s = add('t3s'), reSugg = add('reSugg');
+    var raiseT = add('raiseT'), raiseC = add('raiseC'), gain = add('gain'), act = add('act'), weekly = add('weekly');
+    var t5ukR = add('t5ukR'), t5ukC = add('t5ukC'), t5cnR = add('t5cnR'), t5s = add('t5s');
+    var t3q = add('t3q'), t3fb = add('t3fb'), t3m = add('t3m'), t3c = add('t3c'), t3s = add('t3s'), reSugg = add('reSugg');
     var showPost = add('showPost'), showPrice = add('showPrice'), showProfit = add('showProfit'), showPc = add('showPc'), showFloor = add('showFloor'), showSugg = add('showSugg'), showFinal = add('showFinal'), showNewP = add('showNewP'), showCheck = add('showCheck'), showInc = add('showInc'), showWhy = add('showWhy'), upUK = add('upUK'), upCN = add('upCN');
     function C(i, r) { return L(i) + r; }
     function ref(i) { return L(i); }
-    function gather(sheet, col, r) { return 'IFERROR(IF(LEN(TRIM(INDEX(\'' + sheet + '\'!$' + col + ':$' + col + ',MATCH(A' + r + ',\'' + sheet + '\'!$A:$A,0))&""))=0,"",INDEX(\'' + sheet + '\'!$' + col + ':$' + col + ',MATCH(A' + r + ',\'' + sheet + '\'!$A:$A,0))),"")'; }
-    function gatherInc(sheet, col, r) { var g = gather(sheet, col, r); return 'IF((' + g + ')="","",IF(OR(UPPER(TRIM((' + g + ')&""))="YES",UPPER(TRIM((' + g + ')&""))="Y"),"Yes",IF(OR(UPPER(TRIM((' + g + ')&""))="NO",UPPER(TRIM((' + g + ')&""))="N"),"No","BAD")))'; }
+    function pull(m, sheet, col) { return 'IF(' + m + '="","",IF(LEN(TRIM(INDEX(\'' + sheet + '\'!$' + col + ':$' + col + ',' + m + ')&""))=0,"",INDEX(\'' + sheet + '\'!$' + col + ':$' + col + ',' + m + ')))'; }
+    function normInc(cell) { return 'IF(' + cell + '="","",IF(OR(UPPER(TRIM(' + cell + '&""))="YES",UPPER(TRIM(' + cell + '&""))="Y"),"Yes",IF(OR(UPPER(TRIM(' + cell + '&""))="NO",UPPER(TRIM(' + cell + '&""))="N"),"No","BAD")))'; }
     function countF(ids, r) { return '(' + ids.map(function (i) { return '(' + C(i, r) + '<>"")'; }).join('+') + ')'; }
     function badNum(ids, r, pos) { return '(' + ids.map(function (i) { return 'IF(OR(' + C(i, r) + '="",AND(ISNUMBER(' + C(i, r) + '),' + C(i, r) + pos + ')),0,1)'; }).join('+') + ')'; }
     function minF(ids, r) { return 'MIN(' + ids.map(function (i) { return 'IF(' + C(i, r) + '="",1E99,' + C(i, r) + ')'; }).join(',') + ')'; }
@@ -105,7 +107,9 @@
       setV(28, rec.engProfit, M); setV(29, rec.engPc, PC); setV(30, rec.engFloor, M); setV(31, rec.engCap, M); setV(32, rec.engNewProfit, M);
       setV(33, rec.noData ? 1 : 0); setV(34, rec.priceCheck ? 1 : 0); setV(35, rec.weekly ? 1 : 0); setV(36, rec.t5Min, M); setV(37, rec.act || ''); setV(38, rec.cat || '');
       SRC.forEach(function (src, k) {
-        setF(pCols[k], gather(src[0], src[1], r)); setF(rCols[k], gather(src[0], src[2], r)); setF(yCols[k], gather(src[0], src[3], r)); setF(iCols[k], gatherInc(src[0], src[4], r));
+        var m = C(mCols[k], r);
+        setF(mCols[k], 'IFERROR(MATCH(A' + r + ',\'' + src[0] + '\'!$A:$A,0),"")');
+        setF(pCols[k], pull(m, src[0], src[1])); setF(rCols[k], pull(m, src[0], src[2])); setF(yCols[k], pull(m, src[0], src[3])); setF(iCols[k], normInc(pull(m, src[0], src[4])));
       });
       setF(postN, countF(pCols, r)); setF(postBad, badNum(pCols, r, '>=0')); setF(postMin, minF(pCols, r)); setF(postMax, maxF(pCols, r));
       setF(postStat, statF(C(postBad, r), C(postN, r), C(postMax, r), C(postMin, r)));
@@ -118,8 +122,6 @@
       setF(yourU, 'IF(' + C(yourStat, r) + '="OK",' + C(yourMax, r) + ',"")', M);
       setF(incN, countF(iCols, r));
       setF(incBad, '(' + iCols.map(function (i) { return 'IF(' + C(i, r) + '="BAD",1,0)'; }).join('+') + ')');
-      var first = iCols.reduceRight(function (acc, i) { return 'IF(' + C(i, r) + '="","' + (acc ? '' : '') + '",IF(' + C(i, r) + '="BAD","",' + C(i, r) + '))'.replace('""', acc || '""'); }, '""');
-      /* nested first non-blank Yes/No */
       var incFirstF = '""';
       for (var k = iCols.length - 1; k >= 0; k--) incFirstF = 'IF(OR(' + C(iCols[k], r) + '="",' + C(iCols[k], r) + '="BAD"),' + incFirstF + ',' + C(iCols[k], r) + ')';
       setF(incFirst, incFirstF);
@@ -150,11 +152,15 @@
       var prof = function (p) { return 'ROUND(ROUND((' + p + ')*(1-' + SB.fee + ')-' + C(fixed, r) + ',6),2)'; };
       var pcOf = function (p) { return '((' + p + ')*(1-' + SB.fee + ')-' + C(fixed, r) + ')/' + C(costI, r); };
       var okUK = function (p, fl) { return 'AND(' + p + '<>"",' + p + '>0,' + prof(p) + '>0,' + p + '>=' + fl + '-0.00001,OR(' + C(capP, r) + '="",' + p + '<=' + C(capP, r) + '+0.00001),' + pcOf(p) + '>=' + SB.safeMin + '-0.000000001)'; };
-      var t5ukRaw = 'MAX(' + C(t5MinP, r) + ',ROUND(' + C(priceU, r) + '*(1-' + SB.t5cut + '),2))';
-      var t5ukCap = 'IF(AND(' + C(capP, r) + '<>"",' + t5ukRaw + '>' + C(capP, r) + '),' + C(capP, r) + ',' + t5ukRaw + ')';
-      var t5cnRaw = 'MAX(' + C(floorP, r) + ',ROUND(' + C(priceU, r) + '*(1-' + SB.t5cut + '),2))';
-      setF(t5s, 'IF(' + C(act, r) + '<>"Can\'t win","",IF(' + C(weekly, r) + '=1,"",IF(' + C(chinaI, r) + '=1,IF(AND(' + C(priceU, r) + '-' + t5cnRaw + '>=' + SB.minChange + '-0.000000001,' + okUK(t5cnRaw, C(floorP, r)) + ',' + pcOf(t5cnRaw) + '>=1-0.000000001),' + t5cnRaw + ',""),IF(AND(' + C(priceU, r) + '-' + t5ukCap + '>=' + SB.minChange + '-0.000000001,' + t5ukCap + '>=' + C(t5MinP, r) + '-0.00001,' + okUK(t5ukCap, C(t5MinP, r)) + '),' + t5ukCap + ',""))))', M);
-      setF(t3s, 'IF(OR(' + C(floorP, r) + '="",' + C(priceU, r) + '=""),"",IF(AND(' + C(priceU, r) + '-IF(AND(' + C(capP, r) + '<>"",MAX(ROUND(' + C(priceU, r) + '-(' + C(priceU, r) + '-' + C(floorP, r) + ')/4,2),ROUNDUP(' + C(floorP, r) + '*(1+' + SB.t3buf + '),2))>' + C(capP, r) + '),' + C(capP, r) + ',MAX(ROUND(' + C(priceU, r) + '-(' + C(priceU, r) + '-' + C(floorP, r) + ')/4,2),ROUNDUP(' + C(floorP, r) + '*(1+' + SB.t3buf + '),2)))>=' + SB.minChange + '-0.000000001,' + okUK('IF(AND(' + C(capP, r) + '<>"",MAX(ROUND(' + C(priceU, r) + '-(' + C(priceU, r) + '-' + C(floorP, r) + ')/4,2),ROUNDUP(' + C(floorP, r) + '*(1+' + SB.t3buf + '),2))>' + C(capP, r) + '),' + C(capP, r) + ',MAX(ROUND(' + C(priceU, r) + '-(' + C(priceU, r) + '-' + C(floorP, r) + ')/4,2),ROUNDUP(' + C(floorP, r) + '*(1+' + SB.t3buf + '),2)))', 'ROUNDUP(' + C(floorP, r) + '*(1+' + SB.t3buf + '),2)') + '),IF(AND(' + C(capP, r) + '<>"",MAX(ROUND(' + C(priceU, r) + '-(' + C(priceU, r) + '-' + C(floorP, r) + ')/4,2),ROUNDUP(' + C(floorP, r) + '*(1+' + SB.t3buf + '),2))>' + C(capP, r) + '),' + C(capP, r) + ',MAX(ROUND(' + C(priceU, r) + '-(' + C(priceU, r) + '-' + C(floorP, r) + ')/4,2),ROUNDUP(' + C(floorP, r) + '*(1+' + SB.t3buf + '),2))),""))', M);
+      setF(t5ukR, 'IF(OR(' + C(t5MinP, r) + '="",' + C(priceU, r) + '=""),"",MAX(' + C(t5MinP, r) + ',ROUND(' + C(priceU, r) + '*(1-' + SB.t5cut + '),2)))', M);
+      setF(t5ukC, 'IF(' + C(t5ukR, r) + '="","",IF(AND(' + C(capP, r) + '<>"",' + C(t5ukR, r) + '>' + C(capP, r) + '),' + C(capP, r) + ',' + C(t5ukR, r) + '))', M);
+      setF(t5cnR, 'IF(OR(' + C(floorP, r) + '="",' + C(priceU, r) + '=""),"",MAX(' + C(floorP, r) + ',ROUND(' + C(priceU, r) + '*(1-' + SB.t5cut + '),2)))', M);
+      setF(t5s, 'IF(OR(' + C(act, r) + '<>"Can\'t win",' + C(weekly, r) + '=1),"",IF(' + C(chinaI, r) + '=1,IF(AND(' + C(priceU, r) + '-' + C(t5cnR, r) + '>=' + SB.minChange + '-0.000000001,' + okUK(C(t5cnR, r), C(floorP, r)) + ',' + pcOf(C(t5cnR, r)) + '>=1-0.000000001),' + C(t5cnR, r) + ',""),IF(AND(' + C(priceU, r) + '-' + C(t5ukC, r) + '>=' + SB.minChange + '-0.000000001,' + C(t5ukC, r) + '>=' + C(t5MinP, r) + '-0.00001,' + okUK(C(t5ukC, r), C(t5MinP, r)) + '),' + C(t5ukC, r) + ',"")))', M);
+      setF(t3q, 'IF(OR(' + C(floorP, r) + '="",' + C(priceU, r) + '=""),"",ROUND(' + C(priceU, r) + '-(' + C(priceU, r) + '-' + C(floorP, r) + ')/4,2))', M);
+      setF(t3fb, 'IF(' + C(floorP, r) + '="","",ROUNDUP(' + C(floorP, r) + '*(1+' + SB.t3buf + '),2))', M);
+      setF(t3m, 'IF(OR(' + C(t3q, r) + '="",' + C(t3fb, r) + '=""),"",MAX(' + C(t3q, r) + ',' + C(t3fb, r) + '))', M);
+      setF(t3c, 'IF(' + C(t3m, r) + '="","",IF(AND(' + C(capP, r) + '<>"",' + C(t3m, r) + '>' + C(capP, r) + '),' + C(capP, r) + ',' + C(t3m, r) + '))', M);
+      setF(t3s, 'IF(AND(' + C(priceU, r) + '<>"",' + C(t3c, r) + '<>"",' + C(priceU, r) + '-' + C(t3c, r) + '>=' + SB.minChange + '-0.000000001,' + okUK(C(t3c, r), C(t3fb, r)) + '),' + C(t3c, r) + ',"")', M);
       var floorUp = '(ROUND(' + C(floorP, r) + '*100,0)+MOD(9-MOD(ROUND(' + C(floorP, r) + '*100,0),10)+10,10))/100';
       setF(reSugg, 'IF(OR(' + C(act, r) + '="No data",' + C(act, r) + '="Price check"),"",IF(' + C(act, r) + '="Lower",' + C(bbSugg, r) + ',IF(' + C(act, r) + '="Raise",IF(OR(' + C(pcNow, r) + '="",' + C(pcNow, r) + '<' + C(floorPct, r) + '-0.000000001),IF(' + floorUp + '>0,' + floorUp + ',' + C(floorP, r) + '),' + C(raiseC, r) + '),IF(' + C(act, r) + '="Can\'t win",' + C(t5s, r) + ',IF(AND(' + C(winI, r) + '=1,' + C(salesI, r) + '<1,' + C(treeI, r) + '<>1,NOT(AND(ISNUMBER(' + C(stockI, r) + '),' + C(stockI, r) + '<=0,' + SB.noStockKeep + '=1))),' + C(t3s, r) + ',"")))))', M);
       setF(showPost, 'IF(' + C(postU, r) + '="","",' + C(postU, r) + ')', M);
@@ -450,5 +456,60 @@
       counts: { postage: count('set', 'post'), sellingPrice: count('set', 'priceNow'), your: count('set', 'your'), include: count('set', 'inc'), unknown: unknown.length, duplicate: duplicate.length, conflict: conflicts.length, invalid: invalid.length, formulas: formulas, blank: blankKept } };
   }
 
-  return { make: make, outcome: outcome, parseChecks: parseChecks, normStore: normStore, applyPreview: applyPreview, backup: backup, restoreBackup: restoreBackup, forceCalc: forceCalc, T6: T6, T8: T8, SRC: SRC };
+  /* Same formula copied down a column is stored once (Excel shared formula). Relative refs still move with the row. */
+  function adjustRef(formula, delta) {
+    if (!delta) return formula;
+    return formula.replace(/(\$?)([A-Z]{1,3})(\$?)(\d+)/g, function (all, ca, col, ra, row) {
+      if (ra === '$') return all;
+      return ca + col + String(+row + delta);
+    });
+  }
+  function shareSheetXml(xml) {
+    var re = /<c r="([A-Z]+)(\d+)"([^>]*)><f([^>]*)>([\s\S]*?)<\/f>/g, groups = {}, m;
+    while ((m = re.exec(xml))) {
+      if (/t="shared"/.test(m[4])) continue;
+      var col = m[1];
+      if (!groups[col]) groups[col] = [];
+      groups[col].push({ row: +m[2], f: m[5], at: m.index, len: m[0].length, open: m[0] });
+    }
+    var reps = [], si = 0;
+    Object.keys(groups).forEach(function (col) {
+      var list = groups[col].sort(function (a, b) { return a.row - b.row; });
+      var run = [];
+      function flush() {
+        if (run.length < 2) { run = []; return; }
+        var master = run[0], ok = true;
+        for (var i = 1; i < run.length; i++) {
+          if (adjustRef(master.f, run[i].row - master.row) !== run[i].f) { ok = false; break; }
+        }
+        if (!ok) { run = []; return; }
+        var ref = col + master.row + ':' + col + run[run.length - 1].row, id = si++;
+        reps.push({ at: master.at, len: master.len, text: master.open.replace('<f>', '<f t="shared" ref="' + ref + '" si="' + id + '">') });
+        for (var j = 1; j < run.length; j++) reps.push({ at: run[j].at, len: run[j].len, text: run[j].open.replace(/<f[^>]*>[\s\S]*<\/f>/, '<f t="shared" si="' + id + '"/>') });
+        run = [];
+      }
+      for (var i = 0; i < list.length; i++) {
+        if (run.length && list[i].row !== run[run.length - 1].row + 1) flush();
+        run.push(list[i]);
+      }
+      flush();
+    });
+    reps.sort(function (a, b) { return a.at - b.at; });
+    var out = [], prev = 0;
+    reps.forEach(function (r) { out.push(xml.slice(prev, r.at)); out.push(r.text); prev = r.at + r.len; });
+    out.push(xml.slice(prev));
+    return out.join('');
+  }
+  function shareFormulas(X, bytes) {
+    var Z = X.CFB.read(new Uint8Array(bytes), { type: 'array' });
+    Z.FileIndex.forEach(function (f, i) {
+      var p = Z.FullPaths[i] || '';
+      if (!/xl\/worksheets\/sheet\d+\.xml$/.test(p)) return;
+      var s = txt(f.content);
+      var n = shareSheetXml(s);
+      if (n !== s) f.content = bin(n);
+    });
+    return new Uint8Array(X.CFB.write(Z, { fileType: 'zip', type: 'array', compression: true }));
+  }
+  return { make: make, outcome: outcome, parseChecks: parseChecks, normStore: normStore, applyPreview: applyPreview, backup: backup, restoreBackup: restoreBackup, forceCalc: forceCalc, shareFormulas: shareFormulas, T6: T6, T8: T8, SRC: SRC };
 });

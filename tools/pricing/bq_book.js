@@ -515,6 +515,7 @@
     var bytes = new Uint8Array(writeBook(X, made.list));
     bytes = polish(X, bytes, made.list);
     bytes = Live.forceCalc ? Live.forceCalc(X, bytes, made.list) : bytes;
+    bytes = Live.shareFormulas ? Live.shareFormulas(X, bytes) : bytes;
     return { bytes: bytes, counts: made.counts, B: made, records: pack.recs };
   }
   function writeBook(X, list) {

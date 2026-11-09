@@ -83,6 +83,38 @@ t('a heavy pack at 14999g stays held until postage is typed, including 0', () =>
   if (o.upload) near(finals(wb, '7a Final upload UK').find(x => x[0] === 'PACKH')[1], o.final);
 });
 
+t('a review tab selling-price edit updates that tab, Combined and Final', () => {
+  const built = workbook({ checks: { MTL: { priceNow: 25 } } });
+  const wb = recalc(built.bytes);
+  const o = B.outcome(P, built.records.find(r => r.sku === 'MTL'), { priceNow: 25 }, S0);
+  const src = find(wb, '5 Margin too low', 'MTL');
+  const comb = find(wb, '6 Combined upload', 'MTL');
+  near(src[8], 25); near(src[10], o.profitNow); near(src[11], o.profitNow / 8); near(src[15], o.sugg); assert.strictEqual(src[22], o.check);
+  near(comb[10], src[10]); near(comb[11], src[11]); near(comb[15], src[15]); near(comb[23], src[23]); assert.strictEqual(comb[22], src[22]);
+  const hit = finals(wb, '7a Final upload UK').find(r => r[0] === 'MTL');
+  if (o.upload) near(hit[1], o.final); else assert.ok(!hit);
+});
+
+t('Include Yes does not replace a special postage; typing the same postage clears a heavy pack', () => {
+  const heavy = { sku: 'GTR', title: '3 x Guitar', ean: '199', cost: 5, price: 40, bb: 18, seller: 'Rival', sup: 'UK Ltd', w: 14999, sales: 2, stock: 2, variant: 'GUI-TAR-1' };
+  const d = P.decideAll(rows.concat([heavy]), {});
+  const bb = P.buyBoxAll(d.rows, Object.fromEntries(d.rows.map(o => [o.ean, 1])), {}, P.BB_DEFAULT);
+  const built = B.build(X, P, { bbr: bb, settings: S0, asOf: '2026-11-09', priceChanges: S0.priceChanges, checks: { GTR: { inc: 'Yes' } } });
+  const rec = built.records.find(r => r.sku === 'GTR');
+  near(rec.basePost, 3.3);
+  const held = recalc(built.bytes);
+  const row = find(held, '6 Combined upload', 'GTR');
+  near(row[4], 3.3); assert.strictEqual(row[22], 'CHECK POSTAGE'); assert.strictEqual(row[21], 'No');
+  const cleared = B.build(X, P, { bbr: bb, settings: S0, asOf: '2026-11-09', priceChanges: S0.priceChanges, checks: { GTR: { post: 3.3, inc: 'Yes' } } });
+  const wb = recalc(cleared.bytes);
+  const o = B.outcome(P, rec, { post: 3.3, inc: 'Yes' }, S0);
+  const src = find(wb, '4 Can win buy box', 'GTR') || find(wb, '5 Margin too low', 'GTR') || find(wb, '6 Combined upload', 'GTR');
+  const comb = find(wb, '6 Combined upload', 'GTR');
+  near(src[4], 3.3); near(comb[4], 3.3); assert.notStrictEqual(comb[4], 2.3); assert.notStrictEqual(comb[4], 8);
+  assert.strictEqual(comb[22], o.check); near(comb[10], o.profitNow); near(comb[15], o.sugg);
+  if (o.upload) near(finals(wb, '7a Final upload UK').find(r => r[0] === 'GTR')[1], o.final);
+});
+
 t('selling price review recalculates profit; Your price is a separate final and can be blocked', () => {
   const priced = workbook({ checks: { LOW: { priceNow: 30 } } });
   const wb = recalc(priced.bytes);
@@ -199,6 +231,17 @@ t('backup round-trip keeps 0 postage and drops a formula-like field', () => {
   const again = B.restoreBackup(back);
   assert.strictEqual(again.ok, true); assert.strictEqual(again.store.items.A.post, 0);
   assert.strictEqual(B.restoreBackup({ items: {} }).ok, false);
+});
+
+t('the dashboard pages include the import control and the live calculator', () => {
+  ['index.html', 'sales.html', 'orders.html'].forEach(function (name) {
+    const html = fs.readFileSync(path.join(__dirname, '..', '..', '..', name), 'utf8');
+    assert.ok(html.indexOf('Import checked workbook') > 0, name);
+    assert.ok(html.indexOf('Postage review') > 0, name);
+    assert.ok(html.indexOf('Selling price review') > 0, name);
+    assert.ok(html.indexOf('function shareFormulas') > 0 || html.indexOf('shareFormulas') > 0, name);
+    assert.ok(html.indexOf('saved in this browser') > 0 || html.indexOf('this browser only') > 0, name);
+  });
 });
 
 t('negative postage is invalid and 14998g still uses the normal band', () => {
