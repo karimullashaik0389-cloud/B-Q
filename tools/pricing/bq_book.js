@@ -526,6 +526,8 @@
     if (!Live) return buildValues(X, P, input);
     input = input || {};
     var pack = input.records ? { recs: input.records, S: pureSettings(input), X: [] } : liveRecords(P, input);
+    /* Tab 8 is a report. The formula download used to leave it blank because it never ran the elsewhere-sales list. */
+    if (input.t8 == null && pack.X && pack.X.length && input.aoa) input = Object.assign({}, input, { t8: sells(P, pack.X, input.aoa) });
     var saved = input.checks || (input.settings && input.settings.checks) || {};
     var made = Live.make(pack.recs, input, P, saved, pack.S);
     var bytes = new Uint8Array(writeBook(X, made.list));

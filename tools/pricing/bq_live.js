@@ -318,9 +318,15 @@
       return { name: name, cols: [[T[0][0], null, 24], [T[0][1], null, 14], [T[0][2], null, 16], [T[0][3], null, 22], [T[0][4], null, 22]], head2: T[1], rows: rows, freeze: { x: 0, y: 2 }, filter: false, notes: { 0: note } };
     }
     function tab8(rows8) {
-      var cols = [['B&Q SKU', null, 20], ['Product', null, 40], ['Note', null, 70]];
-      var rows = (rows8 || []).map(function (e) { var o = e.x ? e.x.o : e; return [v(o.sku || e.sku), v(o.title || e.title || ''), v(e.why || 'Report only')]; });
-      if (!rows.length) rows.push([v(''), v(''), v('No rows. This tab never feeds Combined or Final, even if you type here.')]);
+      var cols = [['B&Q SKU', null, 20], ['Product', null, 40], ['UK/China', null, 12], ['Estimated cost', M, 14], ['Postage', M, 12], ['Free stock', IN, 12], ['B&Q 30d sales', IN, 14], ['Price now', M, 12], ['Profit now £', M, 12], ['Profit now %', PC, 12], ['Buy box price', M, 14], ['Buy box seller', null, 18], ['Floor price', M, 12], ['Suggested price', M, 14], ['New profit £', M, 12], ['New profit %', PC, 12], ['Reason', null, 44], ['Other platform 30d sales', IN, 18]];
+      var rows = (rows8 || []).map(function (e) {
+        if (e && e.x && e.x.o) {
+          var o = e.x.o;
+          return [v(o.sku), v(o.title || ''), v(o.china ? 'China' : 'UK'), v(o.cost, M), v(o.post, M), v(o.stock, IN), v(o.sales || 0, IN), v(o.priceBlank ? null : o.price, M), v(o.profit, M), v(o.pc, PC), v(o.bb, M), v(o.seller || ''), v(o.floor, M), null, null, null, v(e.why || ''), v(e.s && e.s.other, IN)];
+        }
+        return [v(e.sku), v(e.title || ''), v(e.uk || ''), v(e.cost, M), v(e.post, M), v(e.stock, IN), v(e.sales, IN), v(e.price, M), v(e.profit, M), v(e.pc, PC), v(e.bb, M), v(e.seller || ''), v(e.floor, M), null, null, null, v(e.why || 'Report only'), v(e.other, IN)];
+      });
+      if (!rows.length) rows.push([v(''), v(''), v(''), null, null, null, null, null, null, null, null, v(''), null, null, null, null, v('No rows. This tab never feeds Combined or Final, even if you type here.'), null]);
       return { name: T8, top: 'REPORT ONLY. This tab does not change postage, prices, Combined or the upload. Typing here has no effect on Final.', cols: cols, rows: rows, freeze: { x: 1, y: 2 }, filter: true };
     }
   }

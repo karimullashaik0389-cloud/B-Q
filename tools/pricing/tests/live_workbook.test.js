@@ -312,4 +312,21 @@ t('weekly hold is tab 5 UK only: 6 days held, 7 days not held', () => {
   assert.notStrictEqual(seven.engCheck, 'WEEKLY HOLD');
 });
 
+t('a normal download fills tab 8 from other-platform sales and does not invent an upload', () => {
+  const aoa = [['sku', 'Variant description', 'Estimated cost', 'B&Q_INV.price', 'B&Q_BB.price', 'seller', 'Main supplier name', 'Weight', 'B n Q 30Days', 'Total 30Days Sales', 'Free stock quantity'],
+    ['ELSE', 'Sells elsewhere', 2, 10, 9, 'Rival', 'UK Ltd', 500, 0, 12, 4],
+    ['HOME', 'Only here', 2, 12, 9, 'Rival', 'UK Ltd', 500, 4, 4, 3]];
+  const raw = aoa.slice(1).map(function (r, i) { return { sku: r[0], title: r[1], cost: r[2], price: r[3], bb: r[4], seller: r[5], sup: r[6], w: r[7], sales: r[8], stock: r[10], ean: 'E' + r[0], ix: i + 1 }; });
+  const d = P.decideAll(raw, {});
+  const bb = P.buyBoxAll(d.rows, Object.fromEntries(d.rows.map(function (o) { return [o.ean, 1]; })), {}, P.BB_DEFAULT);
+  const built = B.build(X, P, { bbr: bb, aoa: aoa, settings: P.BB_DEFAULT });
+  const wb = X.read(Buffer.from(built.bytes), { type: 'buffer' });
+  const t8 = X.utils.sheet_to_json(wb.Sheets['8 Sells elsewhere not B&Q'], { header: 1, raw: true, defval: null });
+  const skus = t8.slice(2).map(function (r) { return r[0]; }).filter(Boolean);
+  assert.deepStrictEqual(skus, ['ELSE']);
+  assert.strictEqual(t8.find(function (r) { return r[0] === 'ELSE'; })[17], 12);
+  const formulas = JSON.stringify(wb.Sheets['6 Combined upload']);
+  assert.ok(formulas.indexOf('8 Sells elsewhere') < 0);
+});
+
 console.log('live workbook tests passed:', n);
