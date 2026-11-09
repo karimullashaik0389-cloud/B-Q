@@ -34,7 +34,19 @@ t('winning with 100+ sales -> +10% step held; with toggle uploaded; max 80%', ()
   assert.strictEqual(u.newp, B.priceFor(a, Math.min(.8, pc + .1))); assert.ok(u.upload); assert.ok(u.fpc <= .8 + .01);
   const top = D({ seller: 'Diva Packages', bb: 9, price: B.priceFor(a, .8), sales: 150, cost: 2 }, { raise100: true }); assert.ok(!top.upload); });
 t('China: floor 100%, 1p under buy box', () => { const o = D({ sup: 'Ashian Homeware', sales: 2, bb: 12, seller: 'Rival', price: 13 }); assert.strictEqual(o.floorPct, 1); assert.strictEqual(o.newp, 11.99); assert.ok(o.fpc >= 1); });
-t('China under the 100% floor is a raise and is not uploaded', () => { const o = D({ sup: 'ashian homeware', sales: 2, bb: 5, seller: 'Rival', price: 5.5 }); assert.ok(o.chinaUp); assert.strictEqual(o.status, 'Raise – held for review'); assert.ok(!o.upload); });
+t('China under the 100% floor is a raise and is not uploaded', () => { const o = D({ sup: 'ashian homeware', sales: 2, bb: 5, seller: 'Rival', price: 5.5 }); assert.ok(o.chinaUp); assert.strictEqual(o.status, 'Raise – held for review'); assert.ok(!o.upload); const forced = D({ sup: 'ashian homeware', sales: 2, bb: 5, seller: 'Rival', price: 5.5, your: o.floor }); assert.ok(!forced.upload, forced.why); });
+t('China no-sales cut does not go below 105% on cost', () => {
+  const o = D({ sup: 'Ashian Homeware', sales: 0, bb: 40, seller: 'Diva Packages', price: 40, cost: 4, w: 400 });
+  const stop = B.priceFor(o.a, 1.05);
+  assert.ok(o.newp == null || o.newp >= stop - 0.001);
+  if (o.newp != null) assert.ok(o.fpc >= 1.05 - 0.02);
+});
+t('ending in 9 is only for a price increase', () => {
+  assert.strictEqual(B.end9(8.04, 12, 6, 9, 10), 8.04);
+  const up = B.end9(11.77, 8, 11.77, null, 12.5);
+  assert.ok(up >= 11.77 && Math.round(up * 100) % 10 === 9);
+  assert.strictEqual(B.end9(11.77, 8, 11.77, null, 11.78), 11.77);
+});
 t('China already above the floor, buy box below the floor -> Margin too low, price kept', () => { const o = D({ sup: 'ashian homeware', sales: 2, bb: 5, seller: 'Rival', price: 30 }); assert.strictEqual(o.status, 'Margin too low'); assert.strictEqual(o.finalp, 30); assert.ok(!o.upload); });
 t('multi-pack check postage starts at 14999g; a light pack and a single over 30kg are not held', () => {
   assert.strictEqual(B.checkPost('3 x Bags', 14998), ''); assert.ok(/14999/.test(B.checkPost('3 x Bags', 14999)));

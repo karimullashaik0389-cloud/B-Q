@@ -148,18 +148,22 @@
     var bb1 = bb != null ? rnd(bb - 0.01, 2) : null, raw, step = false;
     /* China rules A and B (Karimulla 2 Nov 2026) run BEFORE 'already winning', so they apply winning or not.
        A: under the 100% floor -> raise to the floor price (held for review unless opt.chinaRaise).
-       B: no sales in 30 days and above floor +1p -> cut 10% (round down), never to/below the floor: stops at floor +1p. */
+       B: no sales in 30 days -> cut 10% (round down), never below 105% profit on cost (100% floor + 5 points). */
     if (china && cur > 0 && C.pc < CHINA_FLOOR - 1e-9) {
       raw = o.floor; o.chinaUp = true; o.rule = 'A China under 100% floor – raise to floor';
       o.reason = 'China product at ' + Math.round(C.pc * 100) + '% – raise to 100% floor £' + o.floor.toFixed(2);
     } else if (china && cur > 0 && sales < 1) {
-      var stop = rnd(o.floor + 0.01, 2);
-      if (rnd(cur, 2) <= stop) { raw = 'Just above floor – kept'; o.rule = 'B China 0 sales – at floor +1p, kept'; }
-      else {
+      var stop = priceFor(a, CHINA_FLOOR + 0.05);
+      o.chinaMin = stop;
+      if (rnd(cur, 2) <= rnd(stop, 2)) {
+        if (rnd(cur, 2) < rnd(stop, 2) - 0.001) { raw = stop; o.chinaCut = true; o.rule = 'B China 0 sales – lift to 105% on cost'; }
+        else { raw = 'At 105% on cost – kept'; o.rule = 'B China 0 sales – already at 105% on cost'; }
+      } else {
         var cut = floor2(cur * (1 - CHINA_CUT)); o.chinaCut = true;
-        if (cut <= o.floor) { raw = stop; o.rule = 'B China 0 sales – cut 10%, stopped at floor +1p'; } else { raw = cut; o.rule = 'B China 0 sales – cut 10%'; }
-        o.reason = 'China, no sales in 30 days – cut 10% (stops just above 100% floor £' + o.floor.toFixed(2) + ')';
+        raw = cut < stop ? stop : cut;
+        o.rule = cut < stop ? 'B China 0 sales – cut 10%, stopped at 105% on cost' : 'B China 0 sales – cut 10%';
       }
+      o.reason = 'China, no sales in 30 days – not below 105% on cost (£' + stop.toFixed(2) + ')';
     } else if (o.win) {
       raw = 'Already winning'; o.rule = '1 Already winning – kept';
       if (!china && sales >= RAISE_AT && C.pc < UK_MAX - 1e-9) {
@@ -191,7 +195,7 @@
       var Rc = calc(a, raw);
       o.rawProfit = Rc.profit; o.rawPc = Rc.pc;
       if (Rc.profit <= 0) o.status = 'Loss – blocked';
-      else if (rnd(raw, 2) > rnd(cur, 2) && !(step && opt.raise100) && !(o.chinaUp && opt.chinaRaise)) o.status = step ? 'Raise 10% – held for review' : 'Raise – held for review';
+      else if (rnd(raw, 2) > rnd(cur, 2) && !(step && opt.raise100) && !(o.chinaUp && opt.chinaRaise) && !o.chinaCut) o.status = step ? 'Raise 10% – held for review' : 'Raise – held for review';
       else if (isTrim(o, raw, cur, bb1) && !opt.pennyTrims) { o.trim = true; o.status = TRIM; }
       else { if (isTrim(o, raw, cur, bb1)) o.trim = true; o.status = raw; }
     } else o.status = raw;
@@ -204,6 +208,7 @@
       if (!(o.finalp > 0) || F.profit <= 0) { o.why = 'Loss – blocked'; if (your != null) o.status = 'Loss – blocked'; }
       else if (F.pc < SAFE_MIN - 1e-9) { o.why = 'Under 50% – blocked'; if (your != null) o.status = 'Under 50% – blocked'; }
       else if (china && F.pc < CHINA_FLOOR - 1e-9) { o.why = 'Under 100% China – blocked'; if (your != null) o.status = 'Under 100% China – blocked'; }
+      else if (china && C.pc < CHINA_FLOOR - 1e-9 && o.finalp >= cur - 0.001) { o.why = 'China raise – review only'; if (your != null) o.status = 'Raise – held for review'; }
       else if (o.check && !opt.checkPost && !o.postChecked) o.why = 'Check postage first';
       else if (r.dup) o.why = 'Duplicate SKU';
       else { o.upload = true; o.why = your != null ? 'Your price' : 'Price change'; }
@@ -302,14 +307,15 @@
   var XMAS_RE = /\b(christmas|xmas|advent|bauble|baubles|tinsel|nativity|santa|reindeer|snowman|snowflake|festive|stocking)\b/i;
   function isSeasonal(title, sku) { return XMAS_RE.test(String(title || '')) || /^XMA-/i.test(String(sku || '')); }
   function bbStep(bb, s) { var a = num(s.step) || 0, p = num(s.stepPct) || 0; return Math.max(0.01, rnd(Math.max(a, bb * p / 100), 2)); }
-  /* 4 Nov: every changed price ends in 9p – rises round UP to …9, cuts round DOWN to …9; must stay under lim (buy box / rival), at or under cap, at or above floor, else keep the unrounded price */
-  /* the cap allows only the ending-9 overshoot: cap rounded up to the next …9 (4 Nov user rule) */
+  /* Ending in 9 applies only to a price increase. A cut stays on the exact penny (1p under the buy box, or the normal 2dp cut). A 9-ending raise must not go through the cap or the floor. */
   function up9(x) { var c = Math.round(r6(x) * 100); return (c + ((9 - c % 10) + 10) % 10) / 100; }
   function end9(p, cur, fl, lim, cap) {
-    var c = Math.round(r6(p) * 100), q = p > cur ? c + ((9 - c % 10) + 10) % 10 : c - ((c % 10 - 9 + 10) % 10), v = q / 100;
+    if (!(p > cur)) return p;
+    var c = Math.round(r6(p) * 100), q = c + ((9 - (c % 10) + 10) % 10), v = q / 100;
     if (q === c) return p;
-    if (p > cur) return v > 0 ? v : p; /* 4 Nov user rule: rises ALWAYS round up to the next …9, even a few pence over the cap or limit */
-    if (v < fl - 1e-9 || (lim != null && v > rnd(lim, 2) - 0.005) || (cap != null && v > cap + 1e-9) || !(v > 0)) return p;
+    if (!(v > 0) || v < fl - 1e-9) return p;
+    if (cap != null && v > cap + 1e-9) return p;
+    if (lim != null && v > rnd(lim, 2) + 1e-9) return p;
     return v;
   }
   function buyBox(o, x, s) {

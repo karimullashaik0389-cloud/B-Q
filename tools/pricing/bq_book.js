@@ -70,10 +70,14 @@
     if (o.win) {
       if (!(o.sales >= 1)) {
         x.cat = 't3'; x.tab = 3; x.label = 'Winning, 0 sales';
-        var fb = P.ceil2(fl * (1 + T3_BUF)), qtr = P.rnd(cur - (cur - fl) / 4, 2), s3 = Math.max(qtr, fb);
+        var min105 = o.china ? P.priceFor(o.a, P.CHINA_FLOOR + 0.05) : null;
+        var fb = o.china ? min105 : P.ceil2(fl * (1 + T3_BUF)), qtr = P.rnd(cur - (cur - fl) / 4, 2), s3 = Math.max(qtr, fb);
         if (cap != null && s3 > cap) s3 = cap; s3 = P.rnd(s3, 2);
-        if (s3 >= fb - 1e-9 && cur - s3 >= MIN_CHANGE - 1e-9 && ok(P, o, s3)) { x.sugg = s3; x.why = 'We win but sold 0 in 30 days – lower a quarter of the way toward the floor (stops at floor + 5%).'; }
-        else { x.why = 'We win but sold 0 in 30 days – no cut suggested: the price is already close to the floor (within 10p of floor + 5%, or already at/under floor + 5%).'; }
+        if (o.china && s3 < min105) s3 = min105;
+        var gap = cur - s3;
+        if (s3 > cur + 0.001 && o.china && s3 - cur >= MIN_CHANGE - 1e-9 && ok(P, o, s3)) { x.sugg = s3; x.why = 'China, no sales – lift to 105% profit on cost (not an under-floor raise).'; }
+        else if (gap >= MIN_CHANGE - 1e-9 && s3 >= fb - 1e-9 && ok(P, o, s3)) { x.sugg = s3; x.why = o.china ? 'China, no sales – cut toward the floor, not below 105% on cost.' : 'We win but sold 0 in 30 days – lower a quarter of the way toward the floor (stops at floor + 5%).'; }
+        else { x.why = o.china ? 'China, no sales – already at or within 10p of the 105% minimum.' : 'We win but sold 0 in 30 days – no cut suggested: the price is already close to the floor (within 10p of floor + 5%, or already at/under floor + 5%).'; }
         if (chk) x.inc = 'No'; return x;
       }
       if (o.pc != null && o.pc >= o.floorPct - 1e-9 && (cap == null || cur <= cap + 1e-9)) { x.cat = 't2'; x.tab = 2; x.label = 'Winning, in range'; return x; }
@@ -103,7 +107,12 @@
       else if (x.sugg != null) s = !o.china ? ('Optional UK: 5% off (60% floor, min 65%)') : ('Optional: ' + (x.sugg === P.rnd(o.floor, 2) ? 'down to the floor' : '5% off') + ' to attract sales');
       else s = "Can't win above floor – no change";
     }
-    else if (k === 't3') s = x.sugg != null ? '0 B&Q sales: quarter-gap cut toward the floor' : '0 B&Q sales: already near the floor';
+    else if (k === 't3') {
+      if (x.sugg == null) s = o.china ? 'China, no sales – already at the 105% minimum' : '0 B&Q sales: already near the floor';
+      else if (o.china && o.price != null && x.sugg > o.price + 0.001) s = 'China, no sales – lift to 105% profit on cost';
+      else if (o.china) s = 'China, no sales – cut toward the floor, not below 105% on cost';
+      else s = '0 B&Q sales: quarter-gap cut toward the floor';
+    }
     else if (k === 't2') s = 'Winning, in range – no change';
     else s = x.label || 'Keep';
     if (o.check && !S.checkPost && !o.postChecked && x.sugg != null) s += ' · check postage (' + o.check + ')';
@@ -413,6 +422,8 @@
       return s.replace(/<c r="([A-Z]+\d+)"(?: s="(\d+)")?/g, function (m0, ref, sv) {
         var h = sh._hd && sh._hd[ref], k = sh._mk && sh._mk[ref]; if (!h && !k) return m0; var base = sv ? +sv : 0;
         var nx = h ? clone(base, fCol[h]) : clone(base, fSt[k], k === 'neg' ? nfWhite : null); return '<c r="' + ref + '" s="' + nx + '"'; }); }; });
+    var firstVisible = 0;
+    for (var vi = 0; vi < list.length; vi++) { if (!list[vi].hide) { firstVisible = vi; break; } }
     var sheetsXml = list.map(function (sh, i) { var k = get('xl/worksheets/sheet' + (i + 1) + '.xml'); return k == null ? null : { k: k, s: jobs[i](txt(Z.FileIndex[k].content)) }; });
     var dx = STK.map(function (k) { var o = ST[k]; return '<dxf>' + (o.font ? '<font><b/><color rgb="' + o.font + '"/></font>' : '') + '<fill><patternFill patternType="solid"><fgColor rgb="' + o.fill + '"/><bgColor rgb="' + o.fill + '"/></patternFill></fill></dxf>'; });
     st = st.replace(xfs[0], '<cellXfs count="' + list2.length + '">' + list2.join('') + '</cellXfs>');
@@ -422,7 +433,7 @@
       var sx = sheetsXml[i]; if (!sx) return; var s = sx.s, fz = sh.freeze, pane;
       if (fz.x && fz.y) { var tl = X.utils.encode_cell({ r: fz.y, c: fz.x }); pane = '<pane xSplit="' + fz.x + '" ySplit="' + fz.y + '" topLeftCell="' + tl + '" activePane="bottomRight" state="frozen"/><selection pane="topRight"/><selection pane="bottomLeft"/><selection pane="bottomRight" activeCell="' + tl + '" sqref="' + tl + '"/>'; }
       else { var tl2 = 'A' + (fz.y + 1); pane = '<pane ySplit="' + fz.y + '" topLeftCell="' + tl2 + '" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="' + tl2 + '" sqref="' + tl2 + '"/>'; }
-      s = s.replace(/<sheetView ([^>]*?)\/>/, '<sheetView $1' + (i === 0 ? ' tabSelected="1"' : '') + '>' + pane + '</sheetView>');
+      s = s.replace(/<sheetView ([^>]*?)\/>/, '<sheetView $1' + (i === firstVisible ? ' tabSelected="1"' : '') + '>' + pane + '</sheetView>');
       s = s.replace(/<sheetFormatPr [^>]*\/>/, '').replace('<cols>', '<sheetFormatPr defaultRowHeight="16"/><cols>');
       s = s.replace(/<col min="(\d+)" max="(\d+)"([^>]*)\/>/g, function (m0, a) { var j = +a - 1; if (sh.cols[j] && sh.cols[j][3] === 'hide' && !/hidden=/.test(m0)) m0 = m0.replace('/>', ' hidden="1"/>'); var inp = sh.inputs && sh.inputs.indexOf(j) >= 0; if (inp || j === sh.your) return m0.replace('/>', ' style="' + yourXf + '"/>'); if (j === sh.inc && yesXf >= 0) return m0.replace('/>', ' style="' + yesXf + '"/>'); return m0; });
       s = s.replace('<row r="' + (sh._hr + 1) + '"', '<row r="' + (sh._hr + 1) + '" ht="34" customHeight="1"');
