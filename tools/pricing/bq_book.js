@@ -75,8 +75,13 @@
         if (cap != null && s3 > cap) s3 = cap; s3 = P.rnd(s3, 2);
         if (o.china && s3 < min105) s3 = min105;
         var gap = cur - s3;
-        if (s3 > cur + 0.001 && o.china && s3 - cur >= MIN_CHANGE - 1e-9 && ok(P, o, s3)) { x.sugg = s3; x.why = 'China, no sales – lift to 105% profit on cost (not an under-floor raise).'; }
-        else if (gap >= MIN_CHANGE - 1e-9 && s3 >= fb - 1e-9 && ok(P, o, s3)) { x.sugg = s3; x.why = o.china ? 'China, no sales – cut toward the floor, not below 105% on cost.' : 'We win but sold 0 in 30 days – lower a quarter of the way toward the floor (stops at floor + 5%).'; }
+        if (o.china && s3 > cur + 0.001) {
+          x.cat = 'raise'; x.tab = 1; x.inc = 'No'; x.label = 'Raise – China (review only, never uploaded)';
+          x.sugg = (s3 - cur >= MIN_CHANGE - 1e-9 && ok(P, o, s3)) ? s3 : null;
+          x.why = 'China raise – review only. The 105% minimum does not put a higher price on the upload.';
+          return x;
+        }
+        if (gap >= MIN_CHANGE - 1e-9 && s3 >= fb - 1e-9 && ok(P, o, s3)) { x.sugg = s3; x.why = o.china ? 'China, no sales – cut toward the floor, not below 105% on cost.' : 'We win but sold 0 in 30 days – lower a quarter of the way toward the floor (stops at floor + 5%).'; }
         else { x.why = o.china ? 'China, no sales – already at or within 10p of the 105% minimum.' : 'We win but sold 0 in 30 days – no cut suggested: the price is already close to the floor (within 10p of floor + 5%, or already at/under floor + 5%).'; }
         if (chk) x.inc = 'No'; return x;
       }
@@ -127,7 +132,7 @@
     if (c.inc === 'No') { x.inc = 'No'; x.incFrom = 'saved'; return x; }
     var block = '';
     if (x.o.dup) block = 'duplicate';
-    else if (x.cat === 'raise' && x.o.china) block = 'China raise';
+    else if (x.o.china && (x.cat === 'raise' || (x.sugg != null && x.o.price != null && x.sugg > x.o.price + 0.001))) block = 'China raise';
     else if (x.weeklyHold) block = 'weekly hold';
     else if (x.o.check && !S.checkPost && !x.o.postChecked) block = 'check postage';
     else if (x.sugg == null && x.o.your == null) block = 'no price';
@@ -456,7 +461,7 @@
         o = byS[sku];
         why = !o ? 'SKU not in the data' : seen[sku] ? 'twice' : !(p > 0) ? 'no price' : (o.check && !S.checkPost && !o.postChecked) ? 'check postage' : (S.blocks && S.blocks[sku]) ? S.blocks[sku] : !o.a ? 'no cost' : (o.china && ni === 0) ? 'China SKU on UK tab' : (!o.china && ni === 1) ? 'UK SKU on China tab' : !ok(P, o, P.rnd(p, 2)) ? 'under floor / loss / over cap' : '';
         /* China under-floor raises must never be imported even if someone pasted them */
-        if (!why && o && o.china && o.pc != null && o.floorPct != null && o.pc < o.floorPct - 1e-9 && P.rnd(p, 2) > P.rnd(o.price, 2) - 1e-9) why = 'China raise – review only';
+        if (!why && o && o.china && P.rnd(p, 2) > P.rnd(o.price, 2) + 1e-9) why = 'China raise – review only';
         seen[sku] = 1; if (why) bad.push(sku + ' (' + why + ')'); else out.push([sku, P.rnd(p, 2)]);
       }
     }

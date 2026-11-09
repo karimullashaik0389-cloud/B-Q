@@ -147,8 +147,8 @@
     var Fl = floorOf(china, sales, cost); o.floorPct = Fl.f; o.floorWhy = Fl.why; o.floor = floorPrice(a, Fl.f, china); o.ceil = china ? null : priceMax(a, UK_MAX);
     var bb1 = bb != null ? rnd(bb - 0.01, 2) : null, raw, step = false;
     /* China rules A and B (Karimulla 2 Nov 2026) run BEFORE 'already winning', so they apply winning or not.
-       A: under the 100% floor -> raise to the floor price (held for review unless opt.chinaRaise).
-       B: no sales in 30 days -> cut 10% (round down), never below 105% profit on cost (100% floor + 5 points). */
+       A: under the 100% floor -> raise to the floor price. Every China increase is review only and is never uploaded.
+       B: no sales in 30 days -> cut 10% (round down), never below 105% profit on cost. If the price now is already under that 105% price, the lift is review only and is not uploaded. */
     if (china && cur > 0 && C.pc < CHINA_FLOOR - 1e-9) {
       raw = o.floor; o.chinaUp = true; o.rule = 'A China under 100% floor – raise to floor';
       o.reason = 'China product at ' + Math.round(C.pc * 100) + '% – raise to 100% floor £' + o.floor.toFixed(2);
@@ -156,12 +156,13 @@
       var stop = priceFor(a, CHINA_FLOOR + 0.05);
       o.chinaMin = stop;
       if (rnd(cur, 2) <= rnd(stop, 2)) {
-        if (rnd(cur, 2) < rnd(stop, 2) - 0.001) { raw = stop; o.chinaCut = true; o.rule = 'B China 0 sales – lift to 105% on cost'; }
+        if (rnd(cur, 2) < rnd(stop, 2) - 0.001) { raw = stop; o.chinaUp = true; o.rule = 'B China 0 sales – 105% is above the price now, review only'; }
         else { raw = 'At 105% on cost – kept'; o.rule = 'B China 0 sales – already at 105% on cost'; }
       } else {
-        var cut = floor2(cur * (1 - CHINA_CUT)); o.chinaCut = true;
+        var cut = floor2(cur * (1 - CHINA_CUT));
         raw = cut < stop ? stop : cut;
-        o.rule = cut < stop ? 'B China 0 sales – cut 10%, stopped at 105% on cost' : 'B China 0 sales – cut 10%';
+        if (!(rnd(raw, 2) < rnd(cur, 2) - 0.001)) { raw = 'At 105% on cost – kept'; o.rule = 'B China 0 sales – already at 105% on cost'; }
+        else { o.chinaCut = true; o.rule = cut < stop ? 'B China 0 sales – cut 10%, stopped at 105% on cost' : 'B China 0 sales – cut 10%'; }
       }
       o.reason = 'China, no sales in 30 days – not below 105% on cost (£' + stop.toFixed(2) + ')';
     } else if (o.win) {
@@ -195,7 +196,7 @@
       var Rc = calc(a, raw);
       o.rawProfit = Rc.profit; o.rawPc = Rc.pc;
       if (Rc.profit <= 0) o.status = 'Loss – blocked';
-      else if (rnd(raw, 2) > rnd(cur, 2) && !(step && opt.raise100) && !(o.chinaUp && opt.chinaRaise) && !o.chinaCut) o.status = step ? 'Raise 10% – held for review' : 'Raise – held for review';
+      else if (rnd(raw, 2) > rnd(cur, 2) && !(step && opt.raise100 && !china)) o.status = step ? 'Raise 10% – held for review' : 'Raise – held for review';
       else if (isTrim(o, raw, cur, bb1) && !opt.pennyTrims) { o.trim = true; o.status = TRIM; }
       else { if (isTrim(o, raw, cur, bb1)) o.trim = true; o.status = raw; }
     } else o.status = raw;
@@ -208,7 +209,7 @@
       if (!(o.finalp > 0) || F.profit <= 0) { o.why = 'Loss – blocked'; if (your != null) o.status = 'Loss – blocked'; }
       else if (F.pc < SAFE_MIN - 1e-9) { o.why = 'Under 50% – blocked'; if (your != null) o.status = 'Under 50% – blocked'; }
       else if (china && F.pc < CHINA_FLOOR - 1e-9) { o.why = 'Under 100% China – blocked'; if (your != null) o.status = 'Under 100% China – blocked'; }
-      else if (china && C.pc < CHINA_FLOOR - 1e-9 && o.finalp >= cur - 0.001) { o.why = 'China raise – review only'; if (your != null) o.status = 'Raise – held for review'; }
+      else if (china && o.finalp > cur + 0.001) { o.why = 'China raise – review only'; if (your != null) o.status = 'Raise – held for review'; }
       else if (o.check && !opt.checkPost && !o.postChecked) o.why = 'Check postage first';
       else if (r.dup) o.why = 'Duplicate SKU';
       else { o.upload = true; o.why = your != null ? 'Your price' : 'Price change'; }

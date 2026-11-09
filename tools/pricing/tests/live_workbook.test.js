@@ -261,6 +261,38 @@ t('negative postage is invalid and 14998g still uses the normal band', () => {
   assert.ok(!prev.changes.some(c => c.sku === 'LOW' && c.post === 'set'));
 });
 
+t('a China price above the 100% floor is not raised onto the upload', () => {
+  const a = { cost: 4, mult: 2, post: 1.75, collab: 0 };
+  const floor = P.priceFor(a, 1), stop = P.priceFor(a, 1.05);
+  const mid = P.rnd((floor + stop) / 2, 2);
+  const chinaRows = [
+    { sku: 'MID', title: 'China mid', ean: '201', cost: 4, price: mid, bb: mid, seller: 'Diva Packages', sup: 'Ashian Homeware', w: 400, sales: 0, stock: 4 },
+    { sku: 'CUT', title: 'China high', ean: '202', cost: 4, price: 40, bb: 40, seller: 'Diva Packages', sup: 'Ashian Homeware', w: 400, sales: 0, stock: 4 },
+    { sku: 'LOWC', title: 'China under', ean: '203', cost: 4, price: 10, bb: 10, seller: 'Diva Packages', sup: 'Ashian Homeware', w: 400, sales: 2, stock: 4 }
+  ];
+  function built(extra) {
+    const d = P.decideAll(chinaRows, {});
+    const bb = P.buyBoxAll(d.rows, Object.fromEntries(d.rows.map(o => [o.ean, 1])), {}, P.BB_DEFAULT);
+    return B.build(X, P, Object.assign({ bbr: bb, settings: P.BB_DEFAULT }, extra));
+  }
+  const plain = built();
+  const midRec = plain.records.find(r => r.sku === 'MID');
+  assert.strictEqual(midRec.engCheck, 'CHINA RAISE');
+  assert.ok(midRec.engInc !== 'Yes');
+  const wb = recalc(plain.bytes);
+  const cn = finals(wb, '7b Final upload China');
+  assert.ok(!cn.some(r => r[0] === 'MID' || r[0] === 'LOWC'));
+  const cut = cn.find(r => r[0] === 'CUT');
+  assert.ok(cut); assert.ok(cut[1] < 40); assert.ok(cut[1] >= stop - 0.02);
+  const cell = wb.Sheets['7b Final upload China'];
+  const hit = Object.keys(cell).find(k => cell[k] && cell[k].v === 'CUT');
+  assert.ok(hit && cell[hit].f && cell[hit].v === 'CUT');
+  const over = built({ checks: { MID: { your: stop, inc: 'Yes' }, LOWC: { your: floor, inc: 'Yes' } } });
+  const wb2 = recalc(over.bytes);
+  assert.strictEqual(find(wb2, '6 Combined upload', 'MID')[22], 'CHINA RAISE');
+  assert.ok(!finals(wb2, '7b Final upload China').some(r => r[0] === 'MID' || r[0] === 'LOWC'));
+});
+
 t('weekly hold is tab 5 UK only: 6 days held, 7 days not held', () => {
   function one(changes) {
     const d = P.decideAll(rows, {});

@@ -36,7 +36,7 @@
   function judgeYour(P, rec, your, S) {
     var o = { sugg: rec.engSugg, post: rec.basePost, price: rec.basePrice, profitNow: rec.engProfit, floor: rec.engFloor, final: your, inc: rec.engInc };
     if (rec.weekly) { o.check = 'WEEKLY HOLD'; return o; }
-    if (rec.china && rec.act === 'Raise' && your >= (rec.basePrice || 0) - 0.001) { o.check = 'CHINA RAISE'; return o; }
+    if (rec.china && your > (rec.basePrice || 0) + 0.001) { o.check = 'CHINA RAISE'; return o; }
     if (rec.packCheck && !(S && S.checkPost)) { o.check = 'CHECK POSTAGE'; return o; }
     return finishMoney(P, rec, your, rec.basePost, rec.cat === 't5' && !rec.china ? rec.t5Min : rec.engFloor, rec.engCap, o);
   }
@@ -44,7 +44,8 @@
     var o = x.o, post = o.post, price = o.price;
     var out = { sugg: x.sugg, post: post, price: price, profitNow: o.profit, floor: o.floor, final: your != null ? your : x.sugg };
     if (x.weeklyHold) { out.check = 'WEEKLY HOLD'; out.final = null; out.sugg = null; return out; }
-    if (x.cat === 'raise' && o.china && (your == null || your >= price - 0.001)) { out.check = 'CHINA RAISE'; return out; }
+    var proposed = your != null ? your : x.sugg;
+    if (o.china && proposed != null && proposed > price + 0.001) { out.check = 'CHINA RAISE'; out.final = proposed; return out; }
     if (o.check && !o.postChecked) { out.check = 'CHECK POSTAGE'; return out; }
     var final = your != null ? your : x.sugg;
     var floorRef = x.cat === 't5' && !o.china && x.t5Min != null ? x.t5Min : o.floor;
@@ -57,7 +58,7 @@
     if (!(final > 0)) { out.check = 'NO PRICE'; return out; }
     var c = P.calc({ cost: rec.cost, mult: rec.mult, post: post, collab: rec.collab || 0 }, final);
     out.newProfit = c.profit; out.newPc = c.pc;
-    var chk = floorRef != null && final < floorRef - 1e-5 ? 'UNDER FLOOR' : !(c.profit > 0) ? 'LOSS' : (cap != null && final > cap + 1e-5) ? 'OVER CAP' : (c.pc < 0.5 - 1e-9) ? 'UNDER FLOOR' : (rec.china && c.pc < 1 - 1e-9) ? 'UNDER FLOOR' : (rec.basePrice != null && rnd2(final) === rnd2(rec.basePrice)) ? 'NO CHANGE' : 'OK';
+    var chk = floorRef != null && final < floorRef - 1e-5 ? 'UNDER FLOOR' : !(c.profit > 0) ? 'LOSS' : (cap != null && final > cap + 1e-5) ? 'OVER CAP' : (c.pc < 0.5 - 1e-9) ? 'UNDER FLOOR' : (rec.china && c.pc < 1 - 1e-9) ? 'UNDER FLOOR' : (rec.china && rec.basePrice != null && final > rec.basePrice + 0.001) ? 'CHINA RAISE' : (rec.basePrice != null && rnd2(final) === rnd2(rec.basePrice)) ? 'NO CHANGE' : 'OK';
     out.check = chk; return out;
   }
 
@@ -187,8 +188,10 @@
       var reNew = 'IF(OR(' + C(showFinal, r) + '="",' + C(fixed, r) + '=""),"",' + prof(C(showFinal, r)) + ')';
       setF(showNewP, 'IF(AND(' + C(postStat, r) + '="BASE",' + C(priceStat, r) + '="BASE",' + C(yourStat, r) + '="BASE"),IF(' + C(engNewI, r) + '="","",' + C(engNewI, r) + '),' + reNew + ')', M);
       var floorRef = 'IF(AND(' + C(act, r) + '="Can\'t win",' + C(chinaI, r) + '<>1,' + C(t5MinP, r) + '<>""),' + C(t5MinP, r) + ',' + C(floorP, r) + ')';
-      var reChk = 'IF(' + C(weekly, r) + '=1,"WEEKLY HOLD",IF(AND(' + C(act, r) + '="Raise",' + C(chinaI, r) + '=1,OR(' + C(yourStat, r) + '<>"OK",' + C(yourU, r) + '>=' + C(priceU, r) + '-0.001)),"CHINA RAISE",IF(AND(' + C(packI, r) + '=1,' + SB.checkPost + '=0,' + C(postStat, r) + '="BASE"),"CHECK POSTAGE",IF(OR(' + C(showFinal, r) + '="",NOT(ISNUMBER(' + C(showFinal, r) + '))),"NO CHANGE",IF(' + C(showFinal, r) + '<=0,"NO PRICE",IF(' + prof(C(showFinal, r)) + '<=0,"LOSS",IF(AND(' + floorRef + '<>"",' + C(showFinal, r) + '<' + floorRef + '-0.00001),"UNDER FLOOR",IF(IF(' + C(capP, r) + '="",FALSE,' + C(showFinal, r) + '>' + C(capP, r) + '+0.00001),"OVER CAP",IF(' + pcOf(C(showFinal, r)) + '<' + SB.safeMin + '-0.000000001,"UNDER FLOOR",IF(AND(' + C(chinaI, r) + '=1,' + pcOf(C(showFinal, r)) + '<1-0.000000001),"UNDER FLOOR",IF(AND(' + C(priceU, r) + '<>"",ROUND(' + C(showFinal, r) + ',2)=ROUND(' + C(priceU, r) + ',2)),"NO CHANGE","OK")))))))))))';
-      var yourChk = 'IF(' + C(weeklyEngI, r) + '=1,"WEEKLY HOLD",IF(AND(' + C(chinaI, r) + '=1,' + C(engActI, r) + '="Raise",' + C(yourU, r) + '>=' + C(basePriceI, r) + '-0.001),"CHINA RAISE",IF(AND(' + C(packI, r) + '=1,' + SB.checkPost + '=0),"CHECK POSTAGE",IF(' + C(yourU, r) + '<=0,"NO PRICE",IF(' + prof(C(yourU, r)) + '<=0,"LOSS",IF(AND(IF(' + C(t5MinI, r) + '<>"",' + C(t5MinI, r) + ',' + C(engFloorI, r) + ')<>"",' + C(yourU, r) + '<IF(' + C(t5MinI, r) + '<>"",' + C(t5MinI, r) + ',' + C(engFloorI, r) + ')-0.00001),"UNDER FLOOR",IF(IF(' + C(engCapI, r) + '="",FALSE,' + C(yourU, r) + '>' + C(engCapI, r) + '+0.00001),"OVER CAP",IF((' + C(yourU, r) + '*(1-' + SB.fee + ')-(' + C(costI, r) + '*' + C(multI, r) + '+' + C(basePostI, r) + '+' + C(colI, r) + '))/' + C(costI, r) + '<' + SB.safeMin + ',"UNDER FLOOR",IF(AND(' + C(chinaI, r) + '=1,(' + C(yourU, r) + '*(1-' + SB.fee + ')-(' + C(costI, r) + '*' + C(multI, r) + '+' + C(basePostI, r) + '+' + C(colI, r) + '))/' + C(costI, r) + '<1),"UNDER FLOOR",IF(ROUND(' + C(yourU, r) + ',2)=ROUND(' + C(basePriceI, r) + ',2),"NO CHANGE","OK"))))))))))';
+      var chinaUpNow = 'IF(OR(' + C(chinaI, r) + '<>1,' + C(showFinal, r) + '="",' + C(priceU, r) + '="",NOT(ISNUMBER(' + C(showFinal, r) + ')),NOT(ISNUMBER(' + C(priceU, r) + '))),FALSE,' + C(showFinal, r) + '>' + C(priceU, r) + '+0.001)';
+      var reChk = 'IF(' + C(weekly, r) + '=1,"WEEKLY HOLD",IF(' + chinaUpNow + ',"CHINA RAISE",IF(AND(' + C(packI, r) + '=1,' + SB.checkPost + '=0,' + C(postStat, r) + '="BASE"),"CHECK POSTAGE",IF(OR(' + C(showFinal, r) + '="",NOT(ISNUMBER(' + C(showFinal, r) + '))),"NO CHANGE",IF(' + C(showFinal, r) + '<=0,"NO PRICE",IF(' + prof(C(showFinal, r)) + '<=0,"LOSS",IF(AND(' + floorRef + '<>"",' + C(showFinal, r) + '<' + floorRef + '-0.00001),"UNDER FLOOR",IF(IF(' + C(capP, r) + '="",FALSE,' + C(showFinal, r) + '>' + C(capP, r) + '+0.00001),"OVER CAP",IF(' + pcOf(C(showFinal, r)) + '<' + SB.safeMin + '-0.000000001,"UNDER FLOOR",IF(AND(' + C(chinaI, r) + '=1,' + pcOf(C(showFinal, r)) + '<1-0.000000001),"UNDER FLOOR",IF(AND(' + C(priceU, r) + '<>"",ROUND(' + C(showFinal, r) + ',2)=ROUND(' + C(priceU, r) + ',2)),"NO CHANGE","OK")))))))))))';
+      var chinaUpYour = 'IF(OR(' + C(chinaI, r) + '<>1,' + C(yourU, r) + '="",' + C(basePriceI, r) + '="",NOT(ISNUMBER(' + C(yourU, r) + ')),NOT(ISNUMBER(' + C(basePriceI, r) + '))),FALSE,' + C(yourU, r) + '>' + C(basePriceI, r) + '+0.001)';
+      var yourChk = 'IF(' + C(weeklyEngI, r) + '=1,"WEEKLY HOLD",IF(' + chinaUpYour + ',"CHINA RAISE",IF(AND(' + C(packI, r) + '=1,' + SB.checkPost + '=0),"CHECK POSTAGE",IF(' + C(yourU, r) + '<=0,"NO PRICE",IF(' + prof(C(yourU, r)) + '<=0,"LOSS",IF(AND(IF(' + C(t5MinI, r) + '<>"",' + C(t5MinI, r) + ',' + C(engFloorI, r) + ')<>"",' + C(yourU, r) + '<IF(' + C(t5MinI, r) + '<>"",' + C(t5MinI, r) + ',' + C(engFloorI, r) + ')-0.00001),"UNDER FLOOR",IF(IF(' + C(engCapI, r) + '="",FALSE,' + C(yourU, r) + '>' + C(engCapI, r) + '+0.00001),"OVER CAP",IF((' + C(yourU, r) + '*(1-' + SB.fee + ')-(' + C(costI, r) + '*' + C(multI, r) + '+' + C(basePostI, r) + '+' + C(colI, r) + '))/' + C(costI, r) + '<' + SB.safeMin + ',"UNDER FLOOR",IF(AND(' + C(chinaI, r) + '=1,(' + C(yourU, r) + '*(1-' + SB.fee + ')-(' + C(costI, r) + '*' + C(multI, r) + '+' + C(basePostI, r) + '+' + C(colI, r) + '))/' + C(costI, r) + '<1),"UNDER FLOOR",IF(ROUND(' + C(yourU, r) + ',2)=ROUND(' + C(basePriceI, r) + ',2),"NO CHANGE","OK"))))))))))';
       setF(showCheck, 'IF(OR(' + C(postStat, r) + '="CONFLICT",' + C(priceStat, r) + '="CONFLICT",' + C(yourStat, r) + '="CONFLICT",' + C(incStat, r) + '="CONFLICT"),"CONFLICT",IF(OR(' + C(postStat, r) + '="INVALID",' + C(priceStat, r) + '="INVALID",' + C(yourStat, r) + '="INVALID",' + C(incStat, r) + '="INVALID"),"INVALID",IF(AND(' + C(postStat, r) + '="BASE",' + C(priceStat, r) + '="BASE",' + C(yourStat, r) + '="BASE"),' + C(engCheckI, r) + ',IF(AND(' + C(postStat, r) + '="BASE",' + C(priceStat, r) + '="BASE"),' + yourChk + ',' + reChk + '))))');
       setF(showInc, 'IF(OR(' + C(showCheck, r) + '="CONFLICT",' + C(showCheck, r) + '="INVALID"),"No",IF(' + C(incStat, r) + '="OK",IF(' + C(incVal, r) + '="No","No",IF(' + C(showCheck, r) + '="OK","Yes","No")),IF(AND(' + C(postStat, r) + '="BASE",' + C(priceStat, r) + '="BASE",' + C(yourStat, r) + '="BASE"),' + C(engIncI, r) + ',IF(' + C(showCheck, r) + '="OK","Yes","No"))))');
       setF(showWhy, 'IF(AND(' + C(postStat, r) + '="BASE",' + C(priceStat, r) + '="BASE",' + C(yourStat, r) + '="BASE",' + C(incStat, r) + '="BASE"),' + C(engReasonI, r) + ',IF(' + C(showCheck, r) + '="CONFLICT","Two tabs have different review numbers for this SKU. Clear one so only one value remains.",IF(' + C(showCheck, r) + '="INVALID","A review cell is not a valid number. Postage may be 0. Prices must be above 0.",IF(' + C(showCheck, r) + '="CHECK POSTAGE","Heavy pack: type the checked postage in Postage review (0 is allowed). Include Yes alone does not clear it.",IF(' + C(showCheck, r) + '="CHINA RAISE","China raise is review only and is not on the upload.",IF(' + C(showCheck, r) + '="WEEKLY HOLD","Margin too low (UK) was already changed in the last 7 days.",IF(' + C(showCheck, r) + '="OK",IF(' + C(yourStat, r) + '="OK","Your price (final override)","Suggestion recalculated from the review"),' + C(showCheck, r) + ')))))))');
@@ -385,8 +388,9 @@
     return null;
   }
   function readCell(cell) {
-    if (!cell || cell.v == null || cell.v === '') return { blank: true };
+    if (!cell) return { blank: true };
     if (cell.f) return { formula: true };
+    if (cell.v == null || cell.v === '') return { blank: true };
     return { v: cell.v };
   }
   function readMoney(cell, allow0) {

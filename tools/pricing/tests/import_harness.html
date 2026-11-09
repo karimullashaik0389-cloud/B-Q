@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Synthetic import check</title>
+<style>
+body{font-family:Calibri,sans-serif;margin:16px;color:#0F172A}
+.hide{display:none}
+.btn{font-size:15px;padding:8px 12px;border-radius:8px;border:1px solid #CBD5E1;background:#fff}
+.btn.o{background:#FF6600;color:#fff;border-color:#FF6600}
+.note,.mut{color:#475569}
+.bad{color:#991B1B}
+.ok{color:#166534}
+.box{border:1px solid #E2E8F0;border-radius:12px;padding:12px;margin:8px 0}
+table{border-collapse:collapse}
+td,th{border-bottom:1px solid #E2E8F0;padding:4px 8px;text-align:left}
+</style>
+</head>
+<body>
+<h1>Synthetic import check</h1>
+<p class="note">This page loads the branch pricing scripts. It does not unlock the dashboard and it has no live catalogue.</p>
+<div id="tbody"></div>
+<script src="../../../lib/xlsx.full.min.js"></script>
+<script src="../bq_price.js"></script>
+<script src="../bq_live.js"></script>
+<script src="../bq_book.js"></script>
+<script>
+function $(id){return document.getElementById(id)}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function money(n){return n==null?'':('£'+Number(n).toFixed(2))}
+var KIT={
+  $:$, esc:esc, money:money,
+  why:function(e){return (e&&e.message)||String(e)},
+  xlsx:function(){return Promise.resolve(window.XLSX)},
+  getJSON:function(){return Promise.reject(new Error('notyet'))},
+  uk:function(s){return s||''}
+};
+window.BQTabs={kit:KIT, tabs:{}, add:function(id,def){this.tabs[id]=def}, open:function(id){return this.tabs[id].render($('tbody'), KIT)}};
+</script>
+<script src="../site/tabs_pricing.js"></script>
+<script>
+BQTabs.open('pricing').then(function(){
+  document.body.setAttribute('data-ready','1');
+}).catch(function(e){
+  document.body.setAttribute('data-ready','err');
+  document.body.setAttribute('data-err', (e&&e.message)||String(e));
+});
+</script>
+</body>
+</html>

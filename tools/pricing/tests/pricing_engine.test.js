@@ -38,8 +38,22 @@ t('China under the 100% floor is a raise and is not uploaded', () => { const o =
 t('China no-sales cut does not go below 105% on cost', () => {
   const o = D({ sup: 'Ashian Homeware', sales: 0, bb: 40, seller: 'Diva Packages', price: 40, cost: 4, w: 400 });
   const stop = B.priceFor(o.a, 1.05);
-  assert.ok(o.newp == null || o.newp >= stop - 0.001);
-  if (o.newp != null) assert.ok(o.fpc >= 1.05 - 0.02);
+  assert.ok(o.upload); assert.ok(o.newp < 40); assert.ok(o.newp >= stop - 0.001);
+  assert.ok(o.fpc >= 1.05 - 0.02);
+});
+t('China already above 100% is not raised to 105% in the upload', () => {
+  const a = { cost: 4, mult: 2, post: 1.75, collab: 0 };
+  const floor = B.priceFor(a, 1), stop = B.priceFor(a, 1.05);
+  const price = B.rnd((floor + stop) / 2, 2);
+  assert.ok(price > floor + 0.001 && price < stop - 0.001);
+  const row = { sup: 'Ashian Homeware', sales: 0, bb: price, seller: 'Diva Packages', price: price, cost: 4, w: 400 };
+  const o = D(row);
+  assert.ok(o.pc >= 1 - 1e-6); assert.ok(o.pc < 1.05);
+  assert.ok(!o.upload); assert.ok(!(o.finalp > price + 0.001));
+  const forced = D(Object.assign({}, row, { your: stop }));
+  assert.ok(!forced.upload); assert.ok(/raise|review/i.test(forced.why + forced.status));
+  const cut = D(Object.assign({}, row, { your: floor }));
+  assert.ok(cut.finalp < price); assert.ok(cut.upload || /block|floor|loss/i.test(cut.why));
 });
 t('ending in 9 is only for a price increase', () => {
   assert.strictEqual(B.end9(8.04, 12, 6, 9, 10), 8.04);
