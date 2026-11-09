@@ -605,7 +605,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
     if (!(bb > 0)) bb = null;
     var o = { sku: r.sku, title: r.title || '', ean: r.ean || '', cost: cost, price: price == null ? 0 : price, priceBlank: price == null, bb: bb, seller: bb == null && !seller ? 'No competitor' : seller, sales: sales,
       china: china, mult: mult, post: post, postSrc: PI.src, postKind: PI.kind, collab: num(r.collab) || 0, url: r.url || '', check: checkPost(r.title, r.w), your: your,
-      srcPrice: r.srcPrice || '', srcBB: r.srcBB || '', srcSales: r.srcSales || 'Access B n Q 30Days', salesAccess: r.salesAccess == null ? null : num(r.salesAccess), sup: r.sup || '', w: num(r.w), variant: r.variant || '', stock: num(r.stock),
+      srcPrice: r.srcPrice || '', srcBB: r.srcBB || '', srcSales: r.srcSales || 'Access B n Q 30Days', salesAccess: r.salesAccess == null ? null : num(r.salesAccess), sup: r.sup || '', w: num(r.w), variant: r.variant || '', stock: num(r.stock), liveSeen: r.liveSeen == null ? null : num(r.liveSeen), offerFlag: r.offerFlag || '', accessPrice: r.accessPrice == null ? null : num(r.accessPrice),
       ix: r.ix, win: /diva package/i.test(seller), status: '', rule: '', newp: null, finalp: null, upload: false, why: '' };
     var cur = o.price;
     if (!(cost > 0) || post == null) {
@@ -711,11 +711,23 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
         sup: g('sup') == null ? '' : String(g('sup')), w: g('w'), pc: g('pc'), sales: g('sales'), url: g('url') == null ? '' : String(g('url')), collab: g('collab'), variant: g('variant') == null ? '' : String(g('variant')), stock: g('stock'),
         srcPrice: 'Access', srcBB: 'Access', ix: j };
       if (ov.sales30) { r.salesAccess = r.sales; r.sales = ov.sales30[r.sku] || 0; r.srcSales = ov.salesLabel || 'B&Q orders'; if (r.sales > 0) nsold++; }
-      if (imp[r.sku] != null) { r.price = imp[r.sku]; r.srcPrice = ov.importedLabel || 'Imported'; nimp++; }
+      /* 4 Nov: active offers export (REQUIRED in the pricing run) = the live price. Price now = live offer price (discount price when active today).
+         Not in active offers, or Access price differs from the live offer by more than 1p -> flagged, never uploaded. */
+      if (ov.offers) {
+        var of = ov.offers[r.sku], ap = num(r.price);
+        if (!of) r.offerFlag = 'not in the active offers export (' + (ov.offersLabel || 'offers') + ')';
+        else {
+          var lp = num(of[0]), dp = num(of[1]), td = ov.today || '', dOn = dp != null && dp > 0 && (!of[2] || String(of[2]).slice(0, 10) <= td) && (!of[3] || String(of[3]).slice(0, 10) >= td);
+          if (!(Math.abs((lp || 0) - (ap || 0)) <= 0.0100001)) r.offerFlag = 'Access price £' + (ap == null ? '–' : rnd(ap, 2).toFixed(2)) + ' but live offer £' + (lp == null ? '–' : rnd(lp, 2).toFixed(2));
+          r.accessPrice = ap; r.price = dOn ? dp : lp; r.srcPrice = (ov.offersLabel || 'Active offers') + (dOn ? ' (discount price)' : '');
+        }
+      }
+      if (!ov.offers && imp[r.sku] != null) { r.price = imp[r.sku]; r.srcPrice = ov.importedLabel || 'Imported'; nimp++; }
       var b = bbm[r.ean];
       if (b && (b.seller || num(b.price) != null)) {
         r.bb = num(b.price); r.seller = b.seller || ''; r.srcBB = ov.bbLabel || 'Buy box run'; nbb++;
-        if (/diva package/i.test(b.seller || '') && num(b.price) > 0) { r.price = num(b.price); r.srcPrice = (ov.bbLabel || 'Buy box run') + ' (our live price)'; nlive++; }
+        /* 4 Nov: Price now is ALWAYS the Access B&Q_INV.price. If the buy box run saw our own offer at a different price (> 1p), flag it – never use it */
+        if (/diva package/i.test(b.seller || '') && num(b.price) > 0 && !(Math.abs(num(b.price) - (num(r.price) || 0)) <= 0.0100001)) { r.liveSeen = num(b.price); nlive++; }
       }
       rows.push(r);
     }
@@ -760,28 +772,40 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
   var XMAS_RE = /\b(christmas|xmas|advent|bauble|baubles|tinsel|nativity|santa|reindeer|snowman|snowflake|festive|stocking)\b/i;
   function isSeasonal(title, sku) { return XMAS_RE.test(String(title || '')) || /^XMA-/i.test(String(sku || '')); }
   function bbStep(bb, s) { var a = num(s.step) || 0, p = num(s.stepPct) || 0; return Math.max(0.01, rnd(Math.max(a, bb * p / 100), 2)); }
+  /* 4 Nov: every changed price ends in 9p – rises round UP to …9, cuts round DOWN to …9; must stay under lim (buy box / rival), at or under cap, at or above floor, else keep the unrounded price */
+  /* the cap allows only the ending-9 overshoot: cap rounded up to the next …9 (4 Nov user rule) */
+  function up9(x) { var c = Math.round(r6(x) * 100); return (c + ((9 - c % 10) + 10) % 10) / 100; }
+  function end9(p, cur, fl, lim, cap) {
+    var c = Math.round(r6(p) * 100), q = p > cur ? c + ((9 - c % 10) + 10) % 10 : c - ((c % 10 - 9 + 10) % 10), v = q / 100;
+    if (q === c) return p;
+    if (p > cur) return v > 0 ? v : p; /* 4 Nov user rule: rises ALWAYS round up to the next …9, even a few pence over the cap or limit */
+    if (v < fl - 1e-9 || (lim != null && v > rnd(lim, 2) - 0.005) || (cap != null && v > cap + 1e-9) || !(v > 0)) return p;
+    return v;
+  }
   function buyBox(o, x, s) {
     s = Object.assign({}, BB_DEFAULT, s || {}); x = x || {};
     var r = { act: 'Keep', sugg: null, profit: null, pc: null, gain: null, why: '', need: null }, g = function (v) { return '£' + rnd(v, 2).toFixed(2); };
     var pc = function (v) { return Math.round(v * 100) + '%'; };
     if (o.dup) { r.why = 'Duplicate SKU row – only the first row is priced'; return r; }
+    if (o.offerFlag) { r.act = 'Price check'; r.why = 'Price check: ' + o.offerFlag + ' – not in the upload'; return r; }
     if (!o.a) { r.act = 'No data'; r.why = 'No cost or postage in Access – fix the data first'; return r; }
     var a = o.a, cur = rnd(o.price, 2), fl = o.floor, cap = o.china ? null : o.ceil;
     if (!(cur > 0)) { r.act = 'No data'; r.why = 'No current price on the listing'; return r; }
     if (!x.fresh && !s.useStale) { r.act = 'No data'; r.why = "Today's buy box check failed for this product – not using older data"; return r; }
+    if (o.liveSeen != null) { r.act = 'Price check'; r.why = 'Price check: buy box run saw £' + rnd(o.liveSeen, 2).toFixed(2) + ' but Access price is ' + g(cur) + ' – not in the upload'; return r; }
     var seller = String(o.seller || '').trim(), bb = o.bb;
     if (!o.win && !(bb > 0)) { r.act = 'No data'; r.why = 'No buy box price found'; return r; }
     if (s.noStockKeep && o.stock != null && o.stock <= 0) { r.why = 'No free stock – change the price when stock is back'; return r; }
     if (s.keepTrees && isXmasTree(o.title, o.sku)) { r.why = 'Christmas tree – price kept as it is (your decision 3 Nov)'; return r; }
-    var C0 = calc(a, cur), set = function (act, p, why) { var C = calc(a, p); r.act = act; r.sugg = rnd(p, 2); r.profit = C.profit; r.pc = C.pc; r.gain = rnd(C.pr - C0.pr, 2); r.why = why; };
+    var C0 = calc(a, cur), set = function (act, p, why, lim) { p = end9(p, cur, fl, lim, cap); var C = calc(a, p); r.act = act; r.sugg = rnd(p, 2); r.profit = C.profit; r.pc = C.pc; r.gain = rnd(C.pr - C0.pr, 2); r.why = why; };
     if (!o.win) {
       if (cur < rnd(bb, 2)) { r.why = 'We are already cheaper (' + g(cur) + ') than ' + seller + ' (' + g(bb) + ') – B&Q picked them for another reason'; return r; }
       var need = rnd(bb - bbStep(bb, s), 2), t = need, capped = false; r.need = need;
       if (cap != null && t > cap) { t = cap; capped = true; }
       if (t < fl) { r.act = "Can't win (floor)"; r.why = 'To win we need ' + g(need) + ' (under ' + seller + ' ' + g(bb) + '), but our floor is ' + g(fl) + ' (' + pc(o.floorPct) + ' on cost)'; return r; }
-      set('Lower to win', t, capped ? 'Under ' + seller + ' ' + g(bb) + ' at our 80% cap ' + g(t) : (need === rnd(bb - 0.01, 2) ? '1p' : g(bb - need)) + ' under ' + seller + ' ' + g(bb) + '; floor ' + g(fl));
+      set('Lower to win', t, capped ? 'Under ' + seller + ' ' + g(bb) + ' at our 80% cap ' + g(t) : (need === rnd(bb - 0.01, 2) ? '1p' : g(bb - need)) + ' under ' + seller + ' ' + g(bb) + '; floor ' + g(fl), bb);
     } else {
-      if (C0.pc < o.floorPct - 1e-9) { set('Raise', fl, 'We win, but ' + pc(C0.pc) + ' is under our ' + pc(o.floorPct) + ' floor – raise to the floor'); }
+      if (C0.pc < o.floorPct - 1e-9) { set('Raise', fl, 'We win, but ' + pc(C0.pc) + ' is under our ' + pc(o.floorPct) + ' floor – raise to the floor', x.rival && x.rival.p > cur ? x.rival.p : null); }
       else if (cap != null && cur >= cap) { r.why = 'We win at or above the 80% cap (' + g(cap) + ') – keep'; return r; }
       else if (!(o.sales >= 1) && !s.raiseNoSales) { r.why = 'We win but sold 0 in 30 days – a higher price will not help'; return r; }
       else {
@@ -794,12 +818,12 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
         if (!(t2 > cur)) { r.why = 'We win – no room to raise'; return r; }
         var gain = rnd(calc(a, t2).pr - C0.pr, 2);
         if (gain < (num(s.minGain) || 0) - 1e-9) { r.why = 'We win – a raise would add only ' + g(gain) + ' profit (under the ' + g(s.minGain) + ' minimum)'; return r; }
-        set('Raise', t2, why);
+        set('Raise', t2, why, rv && rv.p > cur ? rv.p : null);
       }
     }
     /* absolute safety: never under the floor, never over the cap, never a loss, never under 50% (China 100%) */
     if (r.sugg != null) {
-      var bad = !(r.sugg > 0) || !(r.profit > 0) || r.sugg < fl - 1e-9 || (cap != null && r.sugg > cap + 1e-9) || r.pc < SAFE_MIN - 1e-9 || (o.china && r.pc < CHINA_FLOOR - 1e-9);
+      var bad = !(r.sugg > 0) || !(r.profit > 0) || r.sugg < fl - 1e-9 || (cap != null && r.sugg > up9(cap) + 1e-9) || r.pc < SAFE_MIN - 1e-9 || (o.china && r.pc < CHINA_FLOOR - 1e-9);
       if (bad) { r.act = 'Keep'; r.why = 'Safety check stopped ' + g(r.sugg) + ' – kept'; r.sugg = null; r.profit = null; r.pc = null; r.gain = null; }
       else if (r.sugg === cur) { r.act = 'Keep'; r.why = 'Already at the suggested price'; r.sugg = null; r.profit = null; r.pc = null; r.gain = null; }
     }
@@ -811,7 +835,9 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
   function bbFromScrape(sc, accessDate) {
     var out = { map: {}, fresh: {}, n: 0, failed: 0, label: '', stale: false };
     if (!sc || !sc.rows) return out;
-    if (accessDate && String(sc.date) < String(accessDate)) { out.stale = true; return out; }
+    /* a buy box check up to 1 day older than the Access file still counts (same rule as reload_access.sh) */
+    var d1 = accessDate ? new Date(Date.parse(String(accessDate).slice(0, 10) + 'T00:00:00Z') - 864e5).toISOString().slice(0, 10) : '';
+    if (accessDate && String(sc.date) < d1) { out.stale = true; return out; }
     var rows = [];
     sc.rows.forEach(function (r) { var e = eanOf(r.ean); if (!e) return; if (r.ok) { out.fresh[e] = 1; rows.push({ ean: e, seller: r.seller, price: r.price, fetched: sc.date + 'T12:00:00' }); } else out.failed++; });
     var M = bbMap(rows, accessDate && accessDate < sc.date ? accessDate : null); out.map = M.map; out.n = M.n;
@@ -823,8 +849,9 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
   }
   return { FEE: FEE, sales30: sales30, bbMap: bbMap, ukTime: ukTime, fromAccess: fromAccess, eanOf: eanOf, HDR: HDR, ASHIAN: ASHIAN, OTHER: OTHER, UK_MAX: UK_MAX, SAFE_MIN: SAFE_MIN, CHINA_FLOOR: CHINA_FLOOR, CHINA_CUT: CHINA_CUT, RAISE_AT: RAISE_AT, BANDS: BANDS, OVER: OVER,
     num: num, rnd: rnd, ceil2: ceil2, band: band, postage: postage, postageSrc: postageSrc, postInfo: postInfo, specialRule: specialRule, heavyCode: heavyCode, SPECIAL: SPECIAL, HEAVY: HEAVY, isChina: isChina, multOf: multOf, fixedCost: fixedCost,
-    TRIM: TRIM, calc: calc, priceFor: priceFor, priceMax: priceMax, floorPrice: floorPrice, floor2: floor2, floorOf: floorOf, packN: packN, checkPost: checkPost, decide: decide, decideAll: decideAll, buyBox: buyBox, buyBoxAll: buyBoxAll, bbFromScrape: bbFromScrape, BB_DEFAULT: BB_DEFAULT, isSeasonal: isSeasonal, isXmasTree: isXmasTree, bbStep: bbStep, VERSION: 'bq_price v5 2026-11-04 buy box' };
+    TRIM: TRIM, end9: end9, calc: calc, priceFor: priceFor, priceMax: priceMax, floorPrice: floorPrice, floor2: floor2, floorOf: floorOf, packN: packN, checkPost: checkPost, decide: decide, decideAll: decideAll, buyBox: buyBox, buyBoxAll: buyBoxAll, bbFromScrape: bbFromScrape, BB_DEFAULT: BB_DEFAULT, isSeasonal: isSeasonal, isXmasTree: isXmasTree, bbStep: bbStep, VERSION: 'bq_price v5 2026-11-04 buy box' };
 });
+
 </script>
 <script>
 /* bq_check.js – "Price changes check" layer on top of bq_price.js (Diva Packages, B&Q).
@@ -962,11 +989,13 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
    All maths comes from bq_price.js (window.BQP / require). No data, keys or passwords in this file. Nothing is sent anywhere. */
 (function (root, f) { var m = f(); if (typeof module === 'object' && module.exports) module.exports = m; else root.BQBook = m; })(this, function () {
   'use strict';
-  var VERSION = 'bq_book 2026-11-04 8 tabs lean';
+  var VERSION = 'bq_book 2026-11-04 uniform';
   var MIN_CHANGE = 0.10;      /* a suggested change must move the price by at least 10p (same 10p minimum as the buy box view) */
   var T3_BUF = 0.05;          /* tab 3: never below the floor + 5% of the floor price (rounded UP to the penny) */
   var T5_CUT = 0.05;          /* tab 5: 5% off the price now, but never below the floor */
   var NAMES = ['1 All', '2 Winning in range', '3 Winning 0 sales', '4 Can win buy box', '5 Margin too low', '6 Combined upload', '7 Final upload', '8 Sells elsewhere not B&Q'];
+  var START = 'Start here';
+  var KEY = [['neg', 'Loss'], ['under', 'Under floor'], ['amber', 'Near floor'], ['green', 'Fine'], ['blue', 'Over cap']];
   var T8_MIN_OTHER = 5;       /* tab 8: other-platform 30-day sales at least this many */
   var T8_MAX_SHARE = 0.10;    /* tab 8: ...and B&Q sold 0, or B&Q share of all 30-day sales under this */
   var ALL_COL = 'Total 30Days Sales';   /* Access column with 30-day sales on all platforms (OrderWise) */
@@ -984,6 +1013,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
     var chk = !!o.check && !S.checkPost;
     if (o.dup) { x.label = 'Duplicate SKU row – not priced'; return x; }
     if (r.act === 'No data') { x.label = 'No data'; return x; }
+    if (r.act === 'Price check') { x.label = 'Price check – not in the upload'; x.why = r.why; return x; }
     var cur = P.rnd(o.price, 2), fl = o.floor, cap = o.china ? null : o.ceil;
     if (r.act === 'Raise') {
       x.cat = 'raise'; x.sugg = r.sugg; x.label = o.china ? 'Raise – China (held unless you switch it on)' : 'Raise (already winning)';
@@ -1131,74 +1161,82 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
     });
     for (var j = 1; j < aoa.length; j++) { var rw = aoa[j] || []; if (seenIx[j] || rw.every(function (v) { return v == null || v === ''; })) continue;
       rows1.push(hd.map(function (h, k) { return cellOf(h, rw[k]); }).concat([null, null, null, null, null, c('No SKU – skipped')])); }
-    var t2 = lean(['sku', 'prod', 'uk', 'cost', 'post', 'stock', 'sales', 'price', 'pnow', 'pcnow', 'bb', 'seller', 'floor', 'why'], byTab[2]);
+    var t2 = lean(ALLK, byTab[2]);
     var t3 = lean(ALLK, byTab[3]);
-    var t4 = lean(ALLK, byTab[4], { sugg: ['New price (1p under)', M, 11] });
+    var t4 = lean(ALLK, byTab[4]);
     var t5 = lean(ALLK, byTab[5]);
     /* ---- 6 Combined upload: lean set + Your price / Final / Check / Include, helpers hidden at the right ---- */
     [['t4', byTab[4]], ['t3', byTab[3]], ['t5', byTab[5]], ['raise', X.filter(function (x) { return x.cat === 'raise'; })]].forEach(function (g) { g[1].forEach(function (x) { if (x.sugg != null) comb.push(x); }); });
     var F = P.FEE, base6 = ALLK.slice(0, 14), H0 = 2;   /* row 1 note, row 2 header, data from row 3 */
-    var h6 = base6.map(function (k) { return L[k][0]; }).concat([['Your price', YOURF, 10], ['Final price', M, 10], ['Final profit £', M, 10], ['Final profit %', PC, 9], ['Check', null, 14], ['Include? (Yes/No)', YESF, 9], ['Reason', null, 44],
+    var h6 = base6.map(function (k) { return L[k][0]; }).concat([['Your price', YOURF, 10], L.np[0], L.npc[0], L.why[0], ['Include? (Yes/No)', YESF, 9], ['Final price', M, 10, 'hide'], ['Check', null, 14, 'hide'],
       ['Upload # (helper)', IN, 8, 'hide'], ['Fixed costs (helper)', M, 8, 'hide'], ['Cap price (helper)', M, 8, 'hide'], ['Floor % (helper)', PC, 8, 'hide'], ['Check postage (helper)', null, 8, 'hide']]);
     var okN = 0, rows6 = comb.map(function (x, i) {
       var o = x.o, n = i + H0 + 1, A = o.a, fixed = A.cost * A.mult + A.post + (P.num(A.collab) || 0);
       var J = x.sugg, k = P.calc(A, J), prof = P.rnd(P.rnd(J * (1 - F) - fixed, 6), 2), pc = (J * (1 - F) - fixed) / A.cost, s = status(o, J, prof, pc);
       var chk = J == null || !(J > 0) ? 'NO PRICE' : o.check && !S.checkPost ? 'CHECK POSTAGE' : J < o.floor - 1e-5 ? 'UNDER FLOOR' : prof <= 0 ? 'LOSS' : (!o.china && o.ceil != null && J > o.ceil + 1e-5) ? 'OVER CAP' : P.rnd(J, 2) === P.rnd(o.price, 2) ? 'NO CHANGE' : 'OK';
       var up = x.inc === 'Yes' && chk === 'OK'; if (up) okN++;
-      var f = function (q) { return q.replace(/#/g, n); }, UPF = f('IF(AND(T#="Yes",S#="OK"),COUNTIFS($T$3:T#,"Yes",$S$3:S#,"OK"),"")');
+      var f = function (q) { return q.replace(/#/g, n); }, UPF = f('IF(AND(S#="Yes",U#="OK"),COUNTIFS($S$3:S#,"Yes",$U$3:U#,"OK"),"")');
       return base6.map(function (key) { return key === 'cost' ? c(A.cost, M) : L[key][1](x); }).concat([null,
+        { t: 'n', v: prof, f: f('IFERROR(ROUND(ROUND(T#*(1-' + F + ')-W#,6),2),"")'), z: M, st: s },
+        { t: 'n', v: pc, f: f('IFERROR((T#*(1-' + F + ')-W#)/D#,"")'), z: PC, st: s },
+        c(x.short), { t: 's', v: x.inc, z: YESF },
         { t: 'n', v: J, f: f('IF(O#="",N#,ROUND(O#,2))'), z: M },
-        { t: 'n', v: prof, f: f('IFERROR(ROUND(ROUND(P#*(1-' + F + ')-W#,6),2),"")'), z: M, st: s },
-        { t: 'n', v: pc, f: f('IFERROR((P#*(1-' + F + ')-W#)/D#,"")'), z: PC, st: s },
-        { t: 's', v: chk, f: f('IF(ISERROR(P#),"BAD PRICE",IF(OR(P#="",P#<=0),"NO PRICE",IF(Z#<>"","CHECK POSTAGE",IF(P#<M#-0.00001,"UNDER FLOOR",IF(Q#<=0,"LOSS",IF(AND(X#<>"",P#>X#+0.00001),"OVER CAP",IF(ROUND(P#,2)=ROUND(H#,2),"NO CHANGE","OK")))))))') },
-        { t: 's', v: x.inc, z: YESF }, c(x.short),
+        { t: 's', v: chk, f: f('IF(ISERROR(T#),"BAD PRICE",IF(OR(T#="",T#<=0),"NO PRICE",IF(Z#<>"","CHECK POSTAGE",IF(T#<M#-0.00001,"UNDER FLOOR",IF(P#<=0,"LOSS",IF(AND(X#<>"",T#>X#+0.00001),"OVER CAP",IF(ROUND(T#,2)=ROUND(H#,2),"NO CHANGE","OK")))))))') },
         up ? { t: 'n', v: okN, f: UPF, z: IN } : { t: 's', v: '', f: UPF },
         c(fixed, M), o.china ? null : c(o.ceil, M), c(o.floorPct, PC), c(o.check && !S.checkPost ? o.check : '')]);
     });
-    var last6 = H0 + rows6.length, cf6 = rows6.length ? { sqref: 'Q3:R' + last6, rules: [
-      ['neg', 'AND(ISNUMBER($Q3),$Q3<0)'], ['under', 'AND(ISNUMBER($P3),$P3<$M3-0.00001)'], ['blue', 'AND(ISNUMBER($P3),$X3<>"",$P3>$X3+0.00001)'],
-      ['amber', 'AND(ISNUMBER($R3),$R3<$Y3+' + AMBER_PP + '-0.000001)'], ['green', 'ISNUMBER($R3)']] } : null;
+    var last6 = H0 + rows6.length, cf6 = rows6.length ? { sqref: 'P3:Q' + last6, rules: [
+      ['neg', 'AND(ISNUMBER($P3),$P3<0)'], ['under', 'AND(ISNUMBER($T3),$T3<$M3-0.00001)'], ['blue', 'AND(ISNUMBER($T3),$X3<>"",$T3>$X3+0.00001)'],
+      ['amber', 'AND(ISNUMBER($Q3),$Q3<$Y3+' + AMBER_PP + '-0.000001)'], ['green', 'ISNUMBER($Q3)']] } : null;
     /* ---- 7 Final upload (B&Q template, formulas from tab 6) ---- */
     var T = (input.template && input.template.Data) || [['Offer SKU', 'Offer price', 'Discount price', 'Discount start date', 'Discount end date'], ['offer-sku', 'price', 'discount-price', 'discount-start-date', 'discount-end-date']];
     var up6 = rows6.filter(function (rw) { return rw[21].t === 'n'; });
     var q = "'" + NAMES[5] + "'!";
     var rows7 = comb.map(function (x, i) { var hit = up6[i];
       return [{ t: 's', v: hit ? hit[0].v : '', f: 'IFERROR(INDEX(' + q + '$A:$A,MATCH(ROW()-2,' + q + '$V:$V,0)),"")' },
-        hit ? { t: 'n', v: hit[15].v, f: 'IFERROR(INDEX(' + q + '$P:$P,MATCH(ROW()-2,' + q + '$V:$V,0)),"")', z: '0.00' } : { t: 's', v: '', f: 'IFERROR(INDEX(' + q + '$P:$P,MATCH(ROW()-2,' + q + '$V:$V,0)),"")' }]; });
+        hit ? { t: 'n', v: hit[19].v, f: 'IFERROR(INDEX(' + q + '$T:$T,MATCH(ROW()-2,' + q + '$V:$V,0)),"")', z: '0.00' } : { t: 's', v: '', f: 'IFERROR(INDEX(' + q + '$T:$T,MATCH(ROW()-2,' + q + '$V:$V,0)),"")' }]; });
     /* ---- 8 Sells elsewhere, not on B&Q (report only) ---- */
     var E8 = sells(P, X, aoa), inComb = {}; comb.forEach(function (x) { inComb[x.o.sku] = 1; });
-    var k8 = ['sku', 'prod', 'uk', 'cost', 'post', 'stock', 'sales'], k8b = ['price', 'pnow', 'pcnow', 'bb', 'seller', 'floor', 'sugg'];
-    var h8 = k8.map(function (k) { return L[k][0]; }).concat([['All platforms 30d', IN, 9], ['Other platforms 30d', IN, 9], ['B&Q share %', PC, 8]]).concat(k8b.map(function (k) { return L[k][0]; }))
-      .concat([['Tool action', null, 36], ['In upload (tab 6)?', null, 9], ['Likely reason', null, 50]]);
-    var rows8 = E8.map(function (e) { var x = e.x;
-      return k8.map(function (k) { return L[k][1](x); }).concat([c(e.s.all, IN), c(e.s.other, IN), c(e.s.share == null ? 0 : e.s.share, PC)]).concat(k8b.map(function (k) { return L[k][1](x); }))
-        .concat([c(x.short), c(inComb[x.o.sku] ? 'Yes' : 'No'), c(e.why)]); });
+    var h8 = ALLK.map(function (k) { return L[k][0]; }).concat([['Other platform 30d sales', IN, 10]]);
+    var rows8 = E8.map(function (e) { var x = e.x; return ALLK.map(function (k) { return k === 'why' ? c(e.why) : L[k][1](x); }).concat([c(e.s.other, IN)]); });
     var why8 = {}; REASONS8.forEach(function (k) { why8[k] = 0; }); E8.forEach(function (e) { why8[e.key]++; });
     var counts = { all: rows1.length, t2: t2.rows.length, t3: t3.rows.length, t3sugg: byTab[3].filter(function (x) { return x.sugg != null; }).length, t4: t4.rows.length, t5: t5.rows.length, t5sugg: byTab[5].filter(function (x) { return x.sugg != null; }).length,
       raise: X.filter(function (x) { return x.cat === 'raise'; }).length, chinaRaiseHeld: X.filter(function (x) { return x.cat === 'raise' && x.o.china && x.inc === 'No' && !(x.o.check && !S.checkPost); }).length,
       t6: rows6.length, t7: okN, checkPost: comb.filter(function (x) { return x.o.check && !S.checkPost; }).length, t8: rows8.length, t8why: why8 };
     var fz = { x: 1, y: 2 };
+    var ky = ALLK.indexOf('floor'), info = [
+      [NAMES[0], 'Everything: your Access paste exactly as it came, plus postage, price now, profit now, floor and the action.', counts.all, 'Look up any SKU.'],
+      [NAMES[1], 'We hold the buy box, it sells, profit is between the floor and the 80% cap.', counts.t2, 'Nothing – no change.'],
+      [NAMES[2], 'We hold the buy box but sold 0 on B&Q in 30 days.', counts.t3, 'Optional price cut (goes to tab 6). ' + RULE3],
+      [NAMES[3], 'A rival holds the buy box; we can go 1p under and stay above the floor.', counts.t4, 'Suggested price = 1p under the buy box (or our 80% cap if lower), never under the floor (goes to tab 6).'],
+      [NAMES[4], 'We cannot win the buy box without going under the floor.', counts.t5, RULE5],
+      [NAMES[5], 'Every suggested change in one list. Type your own price in yellow "Your price" (blank = suggested); set Include Yes/No.', counts.t6, 'Rows with Include = Yes that pass the checks (not under floor, not a loss, not over cap, no postage check) go to tab 7. China raises start as No; check-postage rows never go. Hidden helper columns T–Z do the maths – leave them.'],
+      [NAMES[6], 'The B&Q price upload file (B&Q template layout), filled by itself from tab 6.', counts.t7, 'Save and upload this tab to B&Q.'],
+      [NAMES[7], 'REPORT ONLY: sells on other platforms but hardly on B&Q.', counts.t8, 'Other platforms sold ' + T8_MIN_OTHER + '+ in 30 days and B&Q sold 0 or under ' + Math.round(T8_MAX_SHARE * 100) + '% of all sales (all = Access "' + ALL_COL + '"). Reason says what to check.']];
+    var rows0 = (input.dataUsed ? [[c(input.dataUsed)], [null]] : []).concat(info.map(function (r) { return [c(r[0]), c(r[1]), c(r[2], IN), c(r[3])]; })).concat([[null], [c('Colour key (profit cells)')]])
+      .concat(KEY.map(function (k) { var q = c(k[1]); q.st = k[0]; return [q, c({ neg: 'Profit below £0', under: 'Price under the floor', amber: 'Within 5 points above the floor %', green: 'Floor + 5 points up to the cap', blue: 'Over the 80% cap (UK)' }[k[0]])]; }))
+      .concat([[c('Header colours')], [c('grey = cost · blue = selling price · green = profit £ · purple = profit %')]]);
     return { counts: counts, X: X, comb: comb, E8: E8, list: [
-      { name: NAMES[0], top: 'All rows – your Access columns exactly as pasted, then postage, price now, profit now, floor and the action. ' + LEGEND, cols: cols1, rows: rows1, freeze: fz, filter: true },
-      { name: NAMES[1], top: 'We hold the buy box, it sells, and the profit is between the floor and the 80% cap – no change needed.', cols: t2.cols, rows: t2.rows, freeze: fz, filter: true },
-      { name: NAMES[2], top: RULE3, cols: t3.cols, rows: t3.rows, freeze: fz, filter: true },
-      { name: NAMES[3], top: 'A rival holds the buy box. New price = 1p under the buy box price (or our 80% cap if that is lower), never under the floor.', cols: t4.cols, rows: t4.rows, freeze: fz, filter: true },
-      { name: NAMES[4], top: RULE5, cols: t5.cols, rows: t5.rows, freeze: fz, filter: true },
-      { name: NAMES[5], top: 'Type your own price in the yellow “Your price” column (blank = suggested). Final profit, colours and Check update by themselves. Include = Yes and Check = OK go to tab 7. China raises start as No; check-postage rows never go. ' + LEGEND,
-        cols: h6, rows: rows6, freeze: fz, filter: true, your: 14, inc: 19, cf: cf6 },
+      { name: START, top: 'Start here – what each tab is and what to do. Same columns on tabs 2–6 and 8.', cols: [['Tab', null, 24], ['What it is', null, 60], ['Rows', IN, 8], ['What to do / rule', null, 90]], rows: rows0, freeze: { x: 0, y: 2 }, filter: false, wrap: true },
+      { name: NAMES[0], top: 'All rows – your Access paste, then the price/profit/floor/action columns.', key: hd.length + 1, cols: cols1, rows: rows1, freeze: fz, filter: true },
+      { name: NAMES[1], top: 'Winning and selling, profit in range – no change.', key: ky, cols: t2.cols, rows: t2.rows, freeze: fz, filter: true },
+      { name: NAMES[2], top: 'Winning but 0 B&Q sales – optional cut halfway to the floor.', key: ky, cols: t3.cols, rows: t3.rows, freeze: fz, filter: true },
+      { name: NAMES[3], top: 'Rival has the buy box – suggested = 1p under them.', key: ky, cols: t4.cols, rows: t4.rows, freeze: fz, filter: true },
+      { name: NAMES[4], top: 'Cannot win above the floor – optional 5% cut.', key: ky, cols: t5.cols, rows: t5.rows, freeze: fz, filter: true },
+      { name: NAMES[5], top: 'All changes – type in yellow Your price, set Include; OK rows go to tab 7.', key: ky, cols: h6, rows: rows6, freeze: fz, filter: true, your: 14, inc: 18, cf: cf6 },
       { name: NAMES[6], cols: [[T[0][0], null, 24], [T[0][1], null, 12], [T[0][2], null, 14], [T[0][3], null, 20], [T[0][4], null, 20]], head2: T[1], rows: rows7, freeze: { x: 0, y: 2 }, filter: false,
         notes: { 0: 'B&Q price import layout (label row 1, code row 2, data from row 3). Filled by formulas from tab 6: only rows with Include = Yes and Check = OK. Empty rows at the bottom are rows left out.' } },
-      { name: NAMES[7], top: 'REPORT ONLY – does not change the upload. Rows: other platforms sold ' + T8_MIN_OTHER + '+ in 30 days and B&Q sold 0 or under ' + Math.round(T8_MAX_SHARE * 100) + '% of all sales. All platforms = Access “' + ALL_COL + '”; B&Q = the same 30-day B&Q figure the prices use. Other = all − B&Q.',
-        cols: h8, rows: rows8, freeze: fz, filter: true }] };
+      { name: NAMES[7], top: 'REPORT ONLY – sells elsewhere, hardly on B&Q.', key: ky, cols: h8, rows: rows8, freeze: fz, filter: true }] };
   }
 
   /* SheetJS workbook from the specs, then a small zip edit for what the free SheetJS cannot write */
   function build(X, P, input) {
     var B = sheets(P, input), wb = X.utils.book_new(), enc = function (r, k) { return X.utils.encode_cell({ r: r, c: k }); };
     B.list.forEach(function (sh) {
-      var head = sh.cols.map(function (q) { return q[0]; }), top = sh.top ? 1 : 0, hr = top, hrows = [head].concat(sh.head2 ? [sh.head2] : []), R0 = top + hrows.length, ws = {};
-      sh._mk = {}; sh._hd = {}; sh._hr = hr;
+      var head = sh.cols.map(function (q) { return q[0]; }); sh._mk = {}; var top = sh.top ? 1 : 0, hr = top, hrows = [head].concat(sh.head2 ? [sh.head2] : []), R0 = top + hrows.length, ws = {};
+      sh._hd = {}; sh._hr = hr;
       if (top) ws.A1 = { t: 's', v: sh.top };
+      if (top && sh.key != null) KEY.forEach(function (k, i) { var a = enc(0, sh.key + i); ws[a] = { t: 's', v: k[1] }; sh._mk[a] = k[0]; });
       hrows.forEach(function (row, r) { row.forEach(function (v, k) { ws[enc(r + top, k)] = { t: 's', v: v == null ? '' : String(v), z: HDRF }; }); });
       head.forEach(function (h, k) { var t = htype(h); if (t) sh._hd[enc(hr, k)] = t; });
       sh.rows.forEach(function (row, i) { row.forEach(function (cl, k) { if (!cl) return; var o = { t: cl.t, v: cl.v }; if (cl.z) o.z = cl.z; if (cl.f) o.f = cl.f; var a = enc(R0 + i, k); ws[a] = o; if (cl.st) sh._mk[a] = cl.st; }); });
@@ -1276,8 +1314,9 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
       seen[sku] = 1; if (why) bad.push(sku + ' (' + why + ')'); else out.push([sku, P.rnd(p, 2)]); }
     return { rows: out, bad: bad };
   }
-  return { VERSION: VERSION, NAMES: NAMES, RULE3: RULE3, RULE5: RULE5, classify: classify, sheets: sheets, build: build, fromEdited: fromEdited, ok: ok, sells: sells, status: status, MIN_CHANGE: MIN_CHANGE, T8_MIN_OTHER: T8_MIN_OTHER, T8_MAX_SHARE: T8_MAX_SHARE, ALL_COL: ALL_COL, REASONS8: REASONS8 };
+  return { VERSION: VERSION, NAMES: NAMES, START: START, RULE3: RULE3, RULE5: RULE5, classify: classify, sheets: sheets, build: build, fromEdited: fromEdited, ok: ok, sells: sells, status: status, MIN_CHANGE: MIN_CHANGE, T8_MIN_OTHER: T8_MIN_OTHER, T8_MAX_SHARE: T8_MAX_SHARE, ALL_COL: ALL_COL, REASONS8: REASONS8 };
 });
+
 </script>
 <script>
 (function(){
@@ -1355,6 +1394,7 @@ function compute(){
  /* buy box = today's buy box check (pricing.enc bbScrape) when it is newer than the buybox.enc run; failed checks are not "fresh" */
  if(SC.n&&(!M.n||String(st.doc.bbScrape.date)>String(M.to||"").slice(0,10))){M={map:SC.map,n:SC.n,label:SC.label,scrape:true,failed:SC.failed};fresh=SC.fresh}else Object.keys(M.map).forEach(function(e){fresh[e]=1});
  st.fresh=fresh;ov.bb=M.map;ov.bbLabel=M.label;
+ if(st.doc&&st.doc.offers){ov.offers=st.doc.offers;ov.offersLabel=(st.doc.meta&&st.doc.meta.offers_label)||"Active offers";ov.today=(st.doc.meta&&(st.doc.meta.offers_date||st.doc.meta.access_date))||st.accessDate}
  var A=P.fromAccess(st.aoa,ov);A.rows.forEach(function(r){if(st.your[r.sku]!=null)r.your=st.your[r.sku]});
  st.prep=A;st.M=M;st.res=P.decideAll(A.rows,st.opt);
  /* check layer: a typed China price under 100% (or anything else bq_check blocks) never goes in the upload */
@@ -1541,6 +1581,7 @@ function fromEdited(f){var n=$("pzb7n");n.textContent=" Reading "+f.name+"…";
   n.textContent=" Saved B&Q upload with "+E.rows.length+" price"+(E.rows.length===1?"":"s")+"."+(E.bad.length?" Left out "+E.bad.length+" row(s) that failed the check: "+E.bad.slice(0,8).join(", ")+(E.bad.length>8?"…":""):"")}).catch(function(e){n.textContent=" "+K.why(e)})}
 window.BQPricing={state:function(){return st},bbRow:bbRow,BBHD:BBHD,bbSafe:function(){return bbSafe()},book7:function(X){return window.BQBook.build(X,P,b7input())},b7opt:b7opt};
 })();
+
 </script>
 <script>
 (function(){
