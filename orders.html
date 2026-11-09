@@ -2010,7 +2010,8 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
     outcome: function (P, rec, edit, S) { return liveApi().outcome(P, rec, edit, S, classify); } };
 });
 </script>
-<script>(function(){
+<script>
+(function(){
 "use strict";
 /* B&Q dashboard – Pricing tab (6th card). Two views: "Buy box prices" (3 Nov 2026 – P.buyBox per SKU: lower to win / raise / can't win / keep / no data)
    and "All price rules" (the original view, unchanged). All maths = window.BQP (bq_price.js, the one shared engine).
