@@ -23,6 +23,47 @@
   var LEGEND = 'Colours on profit cells: SOLID RED = loss (below £0) · PINK = under the floor · AMBER = within 5 points above the floor % · GREEN = floor + 5 up to the cap · BLUE = over the 80% cap. Header bands: grey = estimated cost, blue = selling price, green = profit £, purple = profit %.';
   var RULE3 = 'We win but sold 0 on B&Q in 30 days. Suggested = price now minus a quarter of the gap to the floor (selling − (selling − floor)/4), rounded to the penny, but never below the floor + 5% (rounded up), never over the 80% cap, and only if the price drops by at least 10p. Projected profit and % are at that price.';
   var RULE5 = 'OPTIONAL – Margin too low. UK: uses a 60% floor on cost for this cut only (other tabs keep the normal cost-band floors); suggested = 5% off price now, rounded to the penny, never below the 65% price (floor + 5 points), never over the 80% cap, only if the drop is at least 10p, and not if the price changed in the last 3 days. Exactly 3 days is allowed. China: 5% off, never below the normal 100% floor. Does not win the buy box – it only makes the price more attractive.';
+
+  var RULES_TITLE = 'Our pricing rules';
+  var TABS_TITLE = 'What each tab does';
+  var TABS_FOOT = 'Normal day: only tab 6, then 7a.';
+  /* Plain-English reminder, one short line per rule, matching bq_price.js + this file. Do not invent extra rules here. */
+  var RULES_LINES = [
+    'Profit is the selling price minus B&Q’s 15% fee, the product cost, a company cost (the full cost for China products, half the cost for UK products), postage, and any collab fee.',
+    'Postage is chosen in this order: the postage you type, then the special list (for example an 8ft Christmas tree is £3.30 and a 10ft tree is £4.30), then DPD rates for descriptions ending H123, H063 or H077 (not CH077) over 15.2 kg (£14 up to 20 kg, £15 up to 25 kg, £17 up to 30 kg), then the Access postage, then weight bands of £1.75 / £2.30 / £8 / £9 / £10.50 / £15. A multi-pack is one parcel.',
+    'A row is marked CHECK POSTAGE only if it is a multi-pack of 14,999 g or more, or a multi-pack with no weight. You must type the postage (0 is allowed) before it can go on the upload. Single items are not flagged this way.',
+    'The lowest allowed price (the floor) is: China products 100% profit on cost; UK products that sold in the last 30 days 50%; UK products with no sales: 80% if cost is under £1, 70% if cost is under £5, 60% if cost is under £10, and 50% if cost is £10 or more.',
+    'The 80% profit cap only blocks a raise above the cap. A cut from a price already over the cap is allowed if it stays at or above the floor and is not a loss.',
+    'To win the buy box we go 1p under the rival, but only if that price is still above our floor (and not over the 80% cap).',
+    'If we are already cheaper than the buy box but still losing, and the product has sold on B&Q in the last 30 days, we may raise the price to 10–15p under the buy box, ending in 9. With no sales the price stays.',
+    'If we already win the buy box but have no B&Q sales, we raise the price only when profit is under 50%, and only up to the 50% price.',
+    'If we cannot win the buy box above the floor, there is an optional 5% cut (UK never below 65% profit on cost, and not if the price changed in the last 3 days; exactly 3 days is allowed). This does not win the buy box.',
+    'The workbook never raises a China price onto the upload – you set those yourself. China cuts can still go on tab 7b. Tab 9 lists China products with no B&Q sales, for you to review the listing.',
+    'When a price is raised, it is rounded to end in 9 if that still stays above the floor and under the cap. A cut stays on the exact penny.',
+    'On Combined, type a price in Your price if you want that instead of the suggestion (leave it blank to use the suggestion). Include override Yes puts the row on 7a or 7b if it passes the checks; No keeps it off. Yes cannot override CHECK POSTAGE, a China raise, or a 3-day hold.'
+  ];
+  var TABS_LINES = [
+    'Rules: a plain-English reminder of these rules and what each tab does.',
+    'Start here: a short guide to how to type in this workbook.',
+    '1 All: every product, for look-up only.',
+    '2 Winning in range: we hold the buy box and profit is between the floor and the cap – nothing to do.',
+    '3 Winning 0 sales: we hold the buy box but sold 0 on B&Q – there may be a small cut toward the floor to help it sell.',
+    '4 Can win buy box: we can go 1p under the winner and still stay above the floor.',
+    '5 Margin too low: we cannot win the buy box above the floor. There may be an optional 5% cut (UK never below 65% profit on cost, and not if the price changed in the last 3 days).',
+    '6 Combined upload: the only tab to work in on a normal day. Filter Check to CHECK POSTAGE and type the postage. You can also type Your price or Include override here.',
+    'China raises (review only): proposed China price rises – you decide yourself; they never go on the upload.',
+    '7a Final upload UK: the UK prices to copy into your B&Q CSV. Do not type on this tab.',
+    '7b Final upload China: China cuts only, never raises. Copy into your B&Q CSV if there is a row. Do not type on this tab.',
+    '8 Sells elsewhere not B&Q: report only – it does not change any price.',
+    '9 China 0 sales – listing check: China products with no B&Q sales, for you to review the listing only.'
+  ];
+  function rulesSheet() {
+    var rows = RULES_LINES.map(function (line, i) { return [{ t: 's', v: (i + 1) + '. ' + line }]; });
+    rows.push([null], [{ t: 's', v: TABS_TITLE }]);
+    TABS_LINES.forEach(function (line) { rows.push([{ t: 's', v: line }]); });
+    rows.push([null], [{ t: 's', v: TABS_FOOT }]);
+    return { name: 'Rules', top: 'These are the rules this workbook uses. They are the same as “Our pricing rules” and “What each tab does” on the Pricing page.', cols: [['Our pricing rules', null, 140]], rows: rows, freeze: { x: 0, y: 2 }, filter: false, wrap: true };
+  }
   var M = '£#,##0.00', PC = '0.0%', IN = '#,##0', EAN = '0', HDRF = '@', YESF = '0;-0;0;@', YOURF = '"£"#,##0.00';
 
   function cls(P, r, S) {
@@ -366,6 +407,7 @@
       .concat(KEY.map(function (k) { var q = c(k[1]); q.st = k[0]; return [q, c({ neg: 'Profit below £0', under: 'Price under the floor', amber: 'Within 5 points above the floor %', green: 'Floor + 5 points up to the cap', blue: 'Over the 80% cap (UK)' }[k[0]])]; }))
       .concat([[c('Header colours')], [c('grey = cost · blue = selling price · green = profit £ · purple = profit %')]]);
     return { counts: counts, X: X, comb: comb, E8: E8, chinaRaises: chinaRaises, list: [
+      rulesSheet(),
       { name: START, top: 'Start here – what each tab is and what to do. Same columns on tabs 2–6 and 8.', cols: [['Tab', null, 24], ['What it is', null, 60], ['Rows', IN, 8], ['What to do / rule', null, 90]], rows: rows0, freeze: { x: 0, y: 2 }, filter: false, wrap: true },
       { name: NAMES[0], top: 'All rows – your Access paste, then the price/profit/floor/action columns.', key: hd.length + 1, cols: cols1, rows: rows1, freeze: fz, filter: true },
       { name: NAMES[1], top: 'Winning and selling, profit in range – no change.', key: ky, cols: t2.cols, rows: t2.rows, freeze: fz, filter: true },
@@ -580,7 +622,7 @@
     });
     return m;
   }
-  return { VERSION: VERSION, NAMES: NAMES, REVIEW_CHINA: REVIEW_CHINA, START: START, RULE3: RULE3, RULE5: RULE5, classify: classify, sheets: sheets, build: build, buildValues: buildValues, fromEdited: fromEdited, ok: ok, okAt: okAt, sells: sells, status: status, snapshotStatus: snapshotStatus, liveRecords: liveRecords, blocks: blocks, applySavedInc: applySavedInc, MIN_CHANGE: MIN_CHANGE, T5_UK_FLOOR: T5_UK_FLOOR, T5_UK_MIN: T5_UK_MIN, WEEKLY_DAYS: WEEKLY_DAYS, T8_MIN_OTHER: T8_MIN_OTHER, T8_MAX_SHARE: T8_MAX_SHARE, ALL_COL: ALL_COL, REASONS8: REASONS8,
+  return { VERSION: VERSION, NAMES: NAMES, REVIEW_CHINA: REVIEW_CHINA, START: START, RULE3: RULE3, RULE5: RULE5, RULES_TITLE: RULES_TITLE, RULES_LINES: RULES_LINES, TABS_TITLE: TABS_TITLE, TABS_LINES: TABS_LINES, TABS_FOOT: TABS_FOOT, rulesSheet: rulesSheet, classify: classify, sheets: sheets, build: build, buildValues: buildValues, fromEdited: fromEdited, ok: ok, okAt: okAt, sells: sells, status: status, snapshotStatus: snapshotStatus, liveRecords: liveRecords, blocks: blocks, applySavedInc: applySavedInc, MIN_CHANGE: MIN_CHANGE, T5_UK_FLOOR: T5_UK_FLOOR, T5_UK_MIN: T5_UK_MIN, WEEKLY_DAYS: WEEKLY_DAYS, T8_MIN_OTHER: T8_MIN_OTHER, T8_MAX_SHARE: T8_MAX_SHARE, ALL_COL: ALL_COL, REASONS8: REASONS8,
     parseChecks: function (X, wb, ctx) { var L = liveApi(); if (!L) throw new Error('calculator missing'); return L.parseChecks(X, wb, ctx); },
     normStore: function (s) { var L = liveApi(); return L ? L.normStore(s) : { v: 1, items: {} }; },
     applyPreview: function (store, preview) { return liveApi().applyPreview(store, preview); },

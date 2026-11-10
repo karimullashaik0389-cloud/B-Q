@@ -431,4 +431,37 @@ t('a pasted Postage used column does not stop import of the yellow review cells'
   assert.ok(!prev.invalid.some(x => /Postage used|postLegacy/.test(x.why || '')));
 });
 
+
+t('Rules is the first visible sheet, is plain text, and does not change 7a or 7b counts', () => {
+  const built = workbook();
+  const wb = X.read(Buffer.from(built.bytes), { type: 'buffer', cellFormula: true });
+  assert.deepStrictEqual(wb.SheetNames.slice(0, 4), ['_Set', '_Calc', 'Rules', 'Start here']);
+  const text = sheetRows(wb, 'Rules').map(r => (r || []).join(' ')).join('\n');
+  assert.ok(text.indexOf('15%') >= 0);
+  assert.ok(text.indexOf('£1.75') >= 0);
+  assert.ok(text.indexOf('14,999') >= 0);
+  assert.ok(text.indexOf('80% profit cap only blocks a raise') >= 0);
+  assert.ok(text.indexOf('10–15p under the buy box') >= 0);
+  assert.ok(text.indexOf('65%') >= 0);
+  assert.ok(text.indexOf('What each tab does') >= 0);
+  assert.ok(text.indexOf('6 Combined upload') >= 0);
+  assert.ok(text.indexOf('China raises (review only)') >= 0);
+  assert.ok(text.indexOf('Normal day: only tab 6, then 7a.') >= 0);
+  assert.ok(text.indexOf('raise to floor') < 0);
+  const ws = wb.Sheets.Rules, range = X.utils.decode_range(ws['!ref']);
+  for (let r = range.s.r; r <= range.e.r; r++) {
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      const cell = ws[X.utils.encode_cell({ r, c })];
+      assert.ok(!cell || !cell.f, 'Rules must be plain text, no formulas');
+    }
+  }
+  const uk = finals(recalc(built.bytes), '7a Final upload UK').map(r => r[0]);
+  const cn = finals(recalc(built.bytes), '7b Final upload China').map(r => r[0]);
+  assert.strictEqual(uk.length, built.counts.t7uk);
+  assert.strictEqual(cn.length, built.counts.t7cn);
+  assert.ok(B.RULES_LINES.length >= 10);
+  assert.ok(B.TABS_LINES.some(s => s.indexOf('5 Margin too low') === 0 && s.indexOf('raise to floor') < 0));
+  assert.ok(B.TABS_FOOT.indexOf('only tab 6, then 7a') >= 0);
+});
+
 console.log('live workbook tests passed:', n);

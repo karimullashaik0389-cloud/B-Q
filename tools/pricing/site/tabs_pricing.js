@@ -21,7 +21,12 @@ var CSS='.pz-b7g{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 10px}.pz-b7t{d
  '.pz-how .tip{display:block;color:#475569;font-size:14px;font-weight:400;margin-top:3px}'+
  '.pz-oops{background:#FFF7ED;border:1px solid #FDBA74;border-radius:10px;padding:10px 12px;margin-top:12px}.pz-oops b{display:block;margin-bottom:6px;color:#9A3412}'+
  '.pz-oops ul{margin:0;padding-left:20px}.pz-oops li{margin:0 0 6px;font-size:14px;line-height:1.4;color:#334155}'+
- '.pz-acts{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:8px 0 10px}.pz-t td,.pz-t th{padding:7px 8px}';
+ '.pz-acts{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:8px 0 10px}.pz-t td,.pz-t th{padding:7px 8px}'+
+ '.pz-guides{display:flex;flex-wrap:wrap;gap:12px;margin:0 0 16px;align-items:flex-start}'+
+ '.pz-rules{flex:1 1 320px;background:#fff;border:2px solid #0F172A;border-radius:14px;padding:12px 18px}'+
+ '.pz-rules summary{cursor:pointer;font-size:20px;font-weight:700;color:#0F172A}'+
+ '.pz-rules ol{margin:10px 0 0;padding-left:28px}.pz-rules li{margin:0 0 8px;font-size:16px;line-height:1.45;color:#0F172A}'+
+ '.pz-rules .end{margin:10px 0 0;font-size:16px;font-weight:700;color:#0F172A}';
 var st=null;
 var HOW='<div class="pz-how" id="pzhow"><h2>How to make today\'s prices</h2>'+
  '<p class="lead">Do these steps every day, in this order. If today\'s Access file is already shown under the buttons, you can go straight to step 4.</p>'+
@@ -44,10 +49,16 @@ var HOW='<div class="pz-how" id="pzhow"><h2>How to make today\'s prices</h2>'+
  '<li>The download button is grey: wait a few seconds for the Access file to finish, or upload it again.</li>'+
  '<li>You picked the wrong file by mistake: click the same button again and pick the right one.</li>'+
  '</ul></div></div>';
+function guideBox(){
+ var B=window.BQBook||{},rules=B.RULES_LINES||[],tabs=B.TABS_LINES||[],foot=B.TABS_FOOT||"";
+ return '<div class="pz-guides" id="pzguides">'+
+  '<details class="pz-rules" id="pzrules"><summary>Our pricing rules</summary><ol>'+rules.map(function(s){return '<li>'+esc(s)+'</li>';}).join('')+'</ol></details>'+
+  '<details class="pz-rules" id="pztabs"><summary>What each tab does</summary><ol>'+tabs.map(function(s){return '<li>'+esc(s)+'</li>';}).join('')+'</ol>'+(foot?'<p class="end">'+esc(foot)+'</p>':'')+'</details></div>';
+}
 function render(body){
  if(!document.getElementById("pz-css")){var s=document.createElement("style");s.id="pz-css";s.textContent=CSS;document.head.appendChild(s)}
  st={doc:null,bbDoc:null,src:"pub",file:"",aoa:null,accessDate:"",your:ls(LSY,{}),opt:ls(LSO,{raise100:false,checkPost:false,pennyTrims:false,chinaRaise:false}),checks:window.BQBook?BQBook.normStore(ls(LSC,{v:1,items:{}})):{v:1,items:{}},checkYour:false,bbo:Object.assign({},P.BB_DEFAULT,{checkPost:false},ls(LSB,{})),userScrape:null};
- body.innerHTML=HOW+
+ body.innerHTML=HOW+guideBox()+
   '<div class="src" id="pzsrc">Reading the prices…</div>'+
   '<div class="box" id="pzup"><div class="pz-acts">'+
   '<button class="btn o pz-big" type="button" id="pzfilebtn">1. Upload Access file</button>'+
