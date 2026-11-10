@@ -334,7 +334,7 @@
     if (!o.win && !(bb > 0)) { r.act = 'No data'; r.why = 'No buy box price found'; return r; }
     if (s.noStockKeep && o.stock != null && o.stock <= 0) { r.why = 'No free stock – change the price when stock is back'; return r; }
     if (s.keepTrees && isXmasTree(o.title, o.sku)) { r.why = 'Christmas tree – price kept as it is (your decision 3 Nov)'; return r; }
-    var C0 = calc(a, cur), set = function (act, p, why, lim) { p = end9(p, cur, fl, lim, cap); var C = calc(a, p); r.act = act; r.sugg = rnd(p, 2); r.profit = C.profit; r.pc = C.pc; r.gain = rnd(C.pr - C0.pr, 2); r.why = why; };
+    var C0 = calc(a, cur), set = function (act, p, why, lim, fl9) { p = end9(p, cur, fl9 == null ? fl : fl9, lim, cap); var C = calc(a, p); r.act = act; r.sugg = rnd(p, 2); r.profit = C.profit; r.pc = C.pc; r.gain = rnd(C.pr - C0.pr, 2); r.why = why; };
     if (!o.win) {
       if (cur < rnd(bb, 2)) { r.why = 'We are already cheaper (' + g(cur) + ') than ' + seller + ' (' + g(bb) + ') – B&Q picked them for another reason'; return r; }
       var need = rnd(bb - bbStep(bb, s), 2), t = need, capped = false; r.need = need;
@@ -342,7 +342,12 @@
       if (t < fl) { r.act = "Can't win (floor)"; r.why = 'To win we need ' + g(need) + ' (under ' + seller + ' ' + g(bb) + '), but our floor is ' + g(fl) + ' (' + pc(o.floorPct) + ' on cost)'; return r; }
       set('Lower to win', t, capped ? 'Under ' + seller + ' ' + g(bb) + ' at our 80% cap ' + g(t) : (need === rnd(bb - 0.01, 2) ? '1p' : g(bb - need)) + ' under ' + seller + ' ' + g(bb) + '; floor ' + g(fl), bb);
     } else {
-      if (C0.pc < o.floorPct - 1e-9) { set('Raise', fl, 'We win, but ' + pc(C0.pc) + ' is under our ' + pc(o.floorPct) + ' floor – raise to the floor', x.rival && x.rival.p > cur ? x.rival.p : null); }
+      /* 10 Nov 2026: a product with 0 B&Q sales is raised only when profit is under 50% on cost, and only up to that 50% price. The 80/70/60% bands stay the floor for cuts, not for this raise. Products with sales still rise to their floor. */
+      var zeroUk = !o.china && !(o.sales >= 1);
+      var raiseAt = zeroUk ? SAFE_MIN : o.floorPct;
+      var raisePx = zeroUk ? priceFor(a, SAFE_MIN) : fl;
+      if (C0.pc < raiseAt - 1e-9) { set('Raise', raisePx, zeroUk ? '0 B&Q sales, profit under 50% on cost – raise only to 50%' : 'We win, but ' + pc(C0.pc) + ' is under our ' + pc(o.floorPct) + ' floor – raise to the floor', x.rival && x.rival.p > cur ? x.rival.p : null, zeroUk ? raisePx : null); }
+      else if (zeroUk && C0.pc < o.floorPct - 1e-9) { r.why = '0 B&Q sales: profit already >= 50%, not raised'; return r; }
       else if (cap != null && cur >= cap) { r.why = 'We win at or above the 80% cap (' + g(cap) + ') – keep'; return r; }
       else if (!(o.sales >= 1) && !s.raiseNoSales) { r.why = 'We win but sold 0 in 30 days – a higher price will not help'; return r; }
       else {
@@ -360,7 +365,8 @@
     }
     /* absolute safety: never under the floor, never over the cap, never a loss, never under 50% (China 100%) */
     if (r.sugg != null) {
-      var bad = !(r.sugg > 0) || !(r.profit > 0) || r.sugg < fl - 1e-9 || (cap != null && r.sugg > up9(cap) + 1e-9) || r.pc < SAFE_MIN - 1e-9 || (o.china && r.pc < CHINA_FLOOR - 1e-9);
+      var minPx = (r.act === 'Raise' && !o.china && !(o.sales >= 1)) ? priceFor(a, SAFE_MIN) : fl;
+      var bad = !(r.sugg > 0) || !(r.profit > 0) || r.sugg < minPx - 1e-9 || (cap != null && r.sugg > up9(cap) + 1e-9) || r.pc < SAFE_MIN - 1e-9 || (o.china && r.pc < CHINA_FLOOR - 1e-9);
       if (bad) { r.act = 'Keep'; r.why = 'Safety check stopped ' + g(r.sugg) + ' – kept'; r.sugg = null; r.profit = null; r.pc = null; r.gain = null; }
       else if (r.sugg === cur) { r.act = 'Keep'; r.why = 'Already at the suggested price'; r.sugg = null; r.profit = null; r.pc = null; r.gain = null; }
     }

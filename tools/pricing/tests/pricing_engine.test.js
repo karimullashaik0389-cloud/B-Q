@@ -27,6 +27,30 @@ t('UK sold, 1p under is above 80% -> capped at 80%', () => { const o = D({ sales
 t('UK buy box below floor -> Margin too low, price kept', () => { const o = D({ sales: 3, bb: 3, seller: 'Rival', price: 9.99 }); assert.strictEqual(o.status, 'Margin too low'); assert.strictEqual(o.finalp, 9.99); assert.ok(!o.upload); });
 t('UK sold, no competitor -> kept', () => { const o = D({ sales: 3, bb: '', seller: '' }); assert.strictEqual(o.status, 'No competitor – kept'); assert.ok(!o.upload); });
 t('UK 0 sales floor uses cost band', () => { const o = D({ cost: 4, sales: 0 }); assert.strictEqual(o.floorPct, .7); });
+t('zero-sales raise stops at 50% and does not use the higher band floor', () => {
+  function atProfit(frac, sales) {
+    const probe = D({ cost: 4, sales: sales, price: 20, bb: 20, seller: 'Diva Packages', w: 500, sup: 'UK Ltd' });
+    const price = frac < 0.5 ? Math.round(B.priceFor(probe.a, frac) * 100) / 100 : B.priceFor(probe.a, frac);
+    const o = D({ cost: 4, sales: sales, price: price, bb: price, seller: 'Diva Packages', w: 500, sup: 'UK Ltd' });
+    return { o: o, bb: B.buyBox(o, { fresh: true }, B.BB_DEFAULT), price: price };
+  }
+  const under = atProfit(0.49, 0);
+  assert.ok(under.o.pc < 0.5);
+  assert.strictEqual(under.bb.act, 'Raise');
+  const stop = B.priceFor(under.o.a, 0.5);
+  assert.ok(under.bb.sugg + 0.001 >= stop);
+  assert.ok(under.bb.sugg < under.o.floor - 0.05);
+  const at = atProfit(0.5, 0), above = atProfit(0.6, 0);
+  assert.ok(at.o.pc + 1e-9 >= 0.5);
+  assert.notStrictEqual(at.bb.act, 'Raise');
+  assert.strictEqual(at.bb.sugg, null);
+  assert.notStrictEqual(above.bb.act, 'Raise');
+  assert.ok(/already >= 50%/.test(above.bb.why));
+  const sold = atProfit(0.4, 3);
+  assert.ok(sold.o.pc < sold.o.floorPct);
+  assert.strictEqual(sold.bb.act, 'Raise');
+  assert.ok(sold.bb.sugg + 0.001 >= sold.o.floor - 0.001);
+});
 t('winning -> kept', () => { const o = D({ seller: 'Diva Packages', bb: 9.99, sales: 5 }); assert.strictEqual(o.status, 'Already winning'); assert.ok(!o.upload); });
 t('winning with 100+ sales -> +10% step held; with toggle uploaded; max 80%', () => {
   const r = { seller: 'Diva Packages', bb: 7, price: 7, sales: 150, cost: 2 }; const o = D(r); assert.strictEqual(o.status, 'Raise 10% – held for review'); assert.ok(!o.upload);

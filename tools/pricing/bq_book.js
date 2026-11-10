@@ -9,7 +9,7 @@
   var T5_CUT = 0.05;          /* tab 5: 5% off the price now */
   var T5_UK_FLOOR = 0.60;     /* tab 5 UK only (9 Nov): special 60% floor on cost */
   var T5_UK_MIN = 0.65;       /* tab 5 UK: never below floor+5pp = 65% on cost */
-  var WEEKLY_DAYS = 7;        /* tab 5 UK: no second cut within 7 days of last price change */
+  var WEEKLY_DAYS = 3;        /* tab 5 UK: held only when the last change was under 3 days ago; exactly 3 days is allowed */
   var NAMES = ['1 All', '2 Winning in range', '3 Winning 0 sales', '4 Can win buy box', '5 Margin too low', '6 Combined upload', '7a Final upload UK', '7b Final upload China', '8 Sells elsewhere not B&Q'];
   var REVIEW_CHINA = 'China raises (review only)';
   var START = 'Start here';
@@ -22,7 +22,7 @@
   var STK = ['neg', 'under', 'blue', 'amber', 'green'], ST = { neg: { fill: 'FFD32F2F', font: 'FFFFFFFF' }, under: { fill: 'FFF8BBD0' }, blue: { fill: 'FFBBDEFB' }, amber: { fill: 'FFFFE082' }, green: { fill: 'FFC8E6C9' } };
   var LEGEND = 'Colours on profit cells: SOLID RED = loss (below £0) · PINK = under the floor · AMBER = within 5 points above the floor % · GREEN = floor + 5 up to the cap · BLUE = over the 80% cap. Header bands: grey = estimated cost, blue = selling price, green = profit £, purple = profit %.';
   var RULE3 = 'We win but sold 0 on B&Q in 30 days. Suggested = price now minus a quarter of the gap to the floor (selling − (selling − floor)/4), rounded to the penny, but never below the floor + 5% (rounded up), never over the 80% cap, and only if the price drops by at least 10p. Projected profit and % are at that price.';
-  var RULE5 = 'OPTIONAL – Margin too low. UK (9 Nov 2026): uses a 60% floor on cost for this cut only (other tabs keep the normal cost-band floors); suggested = 5% off price now, rounded to the penny, never below the 65% price (floor + 5 points), never over the 80% cap, only if the drop is at least 10p, and not if the price changed in the last 7 days (weekly). China: 5% off, never below the normal 100% floor. Does not win the buy box – it only makes the price more attractive.';
+  var RULE5 = 'OPTIONAL – Margin too low. UK: uses a 60% floor on cost for this cut only (other tabs keep the normal cost-band floors); suggested = 5% off price now, rounded to the penny, never below the 65% price (floor + 5 points), never over the 80% cap, only if the drop is at least 10p, and not if the price changed in the last 3 days. Exactly 3 days is allowed. China: 5% off, never below the normal 100% floor. Does not win the buy box – it only makes the price more attractive.';
   var M = '£#,##0.00', PC = '0.0%', IN = '#,##0', EAN = '0', HDRF = '@', YESF = '0;-0;0;@', YOURF = '"£"#,##0.00';
 
   function cls(P, r, S) {
@@ -68,6 +68,11 @@
     /* Keep rows */
     if (stockOut || tree) { x.label = tree ? 'Christmas tree – kept' : 'No free stock – kept'; return x; }
     if (o.win) {
+      if (!o.china && !(o.sales >= 1) && o.pc != null && o.pc >= P.SAFE_MIN - 1e-9 && o.floorPct != null && o.pc < o.floorPct - 1e-9 && r.act !== 'Raise') {
+        x.cat = 'keep'; x.sugg = null; x.inc = 'No'; x.label = '0 B&Q sales: profit already >= 50%, not raised';
+        x.why = '0 B&Q sales: profit already >= 50%, not raised';
+        return x;
+      }
       if (!(o.sales >= 1)) {
         x.cat = 't3'; x.tab = 3; x.label = 'Winning, 0 sales';
         var min105 = o.china ? P.priceFor(o.a, P.CHINA_FLOOR + 0.05) : null;
@@ -105,7 +110,7 @@
     var o = x.o, k = x.cat, s;
     if (o.dup) s = 'Duplicate SKU row – not priced';
     else if (x.label === 'No data') s = 'No buy box data';
-    else if (k === 'raise') s = o.china ? 'China raise – review only (never in Final upload)' : (o.pc != null && o.floorPct != null && o.pc < o.floorPct - 1e-9 ? 'Raise to floor (profit under floor %)' : 'Raise: winning with room to the cap');
+    else if (k === 'raise') s = o.china ? 'China raise – review only (never in Final upload)' : (!(o.sales >= 1) && o.pc != null && o.pc < P.SAFE_MIN - 1e-9 ? '0 B&Q sales: profit under 50% – raise only to 50% on cost' : (o.pc != null && o.floorPct != null && o.pc < o.floorPct - 1e-9 ? 'Raise to floor (profit under floor %)' : 'Raise: winning with room to the cap'));
     else if (k === 't4') s = 'Win buy box: 1p under ' + (o.seller || 'rival');
     else if (k === 't5') {
       if (x.weeklyHold) s = 'Margin too low UK – weekly hold until ' + addDays(x.lastChange, WEEKLY_DAYS);
@@ -348,7 +353,7 @@
       [NAMES[1], 'We hold the buy box, it sells, profit is between the floor and the 80% cap.', counts.t2, 'Nothing – no change.'],
       [NAMES[2], 'We hold the buy box but sold 0 on B&Q in 30 days.', counts.t3, 'Optional price cut (goes to tab 6). ' + RULE3],
       [NAMES[3], 'A rival holds the buy box; we can go 1p under and stay above the floor.', counts.t4, 'Suggested price = 1p under the buy box (or our 80% cap if lower), never under the floor (goes to tab 6).'],
-      [NAMES[4], 'We cannot win the buy box under the normal floor. UK optional cut uses 60% floor (min 65%), weekly (7 days).', counts.t5, RULE5 + ' Price changes are weekly for this tab.'],
+      [NAMES[4], 'We cannot win the buy box under the normal floor. UK optional cut uses 60% floor (min 65%), held only when the last change was under 3 days ago.', counts.t5, RULE5 + ' Exactly 3 days is allowed.'],
       [NAMES[5], 'Every suggested change in one list (except China raises). Type your own price in yellow "Your price" (blank = suggested); set Include Yes/No.', counts.t6, 'Rows with Include = Yes that pass the checks go to tab 7a (UK) or 7b (China). China under-floor raises are NOT here – see the review-only tab. Check-postage rows never go. Hidden helper columns do the maths – leave them.'],
       [REVIEW_CHINA, 'China (Ashian) products under the 100% floor – proposed raise to the floor. REVIEW ONLY.', counts.chinaRaiseReview, 'Never uploaded. Decide offline; do not use Include to push these into Final upload.'],
       [NAMES[6], 'B&Q price upload layout – UK SKUs only.', counts.t7uk, 'Save and upload this tab to B&Q for UK prices.'],

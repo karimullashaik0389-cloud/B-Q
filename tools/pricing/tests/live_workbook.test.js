@@ -293,23 +293,23 @@ t('a China price above the 100% floor is not raised onto the upload', () => {
   assert.ok(!finals(wb2, '7b Final upload China').some(r => r[0] === 'MID' || r[0] === 'LOWC'));
 });
 
-t('weekly hold is tab 5 UK only: 6 days held, 7 days not held', () => {
+t('weekly hold is tab 5 UK only: 2 days held, exactly 3 days not held', () => {
   function one(changes) {
     const d = P.decideAll(rows, {});
     const bb = P.buyBoxAll(d.rows, Object.fromEntries(d.rows.map(o => [o.ean, 1])), {}, P.BB_DEFAULT);
     const S = Object.assign({}, P.BB_DEFAULT, { asOf: '2026-11-09', priceChanges: changes });
     return B.build(X, P, { bbr: bb, settings: S, asOf: '2026-11-09', priceChanges: changes }).records;
   }
-  const six = one({ HELD: { date: '2026-11-03' }, ZERO: { date: '2026-11-03' }, CN: { date: '2026-11-03' } });
-  const rec = sku => six.find(r => r.sku === sku);
+  const two = one({ HELD: { date: '2026-11-07' }, ZERO: { date: '2026-11-07' }, CN: { date: '2026-11-07' } });
+  const rec = sku => two.find(r => r.sku === sku);
   assert.strictEqual(rec('HELD').weekly, 1);
   assert.strictEqual(rec('HELD').engCheck, 'WEEKLY HOLD');
   assert.strictEqual(rec('ZERO').weekly, 0);
   assert.notStrictEqual(rec('ZERO').engCheck, 'WEEKLY HOLD');
   assert.strictEqual(rec('CN').weekly, 0);
-  const seven = one({ HELD: { date: '2026-11-02' } }).find(r => r.sku === 'HELD');
-  assert.strictEqual(seven.weekly, 0);
-  assert.notStrictEqual(seven.engCheck, 'WEEKLY HOLD');
+  const three = one({ HELD: { date: '2026-11-06' } }).find(r => r.sku === 'HELD');
+  assert.strictEqual(three.weekly, 0);
+  assert.notStrictEqual(three.engCheck, 'WEEKLY HOLD');
 });
 
 t('a normal download fills tab 8 from other-platform sales and does not invent an upload', () => {

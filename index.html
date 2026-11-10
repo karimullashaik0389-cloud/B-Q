@@ -71,10 +71,11 @@ table.bt{border-collapse:collapse;width:100%;font-size:14px}.bt th,.bt td{paddin
  </form>
 </div>
 <div class="wrap hide" id="menu">
- <div class="logo">B&amp;Q</div><h1>Choose a dashboard</h1><p class="sub">Sales and Orders open as their own pages. Tap Home to see all dashboards here again. Your phone’s back gesture also returns here.</p>
+ <div class="logo">B&amp;Q</div><h1>Choose a dashboard</h1><p class="sub">Sales, Orders and Products selling open as their own pages. Tap Home to see all dashboards here again. Your phone’s back gesture also returns here.</p>
 
  <a class="big" href="sales.html"><b>Sales</b><span>Revenue, units and profit · All / B&amp;Q GMV / B&amp;Q cash · calculator</span></a>
  <a class="big" href="orders.html"><b>Orders</b><span>Order count and details · status filters · search</span></a>
+ <a class="big" href="productselling.html"><b>Products selling</b><span>Sold in 30 days · no sales · sold yesterday · newly selling · daily trend</span></a>
  <button class="big hide" data-d="sales" type="button" aria-hidden="true"><b>Sales</b></button>
  <button class="big hide" data-d="orders" type="button" aria-hidden="true"><b>Orders</b></button>
  <a class="big" id="listings" href="listings/"><b>Listings</b><span>Create and fix B&amp;Q listings · templates · download files</span></a>
@@ -94,11 +95,11 @@ table.bt{border-collapse:collapse;width:100%;font-size:14px}.bt th,.bt td{paddin
    Keys are kept in sessionStorage (bqDashSession.v1) so sales.html, orders.html,
    Listings and the hub tabs open without asking again. Optional “Remember me”
    still wraps keys in localStorage for this device. Password never printed. */
-var FILES={sales:"sales.enc",orders:"orders.enc"},ITER=600000,AUX_HEX="94ccba845e4963161cceda2f070f59d4",LS1="bqDashKeys.v1",LS2="bqDashKeys.v2";
+var FILES={sales:"sales.enc",orders:"orders.enc",selling:"productselling.enc"},ITER=600000,AUX_HEX="94ccba845e4963161cceda2f070f59d4",LS1="bqDashKeys.v1",LS2="bqDashKeys.v2";
 var $=function(i){return document.getElementById(i)};
 function auxSalt(){var u=new Uint8Array(16);for(var i=0;i<16;i++)u[i]=parseInt(AUX_HEX.substr(i*2,2),16);return u}
 var keys={},bufs={},curUrl=null,te=new TextDecoder(),te2=new TextEncoder(),mode="main";
-var OPEN=(document.body.getAttribute("data-open")||"").trim(); if(OPEN!=="sales"&&OPEN!=="orders") OPEN="";
+var OPEN=(document.body.getAttribute("data-open")||"").trim(); if(OPEN!=="sales"&&OPEN!=="orders"&&OPEN!=="selling") OPEN="";
 function b64(u8){var s="";for(var i=0;i<u8.length;i+=8192)s+=String.fromCharCode.apply(null,u8.subarray(i,i+8192));return btoa(s)}
 function unb64(s){var b=atob(s),u=new Uint8Array(b.length);for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u}
 function show(id){["login","menu"].forEach(function(x){$(x).classList.toggle("hide",x!==id)})}
@@ -107,7 +108,7 @@ function parts(buf){var u=new Uint8Array(buf);
  if(u.length<48||String.fromCharCode(u[0],u[1],u[2],u[3])!=="BQE1")throw new Error("badfile");
  return{salt:u.subarray(4,20),iv:u.subarray(20,32),ct:u.subarray(32)}}
 function getBuf(d){if(bufs[d])return Promise.resolve(bufs[d]);
- return fetch(FILES[d],{cache:"no-cache"}).then(function(r){if(!r.ok)throw new Error("net");return r.arrayBuffer()})
+ return fetch(FILES[d],{cache:"no-cache"}).then(function(r){if(!r.ok)throw new Error(d==="selling"&&r.status===404?"missing":"net");return r.arrayBuffer()})
  .then(function(b){bufs[d]=b;return b})}
 function kdf(pw,salt,ext,use){var c=crypto.subtle;
  return c.importKey("raw",te2.encode(pw),"PBKDF2",false,["deriveKey"]).then(function(base){
@@ -117,8 +118,11 @@ function sameSalt(a,b){if(a.length!==b.length)return false;for(var i=0;i<a.lengt
 function stored(){try{var o=JSON.parse(localStorage.getItem(LS2)||"null");return o&&o.v===2&&o.s&&o.iv&&o.ct?o:null}catch(e){return null}}
 function forget(){try{localStorage.removeItem(LS2);localStorage.removeItem(LS1)}catch(e){}}
 function tryMain(pw){var nk={};
- return Promise.all(Object.keys(FILES).map(function(d){return getBuf(d).then(function(b){var p=parts(b);
+ return Promise.all(["sales","orders"].map(function(d){return getBuf(d).then(function(b){var p=parts(b);
   return kdf(pw,p.salt,true,["decrypt"]).then(function(k){nk[d]={key:k,salt:p.salt.slice()};return decrypt(k,p)})})}))
+ .then(function(){return getBuf("selling").then(function(b){var p=parts(b);
+  return kdf(pw,p.salt,true,["decrypt"]).then(function(k){return decrypt(k,p).then(function(){nk.selling={key:k,salt:p.salt.slice()}})})})
+  .catch(function(e){if(e&&e.message==="missing")return;throw e})})
  .then(function(){return kdf(pw,auxSalt(),true,["encrypt","decrypt"])}).then(function(k){nk.aux={key:k,salt:auxSalt()};return addListingsKey(pw,nk)})}
 function addListingsKey(pw,nk){if(!pw||(nk&&nk.listings))return Promise.resolve(nk);
  return fetch("listings/data.enc",{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error("net");return r.arrayBuffer()}).then(function(b){
@@ -126,7 +130,7 @@ function addListingsKey(pw,nk){if(!pw||(nk&&nk.listings))return Promise.resolve(
   var salt=new Uint8Array(u.subarray(4,20));
   return kdf(pw,salt,true,["decrypt"]).then(function(k){return crypto.subtle.decrypt({name:"AES-GCM",iv:u.subarray(20,32)},k,u.subarray(32)).then(function(){nk.listings={key:k,salt:salt};return nk})})
  }).catch(function(){return nk})}
-function wrapStore(pw,ks){var inner={},ds=Object.keys(FILES).concat(ks.aux?["aux"]:[]).concat(ks.listings?["listings"]:[]),salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));
+function wrapStore(pw,ks){var inner={},ds=Object.keys(FILES).filter(function(d){return ks[d]}).concat(ks.aux?["aux"]:[]).concat(ks.listings?["listings"]:[]),salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));
  return Promise.all(ds.map(function(d){return crypto.subtle.exportKey("raw",ks[d].key).then(function(raw){inner[d]={salt:b64(ks[d].salt),key:b64(new Uint8Array(raw))}})}))
  .then(function(){return kdf(pw,salt,false,["encrypt"])})
  .then(function(wk){return crypto.subtle.encrypt({name:"AES-GCM",iv:iv},wk,te2.encode(JSON.stringify(inner)))})
@@ -136,13 +140,13 @@ function unwrap(pw){var o=stored();if(!o)return Promise.reject(new Error("none")
  .then(function(plain){var inner=JSON.parse(te.decode(plain)),nk={};
   if(!inner.aux)throw new Error("stale");
   var names=Object.keys(FILES).concat(["aux"]);if(inner.listings)names.push("listings");
-  return Promise.all(names.map(function(d){if(!inner[d])throw new Error("x");
+  return Promise.all(names.map(function(d){if(!inner[d]){if(d==="selling")return Promise.resolve();throw new Error("x")}
    return crypto.subtle.importKey("raw",unb64(inner[d].key),{name:"AES-GCM"},true,d==="aux"?["encrypt","decrypt"]:["decrypt"]).then(function(k){nk[d]={key:k,salt:unb64(inner[d].salt)}})}))
   .then(function(){return nk})})}
-function fresh(nk){return Promise.all(Object.keys(FILES).map(function(d){return getBuf(d).then(function(b){return sameSalt(nk[d].salt,parts(b).salt)})}))
+function fresh(nk){return Promise.all(Object.keys(FILES).map(function(d){return getBuf(d).then(function(b){if(!nk[d])throw new Error("stale");return sameSalt(nk[d].salt,parts(b).salt)}).catch(function(e){if(d==="selling"&&e&&e.message==="missing")return true;throw e})}))
  .then(function(r){return r.every(Boolean)})}
 function setMode(m,msg){mode=m;
- $("lh").textContent=OPEN?(OPEN==="sales"?"Sales":"Orders"):"B&Q Dashboards";
+ $("lh").textContent=OPEN?(OPEN==="sales"?"Sales":OPEN==="orders"?"Orders":"Products selling"):"B&Q Dashboards";
  $("pwl").textContent="Password";
  /* one simple screen: keep Remember me available but quiet */
  if($("remrow"))$("remrow").classList.toggle("hide",false);
@@ -183,8 +187,9 @@ function open(d){busy(true);
   if(curUrl)URL.revokeObjectURL(curUrl);
   curUrl=URL.createObjectURL(new Blob([te.decode(plain)],{type:"text/html;charset=utf-8"}));
   setFrame(curUrl);$("viewer").classList.remove("hide");
-  document.title=d==="sales"?"B&Q Sales":"B&Q Orders";busy(false)})
+  document.title=d==="sales"?"B&Q Sales":d==="orders"?"B&Q Orders":"B&Q Products selling";busy(false)})
  .catch(function(e){busy(false);
+  if(e&&e.message==="missing"){alert("Products selling is not on the site yet. The nightly build publishes productselling.enc.");return}
   if(e&&e.message==="net"){alert("Couldn’t load the dashboard. Check your connection.");return}
   lock("Please enter the main password again (the dashboards were updated).")})}
 function setFrame(u){var f=$("frame");try{f.contentWindow.location.replace(u)}catch(e){f.src=u}}
@@ -203,7 +208,7 @@ function restoreSession(){
  try{sessionStorage.removeItem("bqDashReturn")}catch(e){}
  if(!o||o.v!==1||!o.inner||!o.inner.aux||!o.inner.sales||!o.inner.orders)return Promise.resolve(false);
  var nk={},names=Object.keys(FILES).concat(["aux"]).concat(o.inner.listings?["listings"]:[]);
- return Promise.all(names.map(function(d){if(!o.inner[d])throw new Error("x");
+ return Promise.all(names.map(function(d){if(!o.inner[d]){if(d==="selling")return Promise.resolve();throw new Error("x")}
   return crypto.subtle.importKey("raw",unb64(o.inner[d].key),{name:"AES-GCM"},true,d==="aux"?["encrypt","decrypt"]:["decrypt"]).then(function(k){nk[d]={key:k,salt:unb64(o.inner[d].salt)}})}))
   .then(function(){return fresh(nk)}).then(function(ok){if(!ok)return false;
    return getBuf("sales").then(function(b){return decrypt(nk.sales.key,parts(b)).then(function(){keys=nk;return true})})})
@@ -216,10 +221,10 @@ window.addEventListener("message",function(e){var f=$("frame");
  if(m.bq==="hello"){reply({ok:true,remembered:!!stored()});return}
  if(m.bq==="lock"){reply({ok:true});lock("Locked. This device no longer remembers you.");return}
  if(m.bq==="nav"){var nv=String(m.v||"");reply({ok:true});
-  stashSession().then(function(){if(nv==="sales"||nv==="orders")location.href=nv+".html";else if(nv==="home")location.href="index.html"});return}
+  stashSession().then(function(){if(nv==="sales"||nv==="orders"||nv==="selling")location.href=nv+".html";else if(nv==="home")location.href="index.html"});return}
  if(m.bq==="open"){var v=String(m.v||"");reply({ok:true});
   if(v==="listings"){var goL=window.BQ&&BQ.stashSession?BQ.stashSession():Promise.resolve();goL.then(function(){location.href=$("listings").getAttribute("href")});return}
-  if(v==="sales"||v==="orders"){if(OPEN&&v!==OPEN){stashSession().then(function(){location.href=v+".html"});return}open(v);return}
+  if(v==="sales"||v==="orders"||v==="selling"){if(OPEN&&v!==OPEN){stashSession().then(function(){location.href=v+".html"});return}open(v);return}
   if(window.BQTabs&&BQTabs.tabs[v]){back();BQTabs.open(v)}return}
  if(m.bq==="rewrap"){var o=String(m.old||""),n=String(m.nw||"");
   if(n.length<8){reply({ok:false,err:"New password needs at least 8 characters"});return}
@@ -232,7 +237,7 @@ $("lock").addEventListener("click",function(){lock("Locked. This device no longe
 if($("forget"))$("forget").addEventListener("click",function(){clearSession();forget();setMode("main","This device has forgotten the saved login.")});
 if(!window.crypto||!crypto.subtle){$("msg").textContent="This browser can’t unlock the dashboards (needs HTTPS and a modern browser).";$("go").disabled=true}
 else{var had1=false;try{had1=!!localStorage.getItem(LS1);localStorage.removeItem(LS1)}catch(e){}
- if(OPEN){document.title=OPEN==="sales"?"B&Q Sales":"B&Q Orders"}
+ if(OPEN){document.title=OPEN==="sales"?"B&Q Sales":OPEN==="orders"?"B&Q Orders":"B&Q Products selling"}
  restoreSession().then(function(ok){if(ok){afterUnlock(keys);return}
   if(stored())setMode("device");else setMode("main","")});}
 })();
@@ -813,7 +818,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
     if (!o.win && !(bb > 0)) { r.act = 'No data'; r.why = 'No buy box price found'; return r; }
     if (s.noStockKeep && o.stock != null && o.stock <= 0) { r.why = 'No free stock – change the price when stock is back'; return r; }
     if (s.keepTrees && isXmasTree(o.title, o.sku)) { r.why = 'Christmas tree – price kept as it is (your decision 3 Nov)'; return r; }
-    var C0 = calc(a, cur), set = function (act, p, why, lim) { p = end9(p, cur, fl, lim, cap); var C = calc(a, p); r.act = act; r.sugg = rnd(p, 2); r.profit = C.profit; r.pc = C.pc; r.gain = rnd(C.pr - C0.pr, 2); r.why = why; };
+    var C0 = calc(a, cur), set = function (act, p, why, lim, fl9) { p = end9(p, cur, fl9 == null ? fl : fl9, lim, cap); var C = calc(a, p); r.act = act; r.sugg = rnd(p, 2); r.profit = C.profit; r.pc = C.pc; r.gain = rnd(C.pr - C0.pr, 2); r.why = why; };
     if (!o.win) {
       if (cur < rnd(bb, 2)) { r.why = 'We are already cheaper (' + g(cur) + ') than ' + seller + ' (' + g(bb) + ') – B&Q picked them for another reason'; return r; }
       var need = rnd(bb - bbStep(bb, s), 2), t = need, capped = false; r.need = need;
@@ -821,7 +826,12 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
       if (t < fl) { r.act = "Can't win (floor)"; r.why = 'To win we need ' + g(need) + ' (under ' + seller + ' ' + g(bb) + '), but our floor is ' + g(fl) + ' (' + pc(o.floorPct) + ' on cost)'; return r; }
       set('Lower to win', t, capped ? 'Under ' + seller + ' ' + g(bb) + ' at our 80% cap ' + g(t) : (need === rnd(bb - 0.01, 2) ? '1p' : g(bb - need)) + ' under ' + seller + ' ' + g(bb) + '; floor ' + g(fl), bb);
     } else {
-      if (C0.pc < o.floorPct - 1e-9) { set('Raise', fl, 'We win, but ' + pc(C0.pc) + ' is under our ' + pc(o.floorPct) + ' floor – raise to the floor', x.rival && x.rival.p > cur ? x.rival.p : null); }
+      /* 10 Nov 2026: a product with 0 B&Q sales is raised only when profit is under 50% on cost, and only up to that 50% price. The 80/70/60% bands stay the floor for cuts, not for this raise. Products with sales still rise to their floor. */
+      var zeroUk = !o.china && !(o.sales >= 1);
+      var raiseAt = zeroUk ? SAFE_MIN : o.floorPct;
+      var raisePx = zeroUk ? priceFor(a, SAFE_MIN) : fl;
+      if (C0.pc < raiseAt - 1e-9) { set('Raise', raisePx, zeroUk ? '0 B&Q sales, profit under 50% on cost – raise only to 50%' : 'We win, but ' + pc(C0.pc) + ' is under our ' + pc(o.floorPct) + ' floor – raise to the floor', x.rival && x.rival.p > cur ? x.rival.p : null, zeroUk ? raisePx : null); }
+      else if (zeroUk && C0.pc < o.floorPct - 1e-9) { r.why = '0 B&Q sales: profit already >= 50%, not raised'; return r; }
       else if (cap != null && cur >= cap) { r.why = 'We win at or above the 80% cap (' + g(cap) + ') – keep'; return r; }
       else if (!(o.sales >= 1) && !s.raiseNoSales) { r.why = 'We win but sold 0 in 30 days – a higher price will not help'; return r; }
       else {
@@ -839,7 +849,8 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
     }
     /* absolute safety: never under the floor, never over the cap, never a loss, never under 50% (China 100%) */
     if (r.sugg != null) {
-      var bad = !(r.sugg > 0) || !(r.profit > 0) || r.sugg < fl - 1e-9 || (cap != null && r.sugg > up9(cap) + 1e-9) || r.pc < SAFE_MIN - 1e-9 || (o.china && r.pc < CHINA_FLOOR - 1e-9);
+      var minPx = (r.act === 'Raise' && !o.china && !(o.sales >= 1)) ? priceFor(a, SAFE_MIN) : fl;
+      var bad = !(r.sugg > 0) || !(r.profit > 0) || r.sugg < minPx - 1e-9 || (cap != null && r.sugg > up9(cap) + 1e-9) || r.pc < SAFE_MIN - 1e-9 || (o.china && r.pc < CHINA_FLOOR - 1e-9);
       if (bad) { r.act = 'Keep'; r.why = 'Safety check stopped ' + g(r.sugg) + ' – kept'; r.sugg = null; r.profit = null; r.pc = null; r.gain = null; }
       else if (r.sugg === cur) { r.act = 'Keep'; r.why = 'Already at the suggested price'; r.sugg = null; r.profit = null; r.pc = null; r.gain = null; }
     }
@@ -1066,7 +1077,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
   function make(recs, input, P, saved, S) {
     input = input || {}; saved = saved || {}; S = Object.assign({}, P.BB_DEFAULT || {}, S || {});
     var asOf = xDate(S.asOf || (input && input.asOf) || '');
-    var setRows = [['fee', 0.15], ['ukMax', 0.8], ['safeMin', 0.5], ['minChange', 0.1], ['t3buf', 0.05], ['t5cut', 0.05], ['t5ukFloor', 0.6], ['t5ukMin', 0.65], ['weeklyDays', 7], ['step', S.step == null ? 0.01 : S.step], ['stepPct', S.stepPct || 0], ['minGain', S.minGain == null ? 0.1 : S.minGain], ['raisePct', S.raisePct == null ? 0.05 : S.raisePct], ['xmas', S.xmas === false ? 0 : 1], ['raiseNoSales', S.raiseNoSales ? 1 : 0], ['noStockKeep', S.noStockKeep === false ? 0 : 1], ['keepTrees', S.keepTrees === false ? 0 : 1], ['useStale', S.useStale ? 1 : 0], ['checkPost', S.checkPost ? 1 : 0], ['asOf', asOf == null ? '' : asOf], ['packGrams', 14999]];
+    var setRows = [['fee', 0.15], ['ukMax', 0.8], ['safeMin', 0.5], ['minChange', 0.1], ['t3buf', 0.05], ['t5cut', 0.05], ['t5ukFloor', 0.6], ['t5ukMin', 0.65], ['t5HoldDays', 3], ['step', S.step == null ? 0.01 : S.step], ['stepPct', S.stepPct || 0], ['minGain', S.minGain == null ? 0.1 : S.minGain], ['raisePct', S.raisePct == null ? 0.05 : S.raisePct], ['xmas', S.xmas === false ? 0 : 1], ['raiseNoSales', S.raiseNoSales ? 1 : 0], ['noStockKeep', S.noStockKeep === false ? 0 : 1], ['keepTrees', S.keepTrees === false ? 0 : 1], ['useStale', S.useStale ? 1 : 0], ['checkPost', S.checkPost ? 1 : 0], ['asOf', asOf == null ? '' : asOf], ['packGrams', 14999]];
     var SB = {}; setRows.forEach(function (r, i) { SB[r[0]] = "'" + SET + "'!$B$" + (i + 2); });
     var names = [];
     function add(name) { names.push(name); return names.length - 1; }
@@ -1161,9 +1172,10 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
       setH(raiseT, 'IF(AND(ISNUMBER(' + C(rivalI, r) + '),' + C(rivalI, r) + '>' + C(priceU, r) + '),ROUND(' + C(rivalI, r) + '-' + C(stepAmt, r) + ',2),IF(AND(ISNUMBER(' + C(rivalI, r) + '),' + C(rivalI, r) + '<=' + C(priceU, r) + '),"",IF(AND(' + SB.xmas + '=1,' + C(seaI, r) + '=1),"",ROUNDDOWN(' + C(priceU, r) + '*(1+' + SB.raisePct + '),2))))', M);
       setH(raiseC, 'IF(' + C(raiseT, r) + '="","",IF(' + C(capP, r) + '="",' + C(raiseT, r) + ',IF(' + C(raiseT, r) + '>' + C(capP, r) + ',' + C(capP, r) + ',' + C(raiseT, r) + ')))', M);
       setH(gain, 'IF(OR(' + C(raiseC, r) + '="",' + C(priceU, r) + '=""),"",(' + C(raiseC, r) + '-' + C(priceU, r) + ')*(1-' + SB.fee + '))', M);
-      var actF = 'IF(' + C(noDataI, r) + '=1,"No data",IF(' + C(pCheckI, r) + '=1,"Price check",IF(OR(' + C(postU, r) + '="",' + C(priceU, r) + '="",NOT(ISNUMBER(' + C(costI, r) + ')),' + C(costI, r) + '<=0),"No data",IF(AND(' + C(freshI, r) + '=0,' + SB.useStale + '=0),"No data",IF(AND(ISNUMBER(' + C(stockI, r) + '),' + C(stockI, r) + '<=0,' + SB.noStockKeep + '=1),"Keep",IF(AND(' + C(treeI, r) + '=1,' + SB.keepTrees + '=1),"Keep",IF(' + C(winI, r) + '<>1,IF(OR(' + C(bbI, r) + '="",NOT(ISNUMBER(' + C(bbI, r) + ')),' + C(bbI, r) + '<=0),"No data",IF(' + C(priceU, r) + '<ROUND(' + C(bbI, r) + ',2),"Keep",IF(' + C(tLow, r) + '="","",IF(' + C(tLow, r) + '<' + C(floorP, r) + ',"Can\'t win","Lower")))),IF(OR(' + C(pcNow, r) + '="",' + C(floorPct, r) + '=""),"Raise",IF(' + C(pcNow, r) + '<' + C(floorPct, r) + '-0.000000001,"Raise",IF(IF(' + C(capP, r) + '="",FALSE,' + C(priceU, r) + '>=' + C(capP, r) + '-0.000000001),"Keep",IF(AND(' + C(salesI, r) + '<1,' + SB.raiseNoSales + '=0),"Keep",IF(OR(' + C(raiseC, r) + '="",NOT(' + C(raiseC, r) + '>' + C(priceU, r) + ')),"Keep",IF(' + C(gain, r) + '<' + SB.minGain + ',"Keep","Raise")))))))))))))';
+      var raiseLine = 'IF(' + C(chinaI, r) + '=1,' + C(floorPct, r) + ',IF(' + C(salesI, r) + '>=1,' + C(floorPct, r) + ',' + SB.safeMin + '))';
+      var actF = 'IF(' + C(noDataI, r) + '=1,"No data",IF(' + C(pCheckI, r) + '=1,"Price check",IF(OR(' + C(postU, r) + '="",' + C(priceU, r) + '="",NOT(ISNUMBER(' + C(costI, r) + ')),' + C(costI, r) + '<=0),"No data",IF(AND(' + C(freshI, r) + '=0,' + SB.useStale + '=0),"No data",IF(AND(ISNUMBER(' + C(stockI, r) + '),' + C(stockI, r) + '<=0,' + SB.noStockKeep + '=1),"Keep",IF(AND(' + C(treeI, r) + '=1,' + SB.keepTrees + '=1),"Keep",IF(' + C(winI, r) + '<>1,IF(OR(' + C(bbI, r) + '="",NOT(ISNUMBER(' + C(bbI, r) + ')),' + C(bbI, r) + '<=0),"No data",IF(' + C(priceU, r) + '<ROUND(' + C(bbI, r) + ',2),"Keep",IF(' + C(tLow, r) + '="","",IF(' + C(tLow, r) + '<' + C(floorP, r) + ',"Can\'t win","Lower")))),IF(OR(' + C(pcNow, r) + '="",' + raiseLine + '=""),"Raise",IF(' + C(pcNow, r) + '<' + raiseLine + '-0.000000001,"Raise",IF(IF(' + C(capP, r) + '="",FALSE,' + C(priceU, r) + '>=' + C(capP, r) + '-0.000000001),"Keep",IF(AND(' + C(salesI, r) + '<1,' + SB.raiseNoSales + '=0),"Keep",IF(OR(' + C(raiseC, r) + '="",NOT(' + C(raiseC, r) + '>' + C(priceU, r) + ')),"Keep",IF(' + C(gain, r) + '<' + SB.minGain + ',"Keep","Raise")))))))))))))';
       setH(act, actF);
-      setH(weekly, 'IF(OR(' + C(act, r) + '<>"Can\'t win",' + C(chinaI, r) + '=1,' + C(lastI, r) + '="",' + SB.asOf + '=""),0,IF(AND(' + SB.asOf + '-' + C(lastI, r) + '<' + SB.weeklyDays + ',' + SB.asOf + '-' + C(lastI, r) + '>=0),1,0))');
+      setH(weekly, 'IF(OR(' + C(act, r) + '<>"Can\'t win",' + C(chinaI, r) + '=1,' + C(lastI, r) + '="",' + SB.asOf + '=""),0,IF(AND(' + SB.asOf + '-' + C(lastI, r) + '<' + SB.t5HoldDays + ',' + SB.asOf + '-' + C(lastI, r) + '>=0),1,0))');
       var prof = function (p) { return 'ROUND(ROUND((' + p + ')*(1-' + SB.fee + ')-' + C(fixed, r) + ',6),2)'; };
       var pcOf = function (p) { return '((' + p + ')*(1-' + SB.fee + ')-' + C(fixed, r) + ')/' + C(costI, r); };
       var okUK = function (p, fl) { return 'IF(OR(' + p + '="",' + fl + '=""),FALSE,AND(' + p + '>0,' + prof(p) + '>0,' + p + '>=' + fl + '-0.00001,IF(' + C(capP, r) + '="",TRUE,' + p + '<=' + C(capP, r) + '+0.00001),' + pcOf(p) + '>=' + SB.safeMin + '-0.000000001))'; };
@@ -1175,10 +1187,12 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
       setH(t3fb, 'IF(' + C(floorP, r) + '="","",IF(AND(' + C(chinaI, r) + '=1,' + C(salesI, r) + '<1,' + C(chinaMin, r) + '<>""),' + C(chinaMin, r) + ',ROUNDUP(' + C(floorP, r) + '*(1+' + SB.t3buf + '),2)))', M);
       setH(t3m, 'IF(OR(' + C(t3q, r) + '="",' + C(t3fb, r) + '=""),"",MAX(' + C(t3q, r) + ',' + C(t3fb, r) + '))', M);
       setH(t3c, 'IF(' + C(t3m, r) + '="","",IF(' + C(capP, r) + '="",' + C(t3m, r) + ',IF(' + C(t3m, r) + '>' + C(capP, r) + ',' + C(capP, r) + ',' + C(t3m, r) + ')))', M);
-      setH(t3s, 'IF(OR(' + C(priceU, r) + '="",' + C(t3c, r) + '=""),"",IF(ABS(' + C(priceU, r) + '-' + C(t3c, r) + ')<' + SB.minChange + ',"",IF(' + okUK(C(t3c, r), C(t3fb, r)) + ',' + C(t3c, r) + ',"")))', M);
-      var up9 = '(ROUND(' + C(floorP, r) + '*100,0)+MOD(9-MOD(ROUND(' + C(floorP, r) + '*100,0),10)+10,10))/100';
-      var floorUp = 'IF(' + C(floorP, r) + '="","",IF(OR(' + up9 + '<=0,IF(' + C(capP, r) + '="",FALSE,' + up9 + '>' + C(capP, r) + ')),' + C(floorP, r) + ',' + up9 + '))';
-      setH(reSugg, 'IF(OR(' + C(act, r) + '="",' + C(act, r) + '="No data",' + C(act, r) + '="Price check"),"",IF(' + C(act, r) + '="Lower",' + C(bbSugg, r) + ',IF(' + C(act, r) + '="Raise",IF(OR(' + C(pcNow, r) + '="",' + C(pcNow, r) + '<' + C(floorPct, r) + '),' + floorUp + ',' + C(raiseC, r) + '),IF(' + C(act, r) + '="Can\'t win",' + C(t5s, r) + ',IF(AND(' + C(winI, r) + '=1,' + C(salesI, r) + '<1,' + C(treeI, r) + '<>1,OR(NOT(ISNUMBER(' + C(stockI, r) + ')),' + C(stockI, r) + '>0,' + SB.noStockKeep + '=0)),' + C(t3s, r) + ',"")))))', M);
+      setH(t3s, 'IF(OR(' + C(priceU, r) + '="",' + C(t3c, r) + '=""),"",IF(AND(' + C(chinaI, r) + '<>1,' + C(t3c, r) + '>=' + C(priceU, r) + '),"",IF(ABS(' + C(priceU, r) + '-' + C(t3c, r) + ')<' + SB.minChange + ',"",IF(' + okUK(C(t3c, r), C(t3fb, r)) + ',' + C(t3c, r) + ',""))))', M);
+      var raisePx = 'IF(AND(' + C(chinaI, r) + '<>1,' + C(salesI, r) + '<1),' + priceFor(r, SB.safeMin) + ',' + C(floorP, r) + ')';
+      var up9r = '(ROUND(' + raisePx + '*100,0)+MOD(9-MOD(ROUND(' + raisePx + '*100,0),10)+10,10))/100';
+      var raiseUp = 'IF(' + raisePx + '="","",IF(OR(' + up9r + '<=0,IF(' + C(capP, r) + '="",FALSE,' + up9r + '>' + C(capP, r) + ')),' + raisePx + ',' + up9r + '))';
+      var raiseLine2 = 'IF(' + C(chinaI, r) + '=1,' + C(floorPct, r) + ',IF(' + C(salesI, r) + '>=1,' + C(floorPct, r) + ',' + SB.safeMin + '))';
+      setH(reSugg, 'IF(OR(' + C(act, r) + '="",' + C(act, r) + '="No data",' + C(act, r) + '="Price check"),"",IF(' + C(act, r) + '="Lower",' + C(bbSugg, r) + ',IF(' + C(act, r) + '="Raise",IF(OR(' + C(pcNow, r) + '="",' + C(pcNow, r) + '<' + raiseLine2 + '),' + raiseUp + ',' + C(raiseC, r) + '),IF(' + C(act, r) + '="Can\'t win",' + C(t5s, r) + ',IF(AND(' + C(winI, r) + '=1,' + C(salesI, r) + '<1,' + C(treeI, r) + '<>1,OR(NOT(ISNUMBER(' + C(stockI, r) + ')),' + C(stockI, r) + '>0,' + SB.noStockKeep + '=0)),' + C(t3s, r) + ',"")))))', M);
       setF(showPost, 'IF(' + C(postU, r) + '="","",' + C(postU, r) + ')', M);
       setF(showPrice, 'IF(' + C(priceU, r) + '="","",' + C(priceU, r) + ')', M);
       setF(showProfit, 'IF(AND(' + C(postStat, r) + '="BASE",' + C(priceStat, r) + '="BASE"),IF(' + C(engProfitI, r) + '="","",' + C(engProfitI, r) + '),' + C(profitNow, r) + ')', M);
@@ -1195,7 +1209,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
       var yourChk = 'IF(' + C(weeklyEngI, r) + '=1,"WEEKLY HOLD",IF(' + chinaUpYour + ',"CHINA RAISE",IF(AND(' + C(packI, r) + '=1,' + SB.checkPost + '=0),"CHECK POSTAGE",IF(' + C(yourU, r) + '<=0,"NO PRICE",IF(' + prof(C(yourU, r)) + '<=0,"LOSS",IF(AND(IF(' + C(t5MinI, r) + '<>"",' + C(t5MinI, r) + ',' + C(engFloorI, r) + ')<>"",' + C(yourU, r) + '<IF(' + C(t5MinI, r) + '<>"",' + C(t5MinI, r) + ',' + C(engFloorI, r) + ')-0.00001),"UNDER FLOOR",IF(IF(' + C(engCapI, r) + '="",FALSE,' + C(yourU, r) + '>' + C(engCapI, r) + '+0.00001),"OVER CAP",IF((' + C(yourU, r) + '*(1-' + SB.fee + ')-(' + C(costI, r) + '*' + C(multI, r) + '+' + C(basePostI, r) + '+' + C(colI, r) + '))/' + C(costI, r) + '<' + SB.safeMin + ',"UNDER FLOOR",IF(AND(' + C(chinaI, r) + '=1,(' + C(yourU, r) + '*(1-' + SB.fee + ')-(' + C(costI, r) + '*' + C(multI, r) + '+' + C(basePostI, r) + '+' + C(colI, r) + '))/' + C(costI, r) + '<1),"UNDER FLOOR",IF(ROUND(' + C(yourU, r) + ',2)=ROUND(' + C(basePriceI, r) + ',2),"NO CHANGE","OK"))))))))))';
       setF(showCheck, 'IF(OR(' + C(postStat, r) + '="CONFLICT",' + C(priceStat, r) + '="CONFLICT",' + C(yourStat, r) + '="CONFLICT",' + C(incStat, r) + '="CONFLICT"),"CONFLICT",IF(OR(' + C(postStat, r) + '="INVALID",' + C(priceStat, r) + '="INVALID",' + C(yourStat, r) + '="INVALID",' + C(incStat, r) + '="INVALID"),"INVALID",IF(AND(' + C(postStat, r) + '="BASE",' + C(priceStat, r) + '="BASE",' + C(yourStat, r) + '="BASE"),' + C(engCheckI, r) + ',IF(AND(' + C(postStat, r) + '="BASE",' + C(priceStat, r) + '="BASE"),' + yourChk + ',' + reChk + '))))');
       setF(showInc, 'IF(OR(' + C(showCheck, r) + '="CONFLICT",' + C(showCheck, r) + '="INVALID"),"No",IF(' + C(incStat, r) + '="OK",IF(' + C(incVal, r) + '="No","No",IF(' + C(showCheck, r) + '="OK","Yes","No")),IF(AND(' + C(postStat, r) + '="BASE",' + C(priceStat, r) + '="BASE",' + C(yourStat, r) + '="BASE"),' + C(engIncI, r) + ',IF(' + C(showCheck, r) + '="OK","Yes","No"))))');
-      setF(showWhy, 'IF(AND(' + C(postStat, r) + '="BASE",' + C(priceStat, r) + '="BASE",' + C(yourStat, r) + '="BASE",' + C(incStat, r) + '="BASE"),' + C(engReasonI, r) + ',IF(' + C(showCheck, r) + '="CONFLICT","Two tabs have different review numbers for this SKU. Clear one so only one value remains.",IF(' + C(showCheck, r) + '="INVALID","A review cell is not a valid number. Postage may be 0. Prices must be above 0.",IF(' + C(showCheck, r) + '="CHECK POSTAGE","Heavy pack: type the checked postage in Postage review (0 is allowed). Include Yes alone does not clear it.",IF(' + C(showCheck, r) + '="CHINA RAISE","China raise is review only and is not on the upload.",IF(' + C(showCheck, r) + '="WEEKLY HOLD","Margin too low (UK) was already changed in the last 7 days.",IF(' + C(showCheck, r) + '="OK",IF(' + C(yourStat, r) + '="OK","Your price (final override)","Suggestion recalculated from the review"),' + C(showCheck, r) + ')))))))');
+      setF(showWhy, 'IF(AND(' + C(postStat, r) + '="BASE",' + C(priceStat, r) + '="BASE",' + C(yourStat, r) + '="BASE",' + C(incStat, r) + '="BASE"),' + C(engReasonI, r) + ',IF(' + C(showCheck, r) + '="CONFLICT","Two tabs have different review numbers for this SKU. Clear one so only one value remains.",IF(' + C(showCheck, r) + '="INVALID","A review cell is not a valid number. Postage may be 0. Prices must be above 0.",IF(' + C(showCheck, r) + '="CHECK POSTAGE","Heavy pack: type the checked postage in Postage review (0 is allowed). Include Yes alone does not clear it.",IF(' + C(showCheck, r) + '="CHINA RAISE","China raise is review only and is not on the upload.",IF(' + C(showCheck, r) + '="WEEKLY HOLD","Margin too low (UK) was already changed in the last 3 days.",IF(' + C(showCheck, r) + '="OK",IF(' + C(yourStat, r) + '="OK","Your price (final override)","Suggestion recalculated from the review"),' + C(showCheck, r) + ')))))))');
       var qualUK = 'AND(' + C(showInc, r) + '="Yes",' + C(showCheck, r) + '="OK",' + C(2, r) + '="UK")';
       var qualCN = 'AND(' + C(showInc, r) + '="Yes",' + C(showCheck, r) + '="OK",' + C(2, r) + '="China")';
       setF(runUK, (idx === 0 ? 'IF(' + qualUK + ',1,0)' : C(runUK, r - 1) + '+IF(' + qualUK + ',1,0)'));
@@ -1243,7 +1257,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
     list.push(revSheet(T2, byTab[2], 'Winning and in range. Type in the yellow cells if a postage or the current price needs a correction.'));
     list.push(revSheet(T3, byTab[3], 'Winning, 0 sales. A price review recalculates the quarter-gap suggestion. Yellow cells only.'));
     list.push(revSheet(T4, byTab[4], 'Can win the buy box. Yellow Postage review and Selling price review flow to Combined and Final.'));
-    list.push(revSheet(T5, byTab[5], 'Margin too low. UK cut uses a 60% floor and a 65% minimum, 5% off, and will not repeat within 7 days. Yellow cells only.'));
+    list.push(revSheet(T5, byTab[5], 'Margin too low. UK cut uses a 60% floor and a 65% minimum, 5% off, and will not repeat within 3 days. Exactly 3 days is allowed. Yellow cells only.'));
     list.push(revSheet(T6, recs, 'Every product. Filter Check to OK to see upload rows. A suggestion that appears after you type a review shows up here and on Final without retyping. Yellow cells are inputs; white cells are formulas.'));
     list.push(revSheet(TC, byTab.china, 'China raises — review only. They never go on the upload. Typing a higher price does not put them on Final. Tab 8 is not used.'));
     list.push(finalSheet(T7A, upUK, showFinal, recs.length, 'UK prices only. Formulas from Combined. Do not type on this tab. China raises are never listed.'));
@@ -1268,7 +1282,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
         ['One SKU, many tabs', 'Type the correction on the tab you are reviewing. Combined and Final follow that SKU. You do not retype it.'],
         ['If two tabs disagree', 'The row shows CONFLICT and stays off the upload. Clear one yellow cell so only one value is left. The file cannot tell which edit was last.'],
         ['Heavy packs', 'Multi-packs at or above 14999g, or with no weight, stay off the upload until Postage review has a number (0 is allowed).'],
-        ['What never uploads', 'A loss, a price under the floor, a price over the UK cap, a China raise, a UK margin cut repeated within 7 days, a conflict, or an invalid number.'],
+        ['What never uploads', 'A loss, a price under the floor, a price over the UK cap, a China raise, a UK margin cut repeated within 3 days, a conflict, or an invalid number.'],
         ['Final tabs', '7a and 7b are the B&Q upload layout. They fill themselves. Do not type on them.'],
         ['Tab 8', 'Report only. Edits there do not change Combined or Final.'],
         ['This computer', 'Excel recalculates this file. You do not upload it to the website to see the new profit. The website remembers checks only after you use Import checked workbook, and only in that browser.'],
@@ -1564,7 +1578,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
   var T5_CUT = 0.05;          /* tab 5: 5% off the price now */
   var T5_UK_FLOOR = 0.60;     /* tab 5 UK only (9 Nov): special 60% floor on cost */
   var T5_UK_MIN = 0.65;       /* tab 5 UK: never below floor+5pp = 65% on cost */
-  var WEEKLY_DAYS = 7;        /* tab 5 UK: no second cut within 7 days of last price change */
+  var WEEKLY_DAYS = 3;        /* tab 5 UK: held only when the last change was under 3 days ago; exactly 3 days is allowed */
   var NAMES = ['1 All', '2 Winning in range', '3 Winning 0 sales', '4 Can win buy box', '5 Margin too low', '6 Combined upload', '7a Final upload UK', '7b Final upload China', '8 Sells elsewhere not B&Q'];
   var REVIEW_CHINA = 'China raises (review only)';
   var START = 'Start here';
@@ -1577,7 +1591,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
   var STK = ['neg', 'under', 'blue', 'amber', 'green'], ST = { neg: { fill: 'FFD32F2F', font: 'FFFFFFFF' }, under: { fill: 'FFF8BBD0' }, blue: { fill: 'FFBBDEFB' }, amber: { fill: 'FFFFE082' }, green: { fill: 'FFC8E6C9' } };
   var LEGEND = 'Colours on profit cells: SOLID RED = loss (below £0) · PINK = under the floor · AMBER = within 5 points above the floor % · GREEN = floor + 5 up to the cap · BLUE = over the 80% cap. Header bands: grey = estimated cost, blue = selling price, green = profit £, purple = profit %.';
   var RULE3 = 'We win but sold 0 on B&Q in 30 days. Suggested = price now minus a quarter of the gap to the floor (selling − (selling − floor)/4), rounded to the penny, but never below the floor + 5% (rounded up), never over the 80% cap, and only if the price drops by at least 10p. Projected profit and % are at that price.';
-  var RULE5 = 'OPTIONAL – Margin too low. UK (9 Nov 2026): uses a 60% floor on cost for this cut only (other tabs keep the normal cost-band floors); suggested = 5% off price now, rounded to the penny, never below the 65% price (floor + 5 points), never over the 80% cap, only if the drop is at least 10p, and not if the price changed in the last 7 days (weekly). China: 5% off, never below the normal 100% floor. Does not win the buy box – it only makes the price more attractive.';
+  var RULE5 = 'OPTIONAL – Margin too low. UK: uses a 60% floor on cost for this cut only (other tabs keep the normal cost-band floors); suggested = 5% off price now, rounded to the penny, never below the 65% price (floor + 5 points), never over the 80% cap, only if the drop is at least 10p, and not if the price changed in the last 3 days. Exactly 3 days is allowed. China: 5% off, never below the normal 100% floor. Does not win the buy box – it only makes the price more attractive.';
   var M = '£#,##0.00', PC = '0.0%', IN = '#,##0', EAN = '0', HDRF = '@', YESF = '0;-0;0;@', YOURF = '"£"#,##0.00';
 
   function cls(P, r, S) {
@@ -1623,6 +1637,11 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
     /* Keep rows */
     if (stockOut || tree) { x.label = tree ? 'Christmas tree – kept' : 'No free stock – kept'; return x; }
     if (o.win) {
+      if (!o.china && !(o.sales >= 1) && o.pc != null && o.pc >= P.SAFE_MIN - 1e-9 && o.floorPct != null && o.pc < o.floorPct - 1e-9 && r.act !== 'Raise') {
+        x.cat = 'keep'; x.sugg = null; x.inc = 'No'; x.label = '0 B&Q sales: profit already >= 50%, not raised';
+        x.why = '0 B&Q sales: profit already >= 50%, not raised';
+        return x;
+      }
       if (!(o.sales >= 1)) {
         x.cat = 't3'; x.tab = 3; x.label = 'Winning, 0 sales';
         var min105 = o.china ? P.priceFor(o.a, P.CHINA_FLOOR + 0.05) : null;
@@ -1660,7 +1679,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
     var o = x.o, k = x.cat, s;
     if (o.dup) s = 'Duplicate SKU row – not priced';
     else if (x.label === 'No data') s = 'No buy box data';
-    else if (k === 'raise') s = o.china ? 'China raise – review only (never in Final upload)' : (o.pc != null && o.floorPct != null && o.pc < o.floorPct - 1e-9 ? 'Raise to floor (profit under floor %)' : 'Raise: winning with room to the cap');
+    else if (k === 'raise') s = o.china ? 'China raise – review only (never in Final upload)' : (!(o.sales >= 1) && o.pc != null && o.pc < P.SAFE_MIN - 1e-9 ? '0 B&Q sales: profit under 50% – raise only to 50% on cost' : (o.pc != null && o.floorPct != null && o.pc < o.floorPct - 1e-9 ? 'Raise to floor (profit under floor %)' : 'Raise: winning with room to the cap'));
     else if (k === 't4') s = 'Win buy box: 1p under ' + (o.seller || 'rival');
     else if (k === 't5') {
       if (x.weeklyHold) s = 'Margin too low UK – weekly hold until ' + addDays(x.lastChange, WEEKLY_DAYS);
@@ -1903,7 +1922,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
       [NAMES[1], 'We hold the buy box, it sells, profit is between the floor and the 80% cap.', counts.t2, 'Nothing – no change.'],
       [NAMES[2], 'We hold the buy box but sold 0 on B&Q in 30 days.', counts.t3, 'Optional price cut (goes to tab 6). ' + RULE3],
       [NAMES[3], 'A rival holds the buy box; we can go 1p under and stay above the floor.', counts.t4, 'Suggested price = 1p under the buy box (or our 80% cap if lower), never under the floor (goes to tab 6).'],
-      [NAMES[4], 'We cannot win the buy box under the normal floor. UK optional cut uses 60% floor (min 65%), weekly (7 days).', counts.t5, RULE5 + ' Price changes are weekly for this tab.'],
+      [NAMES[4], 'We cannot win the buy box under the normal floor. UK optional cut uses 60% floor (min 65%), held only when the last change was under 3 days ago.', counts.t5, RULE5 + ' Exactly 3 days is allowed.'],
       [NAMES[5], 'Every suggested change in one list (except China raises). Type your own price in yellow "Your price" (blank = suggested); set Include Yes/No.', counts.t6, 'Rows with Include = Yes that pass the checks go to tab 7a (UK) or 7b (China). China under-floor raises are NOT here – see the review-only tab. Check-postage rows never go. Hidden helper columns do the maths – leave them.'],
       [REVIEW_CHINA, 'China (Ashian) products under the 100% floor – proposed raise to the floor. REVIEW ONLY.', counts.chinaRaiseReview, 'Never uploaded. Decide offline; do not use Include to push these into Final upload.'],
       [NAMES[6], 'B&Q price upload layout – UK SKUs only.', counts.t7uk, 'Save and upload this tab to B&Q for UK prices.'],
@@ -2533,7 +2552,7 @@ function render(body){
   draw()})}
 /* safety net: the shared tab bar (bq_nav.js) should sit on top; if this browser did not show it, draw the same 9 tabs inline here */
 function ensureNav(body){setTimeout(function(){var n=document.getElementById("bqnav");if(n&&n.offsetHeight>10&&getComputedStyle(n).display!=="none")return;if($("lkinav"))return;
- var T=(window.BQNav&&BQNav.tabs)||[["home","Home"],["sales","Sales"],["orders","Orders"],["listings","Listings"],["dups","Duplicates"],["access","Access file"],["pricing","Pricing"],["lookup","Individual sales"],["calc","Calculator"]];
+ var T=(window.BQNav&&BQNav.tabs)||[["home","Home"],["sales","Sales"],["orders","Orders"],["selling","Products selling"],["listings","Listings"],["dups","Duplicates"],["access","Access file"],["pricing","Pricing"],["lookup","Individual sales"],["calc","Calculator"]];
  var d=document.createElement("div");d.id="lkinav";d.className="lk-chips";d.innerHTML=T.map(function(t){return '<button type="button" data-g="'+t[0]+'"'+(t[0]==="lookup"?' class="on"':'')+'>'+esc(t[1])+'</button>'}).join("");
  body.insertBefore(d,body.firstChild);
  d.onclick=function(e){var b=e.target.closest&&e.target.closest("[data-g]");if(!b)return;var v=b.getAttribute("data-g");
@@ -2798,7 +2817,7 @@ window.BQCalc={state:function(){return st},compute:compute,csv:csvText,saved:loa
    No keys and no catalogue data in this file. */
 (function(){
 "use strict";
-var T=[["home","Home"],["sales","Sales"],["orders","Orders"],["listings","Listings"],["dups","Duplicates"],["access","Access"],["pricing","Pricing"],["lookup","Individual sales"],["calc","Calculator"]];
+var T=[["home","Home"],["sales","Sales"],["orders","Orders"],["selling","Products selling"],["listings","Listings"],["dups","Duplicates"],["access","Access"],["pricing","Pricing"],["lookup","Individual sales"],["calc","Calculator"]];
 if(document.getElementById("bqnav"))return;
 var CSS='#bqnav{position:fixed;top:0;left:0;right:0;width:100%;max-width:100%;box-sizing:border-box;z-index:80;background:#0F172A;border-bottom:1px solid #1E293B;padding:env(safe-area-inset-top) 0 0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;overflow:hidden}'+
  '#bqnav .bqn-s{display:flex;flex-wrap:wrap;align-items:center;gap:6px;width:100%;max-width:1400px;box-sizing:border-box;margin:0 auto;padding:7px 10px}'+
@@ -2820,10 +2839,10 @@ function base(){if(MAIN)return "";
  var p=location.pathname,i=p.indexOf("/listings/");
  if(i>=0)return p.slice(0,i+1);
  return p.replace(/\/listings(\/index\.html)?\/?$/,"/")||"/"}
-function href(v){if(MAIN){if(v==="listings")return"listings/";if(v==="sales")return"sales.html";if(v==="orders")return"orders.html";if(v==="home")return"index.html";return"#go="+v;}return v==="listings"?"./":base()+(v==="home"?"":v==="sales"?"sales.html":v==="orders"?"orders.html":"#go="+v)}
+function href(v){if(MAIN){if(v==="listings")return"listings/";if(v==="sales")return"sales.html";if(v==="orders")return"orders.html";if(v==="selling")return"productselling.html";if(v==="home")return"index.html";return"#go="+v;}return v==="listings"?"./":base()+(v==="home"?"":v==="sales"?"sales.html":v==="orders"?"orders.html":v==="selling"?"productselling.html":"#go="+v)}
 function mark(v){if(v===cur)return;cur=v;Array.prototype.forEach.call(nav.querySelectorAll("a"),function(a){var on=a.getAttribute("data-bqn")===v;a.classList.toggle("on",on);if(on)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current")})}
 function toListings(){var p=window.BQ&&BQ.stashSession?BQ.stashSession():Promise.resolve();p.then(function(){location.href="listings/"})}
-var ALLOW={home:1,sales:1,orders:1,listings:1,dups:1,access:1,pricing:1,lookup:1,calc:1};
+var ALLOW={home:1,sales:1,orders:1,selling:1,listings:1,dups:1,access:1,pricing:1,lookup:1,calc:1};
 function readGo(){var h=/[#&]go=([a-z]+)/.exec(location.hash||""),s=null;try{s=sessionStorage.getItem("bqDashGo")}catch(e){}
  var hv=h&&ALLOW[h[1]]?h[1]:"",sv=s&&ALLOW[s]?s:"";return hv||sv||""}
 function clearGo(){try{sessionStorage.removeItem("bqDashGo")}catch(e){}
@@ -2835,13 +2854,13 @@ var $=function(i){return document.getElementById(i)},TITLE={};
 function hidden(id){var e=$(id);return !e||e.classList.contains("hide")}
 function state(){if(window.BQ&&BQ.forced)return BQ.forced;
  if(!hidden("tabv")){var tt=($("ttitle")||{}).textContent||"";for(var k in TITLE)if(TITLE[k]===tt)return k;return ""}
- if(!hidden("viewer"))return /Orders/.test(document.title)?"orders":"sales";return "home"}
+ if(!hidden("viewer")){var ttl=document.title;if(/Products selling/.test(ttl))return "selling";return /Orders/.test(ttl)?"orders":"sales";}return "home"}
 var sent=false;
 function sync(){var unl=!hidden("menu")||!hidden("viewer")||!hidden("tabv");document.body.classList.toggle("bqn",unl);nav.style.display=unl?"":"none";if(unl){size();mark(state())}
  if(unl&&!hidden("menu")&&!sent){var v=readGo();if(v){sent=true;clearGo();if(v!=="home")setTimeout(function(){go(v)},0)}}}
 function card(v){return document.querySelector('#menu [data-d="'+v+'"],#menu [data-v="'+v+'"]')}
 function go(v){if(v==="listings"){toListings();return}
- if(v==="sales"||v==="orders"){var p=window.BQ&&BQ.stashSession?BQ.stashSession():Promise.resolve();p.then(function(){location.href=v+".html"});return}
+ if(v==="sales"||v==="orders"||v==="selling"){var p=window.BQ&&BQ.stashSession?BQ.stashSession():Promise.resolve();p.then(function(){location.href=v==="selling"?"productselling.html":v+".html"});return}
  if(v==="home"){var p2=window.BQ&&BQ.stashSession?BQ.stashSession():Promise.resolve();p2.then(function(){location.href="index.html"});return}
  if(window.BQTabs&&BQTabs.close&&!hidden("tabv"))BQTabs.close();
  if(!hidden("viewer")&&window.BQ&&BQ.back)BQ.back();
