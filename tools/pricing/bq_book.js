@@ -467,7 +467,8 @@
       for (i = 2; i < a.length; i++) {
         sku = a[i][0] == null ? '' : String(a[i][0]).trim(); p = P.num(a[i][1]); if (!sku && (p == null)) continue;
         o = byS[sku];
-        why = !o ? 'SKU not in the data' : seen[sku] ? 'twice' : !(p > 0) ? 'no price' : (o.check && !S.checkPost && !o.postChecked) ? 'check postage' : (S.blocks && S.blocks[sku]) ? S.blocks[sku] : !o.a ? 'no cost' : (o.china && ni === 0) ? 'China SKU on UK tab' : (!o.china && ni === 1) ? 'UK SKU on China tab' : !ok(P, o, P.rnd(p, 2)) ? 'under floor / loss / over cap' : '';
+        var minFl = o && o.t5Min != null ? o.t5Min : (o && o.floor);
+        why = !o ? 'SKU not in the data' : seen[sku] ? 'twice' : !(p > 0) ? 'no price' : (o.check && !S.checkPost && !o.postChecked) ? 'check postage' : (S.blocks && S.blocks[sku]) ? S.blocks[sku] : !o.a ? 'no cost' : (o.china && ni === 0) ? 'China SKU on UK tab' : (!o.china && ni === 1) ? 'UK SKU on China tab' : !okAt(P, o, P.rnd(p, 2), minFl) ? 'under floor / loss / over cap' : '';
         /* China under-floor raises must never be imported even if someone pasted them */
         if (!why && o && o.china && P.rnd(p, 2) > P.rnd(o.price, 2) + 1e-9) why = 'China raise – review only';
         seen[sku] = 1; if (why) bad.push(sku + ' (' + why + ')'); else out.push([sku, P.rnd(p, 2)]);

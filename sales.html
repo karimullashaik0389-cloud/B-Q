@@ -2104,7 +2104,8 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
       for (i = 2; i < a.length; i++) {
         sku = a[i][0] == null ? '' : String(a[i][0]).trim(); p = P.num(a[i][1]); if (!sku && (p == null)) continue;
         o = byS[sku];
-        why = !o ? 'SKU not in the data' : seen[sku] ? 'twice' : !(p > 0) ? 'no price' : (o.check && !S.checkPost && !o.postChecked) ? 'check postage' : (S.blocks && S.blocks[sku]) ? S.blocks[sku] : !o.a ? 'no cost' : (o.china && ni === 0) ? 'China SKU on UK tab' : (!o.china && ni === 1) ? 'UK SKU on China tab' : !ok(P, o, P.rnd(p, 2)) ? 'under floor / loss / over cap' : '';
+        var minFl = o && o.t5Min != null ? o.t5Min : (o && o.floor);
+        why = !o ? 'SKU not in the data' : seen[sku] ? 'twice' : !(p > 0) ? 'no price' : (o.check && !S.checkPost && !o.postChecked) ? 'check postage' : (S.blocks && S.blocks[sku]) ? S.blocks[sku] : !o.a ? 'no cost' : (o.china && ni === 0) ? 'China SKU on UK tab' : (!o.china && ni === 1) ? 'UK SKU on China tab' : !okAt(P, o, P.rnd(p, 2), minFl) ? 'under floor / loss / over cap' : '';
         /* China under-floor raises must never be imported even if someone pasted them */
         if (!why && o && o.china && P.rnd(p, 2) > P.rnd(o.price, 2) + 1e-9) why = 'China raise – review only';
         seen[sku] = 1; if (why) bad.push(sku + ' (' + why + ')'); else out.push([sku, P.rnd(p, 2)]);
@@ -2374,19 +2375,19 @@ function bbRow(r){var o=r.o,r2=function(v){return v==null?"":P.rnd(v,2)},p4=func
 var BBHD=["SKU","EAN","Product","UK / China","Price now","Profit now £","Profit now %","Buy box price","Buy box seller","We win","Action","Suggested price","Profit at suggested £","Profit at suggested %","Profit change £","Floor price","Floor %","Cap price (80%)","B&Q 30-day sales","Free stock","Postage","Postage from","Reason","In upload"];
 BQTabs.add("pricing",{title:"Pricing",render:function(body){return render(body)}});
 function b7opt(){return Object.assign({},st.bbo,{chinaRaise:false,checkPost:!!st.bbo.checkPost,checks:st.checks&&st.checks.items||{}})}
-function b7draw(){var B=window.BQBook,R=st.bbr||[];if(!$("pzb7"))return;if(!B||!R.length){$("pzb7dl").disabled=true;$("pzb7c").innerHTML="";return}
+function b7draw(){var B=window.BQBook,R=st.bbr||[];if(!$("pzb7"))return;if(!B||!R.length){$("pzb7dl").disabled=true;if($("pzchkimp"))$("pzchkimp").disabled=true;if($("pzb7in"))$("pzb7in").disabled=true;if($("pzb7inl"))$("pzb7inl").classList.add("off");$("pzb7c").innerHTML="";return}
  var X=B.classify(P,R,b7opt()),n={2:0,3:0,4:0,5:0},s3=0,s5=0,c6=0,c7uk=0,c7cn=0,nRaise=0;X.forEach(function(x){if(n[x.tab]!=null)n[x.tab]++;if(x.tab===3&&x.sugg!=null)s3++;if(x.tab===5&&x.sugg!=null)s5++;
   if(x.cat==="raise"&&x.o.china){nRaise++;return}if(x.sugg!=null&&(x.tab>2||x.cat==="raise")){c6++;if(x.inc==="Yes"&&!(x.o.check&&!st.bbo.checkPost)){if(x.o.china)c7cn++;else c7uk++}}});
  var t=[["1 All",n0(R.length)],["2 Winning, in range",n0(n[2])],["3 Winning, 0 sales",n0(n[3])+" · "+n0(s3)+" to lower"],["4 Can win",n0(n[4])],["5 Margin too low",n0(n[5])+" · "+n0(s5)+" optional"],["6 Combined",n0(c6)],["China raises review",n0(nRaise)],["7a Final UK",n0(c7uk)+" prices"],["7b Final China",n0(c7cn)+" prices"]];var E8=B.sells?B.sells(P,X,st.aoa||[]):[];st.b8=E8.length;t.push(["8 Sells elsewhere, not B&Q",n0(E8.length)]);
  $("pzb7c").innerHTML=t.map(function(a){return '<span class="pz-b7t"><b>'+esc(a[1])+'</b>'+esc(a[0])+'</span>'}).join("");
- $("pzb7src").textContent=st.src==="file"?"· from your Access file "+(st.file||""):"· from the published Access file "+(st.file||"");$("pzb7dl").disabled=false}
+ $("pzb7src").textContent=st.src==="file"?"· from your Access file "+(st.file||""):"· from the published Access file "+(st.file||"");$("pzb7dl").disabled=false;if($("pzchkimp"))$("pzchkimp").disabled=false;if($("pzb7in"))$("pzb7in").disabled=false;if($("pzb7inl"))$("pzb7inl").classList.remove("off")}
 function b7input(){var doc=st.doc||{},meta=doc.meta||{};return{bbr:st.bbr,aoa:st.aoa,settings:b7opt(),template:doc.template||TPL,checks:st.checks&&st.checks.items||{},rivals:doc.rivals||{},fresh:st.fresh||{},priceChanges:doc.priceChanges||meta.priceChanges||null,asOf:doc.asOf||meta.as_of||meta.access_date||st.accessDate||""}}
 function saveBytes(bytes,name){var bl=new Blob([bytes],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),u=URL.createObjectURL(bl),a=document.createElement("a");a.href=u;a.download=name;document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(u);a.remove()},4000)}
 function book7(){var b=$("pzb7dl");if(!window.BQBook||!st.bbr)return;b.disabled=true;var old=b.innerHTML;b.textContent="Preparing…";
  K.xlsx().then(function(X){var out=window.BQBook.build(X,P,b7input());st.b7=out.counts;saveBytes(out.bytes,"B&Q Pricing 7a/7b "+(st.accessDate||"")+" made "+today()+".xlsx");
   $("pzb7n").textContent=" Saved – 7a UK "+(out.counts.t7uk||0)+", 7b China "+(out.counts.t7cn||0)+" (China raises review "+(out.counts.chinaRaiseReview||0)+").";}).catch(function(e){alert(K.why(e))}).then(function(){b.disabled=false;b.innerHTML=old})}
 function fromEdited(f){var n=$("pzb7n");n.textContent=" Reading "+f.name+"…";
- Promise.all([K.xlsx(),f.arrayBuffer()]).then(function(a){var X=a[0],wb=X.read(new Uint8Array(a[1]),{type:"array"}),by={};(st.bbr||[]).forEach(function(r){if(!r.o.dup&&!by[r.o.sku])by[r.o.sku]=r.o});
+ Promise.all([K.xlsx(),f.arrayBuffer()]).then(function(a){var X=a[0],wb=X.read(new Uint8Array(a[1]),{type:"array"}),by={};(window.BQBook.classify(P,st.bbr||[],b7opt())||[]).forEach(function(x){if(x.o&&!x.o.dup&&!by[x.o.sku]){if(x.t5Min!=null)x.o.t5Min=x.t5Min;by[x.o.sku]=x.o}});
   var E=window.BQBook.fromEdited(X,P,wb,by,b7opt());
   if(!E.rows.length){n.textContent=" No prices to upload in tab 7"+(E.bad.length?" ("+E.bad.length+" row(s) failed the check: "+E.bad.slice(0,5).join(", ")+")":"")+".";return}
   var T=(st.doc&&st.doc.template)||TPL,w2=X.utils.book_new(),ws=X.utils.aoa_to_sheet(T.Data.slice(0,2).concat(E.rows));ws["!cols"]=[{wch:22},{wch:12},{wch:14},{wch:20},{wch:20}];X.utils.book_append_sheet(w2,ws,"Data");
@@ -2396,7 +2397,7 @@ function fromEdited(f){var n=$("pzb7n");n.textContent=" Reading "+f.name+"…";
 var CHKHTML='<div class="box" id="pzchk"><b>After you edit the workbook</b> <span class="mut">Saved in this browser only</span>'+
  '<p class="note">Use this after you have typed postage in the yellow cells. Pick the same workbook you just edited. Checks stay in this browser after you refresh the page. They are not copied to your other devices. Export a backup if you need a copy. Blank cells do not remove a check you already saved.</p>'+
  '<div class="pz-acts">'+
- '<button class="btn o pz-big" type="button" id="pzchkimp">3. Import checked workbook</button> '+
+ '<button class="btn o pz-big" type="button" id="pzchkimp" disabled>3. Import checked workbook</button> '+
  '<label class="btn l pz-big" for="pzb7in" id="pzb7inl">Make B&amp;Q upload from my edited workbook</label><input type="file" id="pzb7in" accept=".xlsx" class="hide">'+
  '</div>'+
  '<label class="pz-tg"><input type="checkbox" id="pzchkyour"> Also remember Your price (checked again against today’s cost)</label>'+
@@ -2415,6 +2416,7 @@ function chkWire(){if(!$("pzchkimp"))return;
  $("pzchkexp").onclick=exportChecks;$("pzchkbin").onchange=function(){var f=this.files&&this.files[0];this.value="";if(f)importBackup(f);};
  $("pzchkclr").onclick=function(){if(!window.confirm("Remove every saved check in this browser?"))return;var r=persistChecks({v:1,items:{}});$("pzchkmsg").textContent=r.ok?"Removed the saved checks in this browser.":r.error;if(r.ok){compute();draw();}};}
 function readChecked(file){$("pzchkmsg").textContent="Reading "+file.name+"…";
+ var ctx=checkCtx();if(!ctx.by||!Object.keys(ctx.by).length){$("pzchkmsg").textContent="Wait until today’s prices have finished loading, then import again.";return;}
  Promise.all([K.xlsx(),file.arrayBuffer()]).then(function(a){var X=a[0],wb;try{wb=X.read(new Uint8Array(a[1]),{type:"array",cellFormula:true});}catch(e){throw new Error("This is not an Excel file.");}
   st._chkWb=wb;showPreview(wb);}).catch(function(e){$("pzchkmsg").textContent=(e&&e.message)||K.why(e);});}
 function showPreview(wb){K.xlsx().then(function(X){var prev=BQBook.parseChecks(X,wb,checkCtx());st._chkPrev=prev;var box=$("pzchkprev");if(!prev.ok){box.innerHTML='<p class="bad">'+esc(prev.error)+'</p>';return;}
