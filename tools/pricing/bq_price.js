@@ -5,11 +5,11 @@
      profit = price - total cost      profit % = profit / estimated cost
      postage (in this order): 1 your typed postage; 2 special fixed rules (Karimulla's seniors' list, 26 Oct + 2 Nov 2026 notes, see SPECIAL);
        3 description code H123/H063/H077 over 15.2kg: DPD 14 (<=20kg) / 15 (<=25kg) / 17 (<=30kg); 4 Access 'Postage Cost' if > 0;
-       5 weight band on the (total pack) weight: <=2000g 1.75, <=15200g 2.30, <=20000g 8, <=25000g 9, <=30000g 10.50, else 15. A multi-pack is ONE parcel.
+       5 weight band on the (total pack) weight: <=2000g 1.75, <=15200g 2.30, <=20000g 8, <=25000g 9, <=30000g 10.50, else 15. A multi-pack is ONE parcel. Check-postage only for multi-packs with weight >=14999g (or missing weight).
    No data and no keys in this file. */
 (function (root, f) { var m = f(); if (typeof module === 'object' && module.exports) module.exports = m; else root.BQP = m; })(this, function () {
   'use strict';
-  var FEE = 0.15, ASHIAN = 2, OTHER = 1.5, UK_MAX = 0.8, CHINA_FLOOR = 1, SAFE_MIN = 0.5, RAISE_AT = 100, RAISE_STEP = 0.1;
+  var FEE = 0.15, ASHIAN = 2, OTHER = 1.5, UK_MAX = 0.8, CHINA_FLOOR = 1, SAFE_MIN = 0.5, RAISE_AT = 100, RAISE_STEP = 0.1, CHINA_CUT = 0.1;
   var BANDS = [[2000, 1.75, '≤2 kg'], [15200, 2.3, '≤15.2 kg'], [20000, 8, '≤20 kg'], [25000, 9, '≤25 kg'], [30000, 10.5, '≤30 kg']], OVER = [15, 'over 30 kg'];
   /* number from 8.7, '8.70', '£8.70', '1,234.50', ' 8.7 '; blank / text -> null */
   function num(v) {
@@ -94,7 +94,8 @@
   function priceMax(a, f) { return floor2((a.cost * a.mult + a.post + (num(a.collab) || 0) + f * a.cost) / (1 - FEE)); }
   /* floor price: China = round up; UK = round up but never above the 80% cap (only bites when floor and cap are both 80%) */
   function floorPrice(a, f, china) { var p = priceFor(a, f); return china ? p : Math.min(p, priceMax(a, UK_MAX)); }
-  /* floor % on cost: China 100%; UK sold in last 30 days 50%; UK no sales by cost <1 80%, <5 70%, <10 60%, else 50% */
+  /* floor % on cost: China 100%; UK sold in last 30 days 50%; UK no sales by cost <1 80%, <5 70%, <10 60%, else 50%.
+     Tab 5 Margin-too-low UK uses a 60% floor (minimum 65%) for that optional cut only – see bq_book.js. */
   function floorOf(china, sales30, cost) {
     if (china) return { f: CHINA_FLOOR, why: 'China product · 100% on cost' };
     if (sales30 > 0) return { f: 0.5, why: 'sold in the last 30 days' };
@@ -106,9 +107,17 @@
     var p = t.slice(0, i).trim(); if (!/^[+-]?((\d{1,3}(,\d{3})+|\d+)(\.\d*)?|\.\d+)$/.test(p)) return null;
     var v = parseFloat(p.replace(/,/g, '')); return v > 1 ? v : null;
   }
+  /* Check-postage flag (Karimulla 9 Nov 2026): only multi-packs with Access Weight >= 14999g
+     (or missing/blank weight) need review. Light multi-packs (<14999g) use normal postage and
+     go to the upload. Special postage rules are unchanged (they still win in postInfo). Singles
+     are never flagged here, even over 30kg. Weight is grams. */
   function checkPost(title, w) {
-    var n = packN(title), out = [], wt = num(w) || 0;
-    if (n) out.push('Multi-pack x' + n); if (wt > 30000) out.push('Over 30kg (' + wt + 'g)'); return out.join(' | ');
+    var n = packN(title), out = [], wt = num(w);
+    if (n) {
+      if (wt == null || !(wt > 0)) out.push('Multi-pack x' + n + ' (no weight)');
+      else if (wt >= 14999) out.push('Multi-pack x' + n + ' (≥14999g)');
+    }
+    return out.join(' | ');
   }
   /* ONE row -> price decision. r = {sku,title,ean,cost,price,bb,seller,sup,pc,w,sales,collab,url,your}
      opt = {raise100: include 100+ sales raises in the upload, checkPost: include 'Check postage' rows in the upload} */
@@ -122,12 +131,12 @@
   function decide(r, opt) {
     opt = opt || {};
     var cost = num(r.cost), price = num(r.price), bb = num(r.bb), sales = num(r.sales) || 0, your = num(r.your);
-    var china = isChina(r.sup), mult = china ? ASHIAN : OTHER, PI = postInfo(r.pc, r.w, r.title, [r.sku, r.variant], r.postYour), post = PI.p, seller = (r.seller == null ? '' : String(r.seller)).trim();
+    var china = isChina(r.sup), mult = china ? ASHIAN : OTHER, autoPI = postInfo(r.pc, r.w, r.title, [r.sku, r.variant]), PI = postInfo(r.pc, r.w, r.title, [r.sku, r.variant], r.postYour), post = PI.p, seller = (r.seller == null ? '' : String(r.seller)).trim();
     if (!(bb > 0)) bb = null;
     var o = { sku: r.sku, title: r.title || '', ean: r.ean || '', cost: cost, price: price == null ? 0 : price, priceBlank: price == null, bb: bb, seller: bb == null && !seller ? 'No competitor' : seller, sales: sales,
-      china: china, mult: mult, post: post, postSrc: PI.src, postKind: PI.kind, collab: num(r.collab) || 0, url: r.url || '', check: checkPost(r.title, r.w), your: your,
-      srcPrice: r.srcPrice || '', srcBB: r.srcBB || '', srcSales: r.srcSales || 'Access B n Q 30Days', salesAccess: r.salesAccess == null ? null : num(r.salesAccess), sup: r.sup || '', w: num(r.w), variant: r.variant || '',
-      win: /diva package/i.test(seller), status: '', rule: '', newp: null, finalp: null, upload: false, why: '' };
+      china: china, mult: mult, post: post, postAuto: autoPI.p, postSrc: PI.src, postKind: PI.kind, postChecked: PI.kind === 'your', accessPc: num(r.pc), collab: num(r.collab) || 0, url: r.url || '', check: checkPost(r.title, r.w), your: your,
+      srcPrice: r.srcPrice || '', srcBB: r.srcBB || '', srcSales: r.srcSales || 'Access B n Q 30Days', salesAccess: r.salesAccess == null ? null : num(r.salesAccess), sup: r.sup || '', w: num(r.w), variant: r.variant || '', stock: num(r.stock), liveSeen: r.liveSeen == null ? null : num(r.liveSeen), offerFlag: r.offerFlag || '', accessPrice: r.accessPrice == null ? null : num(r.accessPrice),
+      ix: r.ix, win: /diva package/i.test(seller), status: '', rule: '', newp: null, finalp: null, upload: false, why: '' };
     var cur = o.price;
     if (!(cost > 0) || post == null) {
       o.rule = 'NEED YOUR REVIEW – ' + (!(cost > 0) ? 'no cost' : 'no postage or weight'); o.status = 'NEED YOUR REVIEW'; o.finalp = cur; o.why = 'Missing data'; return o;
@@ -137,7 +146,26 @@
     var C = calc(a, cur); o.fee = C.fee; o.company = C.company; o.total = C.total; o.profit = C.profit; o.pr = C.pr; o.pc = C.pc;
     var Fl = floorOf(china, sales, cost); o.floorPct = Fl.f; o.floorWhy = Fl.why; o.floor = floorPrice(a, Fl.f, china); o.ceil = china ? null : priceMax(a, UK_MAX);
     var bb1 = bb != null ? rnd(bb - 0.01, 2) : null, raw, step = false;
-    if (o.win) {
+    /* China rules A and B (Karimulla 2 Nov 2026) run BEFORE 'already winning', so they apply winning or not.
+       A: under the 100% floor -> raise to the floor price. Every China increase is review only and is never uploaded.
+       B: no sales in 30 days -> cut 10% (round down), never below 105% profit on cost. If the price now is already under that 105% price, the lift is review only and is not uploaded. */
+    if (china && cur > 0 && C.pc < CHINA_FLOOR - 1e-9) {
+      raw = o.floor; o.chinaUp = true; o.rule = 'A China under 100% floor – raise to floor';
+      o.reason = 'China product at ' + Math.round(C.pc * 100) + '% – raise to 100% floor £' + o.floor.toFixed(2);
+    } else if (china && cur > 0 && sales < 1) {
+      var stop = priceFor(a, CHINA_FLOOR + 0.05);
+      o.chinaMin = stop;
+      if (rnd(cur, 2) <= rnd(stop, 2)) {
+        if (rnd(cur, 2) < rnd(stop, 2) - 0.001) { raw = stop; o.chinaUp = true; o.rule = 'B China 0 sales – 105% is above the price now, review only'; }
+        else { raw = 'At 105% on cost – kept'; o.rule = 'B China 0 sales – already at 105% on cost'; }
+      } else {
+        var cut = floor2(cur * (1 - CHINA_CUT));
+        raw = cut < stop ? stop : cut;
+        if (!(rnd(raw, 2) < rnd(cur, 2) - 0.001)) { raw = 'At 105% on cost – kept'; o.rule = 'B China 0 sales – already at 105% on cost'; }
+        else { o.chinaCut = true; o.rule = cut < stop ? 'B China 0 sales – cut 10%, stopped at 105% on cost' : 'B China 0 sales – cut 10%'; }
+      }
+      o.reason = 'China, no sales in 30 days – not below 105% on cost (£' + stop.toFixed(2) + ')';
+    } else if (o.win) {
       raw = 'Already winning'; o.rule = '1 Already winning – kept';
       if (!china && sales >= RAISE_AT && C.pc < UK_MAX - 1e-9) {
         var sp = Math.min(priceFor(a, Math.min(UK_MAX, C.pc + RAISE_STEP)), priceMax(a, UK_MAX));
@@ -168,7 +196,7 @@
       var Rc = calc(a, raw);
       o.rawProfit = Rc.profit; o.rawPc = Rc.pc;
       if (Rc.profit <= 0) o.status = 'Loss – blocked';
-      else if (rnd(raw, 2) > rnd(cur, 2) && !(step && opt.raise100)) o.status = step ? 'Raise 10% – held for review' : 'Raise – held for review';
+      else if (rnd(raw, 2) > rnd(cur, 2) && !(step && opt.raise100 && !china)) o.status = step ? 'Raise 10% – held for review' : 'Raise – held for review';
       else if (isTrim(o, raw, cur, bb1) && !opt.pennyTrims) { o.trim = true; o.status = TRIM; }
       else { if (isTrim(o, raw, cur, bb1)) o.trim = true; o.status = raw; }
     } else o.status = raw;
@@ -180,11 +208,13 @@
     if (o.changed) {
       if (!(o.finalp > 0) || F.profit <= 0) { o.why = 'Loss – blocked'; if (your != null) o.status = 'Loss – blocked'; }
       else if (F.pc < SAFE_MIN - 1e-9) { o.why = 'Under 50% – blocked'; if (your != null) o.status = 'Under 50% – blocked'; }
-      else if (o.check && !opt.checkPost) o.why = 'Check postage first';
+      else if (china && F.pc < CHINA_FLOOR - 1e-9) { o.why = 'Under 100% China – blocked'; if (your != null) o.status = 'Under 100% China – blocked'; }
+      else if (china && o.finalp > cur + 0.001) { o.why = 'China raise – review only'; if (your != null) o.status = 'Raise – held for review'; }
+      else if (o.check && !opt.checkPost && !o.postChecked) o.why = 'Check postage first';
       else if (r.dup) o.why = 'Duplicate SKU';
       else { o.upload = true; o.why = your != null ? 'Your price' : 'Price change'; }
     } else o.why = typeof o.status === 'string' ? o.status : 'No change';
-    if (your != null && o.why !== 'Loss – blocked' && o.why !== 'Under 50% – blocked') o.status = 'Your price';
+    if (your != null && !/ – blocked$/.test(o.why)) o.status = 'Your price';
     return o;
   }
   /* many rows: first row of each SKU wins, later duplicates marked; rows with no SKU skipped */
@@ -214,14 +244,26 @@
       var x = aoa[j] || [], g = function (k) { return ix[k] >= 0 ? x[ix[k]] : null; };
       if (x.every(function (v) { return v == null || v === ''; })) continue;
       var r = { sku: g('sku') == null ? '' : String(g('sku')).trim(), title: g('title') == null ? '' : String(g('title')), ean: eanOf(g('ean')), cost: g('cost'), price: g('price'), bb: g('bb'), seller: g('seller'),
-        sup: g('sup') == null ? '' : String(g('sup')), w: g('w'), pc: g('pc'), sales: g('sales'), url: g('url') == null ? '' : String(g('url')), collab: g('collab'), variant: g('variant') == null ? '' : String(g('variant')),
-        srcPrice: 'Access', srcBB: 'Access' };
+        sup: g('sup') == null ? '' : String(g('sup')), w: g('w'), pc: g('pc'), sales: g('sales'), url: g('url') == null ? '' : String(g('url')), collab: g('collab'), variant: g('variant') == null ? '' : String(g('variant')), stock: g('stock'),
+        srcPrice: 'Access', srcBB: 'Access', ix: j };
       if (ov.sales30) { r.salesAccess = r.sales; r.sales = ov.sales30[r.sku] || 0; r.srcSales = ov.salesLabel || 'B&Q orders'; if (r.sales > 0) nsold++; }
-      if (imp[r.sku] != null) { r.price = imp[r.sku]; r.srcPrice = ov.importedLabel || 'Imported'; nimp++; }
+      /* 4 Nov: active offers export (REQUIRED in the pricing run) = the live price. Price now = live offer price (discount price when active today).
+         Not in active offers, or Access price differs from the live offer by more than 1p -> flagged, never uploaded. */
+      if (ov.offers) {
+        var of = ov.offers[r.sku], ap = num(r.price);
+        if (!of) r.offerFlag = 'not in the active offers export (' + (ov.offersLabel || 'offers') + ')';
+        else {
+          var lp = num(of[0]), dp = num(of[1]), td = ov.today || '', dOn = dp != null && dp > 0 && (!of[2] || String(of[2]).slice(0, 10) <= td) && (!of[3] || String(of[3]).slice(0, 10) >= td);
+          if (!(Math.abs((lp || 0) - (ap || 0)) <= 0.0100001)) r.offerFlag = 'Access price £' + (ap == null ? '–' : rnd(ap, 2).toFixed(2)) + ' but live offer £' + (lp == null ? '–' : rnd(lp, 2).toFixed(2));
+          r.accessPrice = ap; r.price = dOn ? dp : lp; r.srcPrice = (ov.offersLabel || 'Active offers') + (dOn ? ' (discount price)' : '');
+        }
+      }
+      if (!ov.offers && imp[r.sku] != null) { r.price = imp[r.sku]; r.srcPrice = ov.importedLabel || 'Imported'; nimp++; }
       var b = bbm[r.ean];
       if (b && (b.seller || num(b.price) != null)) {
         r.bb = num(b.price); r.seller = b.seller || ''; r.srcBB = ov.bbLabel || 'Buy box run'; nbb++;
-        if (/diva package/i.test(b.seller || '') && num(b.price) > 0) { r.price = num(b.price); r.srcPrice = (ov.bbLabel || 'Buy box run') + ' (our live price)'; nlive++; }
+        /* 4 Nov: Price now is ALWAYS the Access B&Q_INV.price. If the buy box run saw our own offer at a different price (> 1p), flag it – never use it */
+        if (/diva package/i.test(b.seller || '') && num(b.price) > 0 && !(Math.abs(num(b.price) - (num(r.price) || 0)) <= 0.0100001)) { r.liveSeen = num(b.price); nlive++; }
       }
       rows.push(r);
     }
@@ -254,7 +296,125 @@
     });
     return { map: m, n: n, from: t0, to: t1, label: n ? 'Buy box run ' + (t0 ? ukTime(t0) + '–' + ukTime(t1) + ' UK' : '') : '' };
   }
-  return { FEE: FEE, sales30: sales30, bbMap: bbMap, ukTime: ukTime, fromAccess: fromAccess, eanOf: eanOf, HDR: HDR, ASHIAN: ASHIAN, OTHER: OTHER, UK_MAX: UK_MAX, SAFE_MIN: SAFE_MIN, RAISE_AT: RAISE_AT, BANDS: BANDS, OVER: OVER,
+
+  /* ===== BUY BOX suggestion (3 Nov 2026) – one SKU, on top of decide() (same cost, postage, floor and 80% cap).
+     o = decide(row) output.  x = {fresh: today's buy box check worked for this EAN, rival: {p, s, d} newest OTHER seller seen holding the box,
+     seasonal: Christmas product}.  s = settings (BB_DEFAULT).  Returns {act, sugg, profit, pc, gain, why, need}.
+     act: 'Lower to win' | 'Raise' | "Can't win (floor)" | 'Keep' | 'No data'.  sugg is only set for Lower to win / Raise, and is never
+     under the floor, never over the UK 80% cap, never a loss (checked again at the end – if not, act becomes Keep). */
+  var BB_DEFAULT = { step: 0.01, stepPct: 0, minGain: 0.10, raisePct: 0.05, raiseNoSales: false, noStockKeep: true, useStale: false, xmas: true, keepTrees: true };
+  /* Christmas trees (XMAS TREE 5/6/7/8/10FT, SKU XMA-TRE-GRE-…): Karimulla 3 Nov 2026 – keep the tree prices as they are (no raise, no lower). Not tree bags / stands / spray. */
+  function isXmasTree(title, sku) { return /\b(?:xmas|christmas)\s+tree\s+\d+\s*(?:ft|feet|foot)\b/i.test(String(title || '')) || /^XMA-TRE-GRE-/i.test(String(sku || '')); }
+  var XMAS_RE = /\b(christmas|xmas|advent|bauble|baubles|tinsel|nativity|santa|reindeer|snowman|snowflake|festive|stocking)\b/i;
+  function isSeasonal(title, sku) { return XMAS_RE.test(String(title || '')) || /^XMA-/i.test(String(sku || '')); }
+  function bbStep(bb, s) { var a = num(s.step) || 0, p = num(s.stepPct) || 0; return Math.max(0.01, rnd(Math.max(a, bb * p / 100), 2)); }
+  /* Ending in 9 applies only to a price increase. A cut stays on the exact penny (1p under the buy box, or the normal 2dp cut). A 9-ending raise must not go through the cap or the floor. */
+  function up9(x) { var c = Math.round(r6(x) * 100); return (c + ((9 - c % 10) + 10) % 10) / 100; }
+  /* Highest price ending in 9 that is at or under x. */
+  function down9(x) { var c = Math.round(r6(x) * 100); return (c - ((c % 10 - 9 + 10) % 10)) / 100; }
+  /* Losing, but already cheaper than the buy box, and the SKU has sold. Raise into [buy box−15p, buy box−10p], highest price ending in 9; if none, buy box−10p. Never over the cap, never under the floor, and only when the result is above the current price. */
+  function losingCloser(bb, cur, cap, fl) {
+    var bb2 = rnd(bb, 2), hi = rnd(bb2 - 0.10, 2), lo = rnd(bb2 - 0.15, 2), nine = down9(hi);
+    var target = nine + 1e-9 >= lo ? nine : hi;
+    if (cap != null && target > cap + 1e-9) {
+      var under = down9(cap);
+      if (!(under > cur + 1e-9)) return { why: 'Losing – already cheaper, cap' };
+      target = under;
+    }
+    if (!(target > cur + 1e-9)) return { why: 'Losing – already cheaper, no raise above the current price' };
+    if (fl != null && target < fl - 1e-9) return { why: 'Losing – already cheaper, at floor' };
+    return { price: rnd(target, 2) };
+  }
+  function end9(p, cur, fl, lim, cap) {
+    if (!(p > cur)) return p;
+    var c = Math.round(r6(p) * 100), q = c + ((9 - (c % 10) + 10) % 10), v = q / 100;
+    if (q === c) return p;
+    if (!(v > 0) || v < fl - 1e-9) return p;
+    if (cap != null && v > cap + 1e-9) return p;
+    if (lim != null && v > rnd(lim, 2) + 1e-9) return p;
+    return v;
+  }
+  function buyBox(o, x, s) {
+    s = Object.assign({}, BB_DEFAULT, s || {}); x = x || {};
+    var r = { act: 'Keep', sugg: null, profit: null, pc: null, gain: null, why: '', need: null }, g = function (v) { return '£' + rnd(v, 2).toFixed(2); };
+    var pc = function (v) { return Math.round(v * 100) + '%'; };
+    if (o.dup) { r.why = 'Duplicate SKU row – only the first row is priced'; return r; }
+    if (o.offerFlag) { r.act = 'Price check'; r.why = 'Price check: ' + o.offerFlag + ' – not in the upload'; return r; }
+    if (!o.a) { r.act = 'No data'; r.why = 'No cost or postage in Access – fix the data first'; return r; }
+    var a = o.a, cur = rnd(o.price, 2), fl = o.floor, cap = o.china ? null : o.ceil;
+    if (!(cur > 0)) { r.act = 'No data'; r.why = 'No current price on the listing'; return r; }
+    if (!x.fresh && !s.useStale) { r.act = 'No data'; r.why = "Today's buy box check failed for this product – not using older data"; return r; }
+    if (o.liveSeen != null) { r.act = 'Price check'; r.why = 'Price check: buy box run saw £' + rnd(o.liveSeen, 2).toFixed(2) + ' but Access price is ' + g(cur) + ' – not in the upload'; return r; }
+    var seller = String(o.seller || '').trim(), bb = o.bb;
+    if (!o.win && !(bb > 0)) { r.act = 'No data'; r.why = 'No buy box price found'; return r; }
+    if (s.noStockKeep && o.stock != null && o.stock <= 0) { r.why = 'No free stock – change the price when stock is back'; return r; }
+    if (s.keepTrees && isXmasTree(o.title, o.sku)) { r.why = 'Christmas tree – price kept as it is (your decision 3 Nov)'; return r; }
+    var C0 = calc(a, cur), set = function (act, p, why, lim, fl9) { p = end9(p, cur, fl9 == null ? fl : fl9, lim, cap); var C = calc(a, p); r.act = act; r.sugg = rnd(p, 2); r.profit = C.profit; r.pc = C.pc; r.gain = rnd(C.pr - C0.pr, 2); r.why = why; };
+    if (!o.win) {
+      if (cur < rnd(bb, 2)) {
+        if (!(o.sales >= 1)) { r.why = 'Losing – already cheaper, 0 sales: kept'; return r; }
+        var closer = losingCloser(bb, cur, cap, fl);
+        if (closer.price == null) { r.why = closer.why; return r; }
+        var Cc = calc(a, closer.price);
+        if (!(Cc.profit > 0) || Cc.pc < SAFE_MIN - 1e-9 || (o.china && Cc.pc < CHINA_FLOOR - 1e-9)) { r.why = 'Losing – already cheaper, at floor'; return r; }
+        r.act = 'Raise'; r.sugg = closer.price; r.profit = Cc.profit; r.pc = Cc.pc; r.gain = rnd(Cc.pr - C0.pr, 2);
+        r.why = 'Losing – already cheaper: raise to 10–15p under buy box, ends in 9';
+        return r;
+      }
+      var need = rnd(bb - bbStep(bb, s), 2), t = need, capped = false; r.need = need;
+      if (cap != null && t > cap) { t = cap; capped = true; }
+      if (t < fl) { r.act = "Can't win (floor)"; r.why = 'To win we need ' + g(need) + ' (under ' + seller + ' ' + g(bb) + '), but our floor is ' + g(fl) + ' (' + pc(o.floorPct) + ' on cost)'; return r; }
+      set('Lower to win', t, capped ? 'Under ' + seller + ' ' + g(bb) + ' at our 80% cap ' + g(t) : (need === rnd(bb - 0.01, 2) ? '1p' : g(bb - need)) + ' under ' + seller + ' ' + g(bb) + '; floor ' + g(fl), bb);
+    } else {
+      /* 10 Nov 2026: a product with 0 B&Q sales is raised only when profit is under 50% on cost, and only up to that 50% price. The 80/70/60% bands stay the floor for cuts, not for this raise. Products with sales still rise to their floor. */
+      var zeroUk = !o.china && !(o.sales >= 1);
+      var raiseAt = zeroUk ? SAFE_MIN : o.floorPct;
+      var raisePx = zeroUk ? priceFor(a, SAFE_MIN) : fl;
+      if (C0.pc < raiseAt - 1e-9) { set('Raise', raisePx, zeroUk ? '0 B&Q sales, profit under 50% on cost – raise only to 50%' : 'We win, but ' + pc(C0.pc) + ' is under our ' + pc(o.floorPct) + ' floor – raise to the floor', x.rival && x.rival.p > cur ? x.rival.p : null, zeroUk ? raisePx : null); }
+      else if (zeroUk && C0.pc < o.floorPct - 1e-9) { r.why = '0 B&Q sales: profit already >= 50%, not raised'; return r; }
+      else if (cap != null && cur >= cap) { r.why = 'We win at or above the 80% cap (' + g(cap) + ') – keep'; return r; }
+      else if (!(o.sales >= 1) && !s.raiseNoSales) { r.why = 'We win but sold 0 in 30 days – a higher price will not help'; return r; }
+      else {
+        var rv = x.rival, t2, why;
+        if (rv && rv.p > cur) { t2 = rnd(rv.p - bbStep(rv.p, s), 2); why = rv.s + ' was seen at ' + g(rv.p) + ' (' + rv.d + ') – go to ' + (t2 === rnd(rv.p - 0.01, 2) ? '1p' : g(rv.p - t2)) + ' under them'; }
+        else if (rv) { r.why = 'We win, but ' + rv.s + ' was seen at ' + g(rv.p) + ' (' + rv.d + '), not above us – hold'; return r; }
+        else if (s.xmas && x.seasonal) { r.why = 'Christmas mode: we win a seasonal product – hold the box, no blind raise'; return r; }
+        else { t2 = floor2(cur * (1 + (num(s.raisePct) || 0))); why = 'We win and no other seller has been seen – try +' + (num(s.raisePct) * 100).toFixed(0) + '%'; }
+        if (cap != null && t2 > cap) { t2 = cap; why += ' (stops at the 80% cap ' + g(cap) + ')'; }
+        if (!(t2 > cur)) { r.why = 'We win – no room to raise'; return r; }
+        var gain = rnd(calc(a, t2).pr - C0.pr, 2);
+        if (gain < (num(s.minGain) || 0) - 1e-9) { r.why = 'We win – a raise would add only ' + g(gain) + ' profit (under the ' + g(s.minGain) + ' minimum)'; return r; }
+        set('Raise', t2, why, rv && rv.p > cur ? rv.p : null);
+      }
+    }
+    /* absolute safety: never under the floor, never over the cap, never a loss, never under 50% (China 100%) */
+    if (r.sugg != null) {
+      var minPx = (r.act === 'Raise' && !o.china && !(o.sales >= 1)) ? priceFor(a, SAFE_MIN) : fl;
+      var bad = !(r.sugg > 0) || !(r.profit > 0) || r.sugg < minPx - 1e-9 || (cap != null && r.sugg > up9(cap) + 1e-9) || r.pc < SAFE_MIN - 1e-9 || (o.china && r.pc < CHINA_FLOOR - 1e-9);
+      if (bad) { r.act = 'Keep'; r.why = 'Safety check stopped ' + g(r.sugg) + ' – kept'; r.sugg = null; r.profit = null; r.pc = null; r.gain = null; }
+      else if (r.sugg === cur) { r.act = 'Keep'; r.why = 'Already at the suggested price'; r.sugg = null; r.profit = null; r.pc = null; r.gain = null; }
+    }
+    return r;
+  }
+
+  /* today's buy box scrape (doc.bbScrape from buybox_data.py) -> {map for fromAccess ov.bb, fresh: {ean:1} checked OK today, label}.
+     Failed checks (HTTP 503/500, no product link, no seller) are NOT in the map and NOT fresh. A scrape older than the Access file is ignored. */
+  function bbFromScrape(sc, accessDate) {
+    var out = { map: {}, fresh: {}, n: 0, failed: 0, label: '', stale: false };
+    if (!sc || !sc.rows) return out;
+    /* a buy box check up to 1 day older than the Access file still counts (same rule as reload_access.sh) */
+    var d1 = accessDate ? new Date(Date.parse(String(accessDate).slice(0, 10) + 'T00:00:00Z') - 864e5).toISOString().slice(0, 10) : '';
+    if (accessDate && String(sc.date) < d1) { out.stale = true; return out; }
+    var rows = [];
+    sc.rows.forEach(function (r) { var e = eanOf(r.ean); if (!e) return; if (r.ok) { out.fresh[e] = 1; rows.push({ ean: e, seller: r.seller, price: r.price, fetched: sc.date + 'T12:00:00' }); } else out.failed++; });
+    var M = bbMap(rows, accessDate && accessDate < sc.date ? accessDate : null); out.map = M.map; out.n = M.n;
+    out.label = 'Buy box check ' + sc.date; return out;
+  }
+  function buyBoxAll(rows, fresh, rivals, s) {
+    fresh = fresh || {}; rivals = rivals || {};
+    return rows.map(function (o) { var b = buyBox(o, { fresh: !!fresh[o.ean], rival: rivals[o.ean] || null, seasonal: isSeasonal(o.title, o.sku) }, s); b.o = o; return b; });
+  }
+  return { FEE: FEE, sales30: sales30, bbMap: bbMap, ukTime: ukTime, fromAccess: fromAccess, eanOf: eanOf, HDR: HDR, ASHIAN: ASHIAN, OTHER: OTHER, UK_MAX: UK_MAX, SAFE_MIN: SAFE_MIN, CHINA_FLOOR: CHINA_FLOOR, CHINA_CUT: CHINA_CUT, RAISE_AT: RAISE_AT, BANDS: BANDS, OVER: OVER,
     num: num, rnd: rnd, ceil2: ceil2, band: band, postage: postage, postageSrc: postageSrc, postInfo: postInfo, specialRule: specialRule, heavyCode: heavyCode, SPECIAL: SPECIAL, HEAVY: HEAVY, isChina: isChina, multOf: multOf, fixedCost: fixedCost,
-    TRIM: TRIM, calc: calc, priceFor: priceFor, priceMax: priceMax, floorPrice: floorPrice, floor2: floor2, floorOf: floorOf, packN: packN, checkPost: checkPost, decide: decide, decideAll: decideAll, VERSION: 'bq_price v4 2026-11-02 special postage' };
+    TRIM: TRIM, end9: end9, calc: calc, priceFor: priceFor, priceMax: priceMax, floorPrice: floorPrice, floor2: floor2, floorOf: floorOf, packN: packN, checkPost: checkPost, decide: decide, decideAll: decideAll, buyBox: buyBox, buyBoxAll: buyBoxAll, bbFromScrape: bbFromScrape, BB_DEFAULT: BB_DEFAULT, isSeasonal: isSeasonal, isXmasTree: isXmasTree, bbStep: bbStep, CHECK_G: 14999, VERSION: 'bq_price v5 2026-11-09 pack14999 checks' };
 });

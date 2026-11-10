@@ -2,8 +2,8 @@
 "use strict";
 /* Separate Sales / Orders entry pages: after unlock, open that dashboard only. */
 var OPEN=(document.body.getAttribute("data-open")||"").trim();
-if(OPEN!=="sales"&&OPEN!=="orders") OPEN="";
-if(OPEN){document.title=OPEN==="sales"?"B&Q Sales":"B&Q Orders";}
+if(OPEN!=="sales"&&OPEN!=="orders"&&OPEN!=="selling") OPEN="";
+if(OPEN){document.title=OPEN==="sales"?"B&Q Sales":OPEN==="orders"?"B&Q Orders":"B&Q Products selling";}
 function tryOpen(){
   if(!OPEN)return false;
   if(window.BQ&&typeof BQ.openDash==="function"){BQ.openDash(OPEN);return true;}

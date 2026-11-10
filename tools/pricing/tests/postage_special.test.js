@@ -34,9 +34,9 @@ t('earlier-list items (26 Oct rules)', () => { assert.strictEqual(P('Baby High C
 t('H077/H063/H123 DPD tiers 14/15/17 over 15.2kg', () => { ['H077', 'H063', 'H123'].forEach(h => { const T = 'Compost 75L- 888436 - ' + h;
   assert.strictEqual(P(T, [], 15201, 15).p, 14); assert.strictEqual(P(T, [], 20000, 15).p, 14); assert.strictEqual(P(T, [], 20001, null).p, 15); assert.strictEqual(P(T, [], 25000, 9).p, 15);
   assert.strictEqual(P(T, [], 25001, null).p, 17); assert.strictEqual(P(T, [], 30000, 10.5).p, 17); assert.strictEqual(P(T, [], 23000, 15).src, 'DPD ' + h + ' 20-25kg'); }); });
-t('H-codes at <=15.2kg use the normal rules; over 30kg keeps current behaviour + flag', () => { const T = 'Compost 40L - H123';
+t('H-codes at <=15.2kg use the normal rules; a single over 30kg keeps the £15 band and is not a postage hold', () => { const T = 'Compost 40L - H123';
   assert.strictEqual(P(T, [], 15200, null).p, 2.3); assert.strictEqual(P(T, [], 1500, 1.9).p, 1.9); assert.strictEqual(P(T, [], 31000, null).p, 15); assert.strictEqual(P(T, [], 31000, 20).p, 20);
-  assert.ok(/Over 30kg/.test(B.checkPost(T, 31000))); });
+  assert.strictEqual(B.checkPost(T, 31000), ''); assert.strictEqual(B.checkPost('3 x ' + T, 14998), ''); assert.ok(/14999/.test(B.checkPost('3 x ' + T, 14999))); });
 t('CH077 / CH921 / H077 in the middle do NOT count', () => { assert.strictEqual(P('Makeup Organiser Storage - White- CH077', [], 23000, null).p, 9); assert.strictEqual(P('Thing - CH921', [], 18000, null).p, 8);
   assert.strictEqual(P('H077 compost - 888436', [], 23000, null).p, 9); assert.strictEqual(B.heavyCode('X - H077'), 'H077'); assert.strictEqual(B.heavyCode('X - CH077'), null); });
 t('normal DPD bands unchanged: 8 / 9 / 10.50', () => { assert.strictEqual(P('Sand', [], 18000, null).p, 8); assert.strictEqual(P('Sand', [], 23000, null).p, 9); assert.strictEqual(P('Sand', [], 28000, null).p, 10.5);
