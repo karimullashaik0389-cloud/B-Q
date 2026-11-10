@@ -310,6 +310,21 @@
   function bbStep(bb, s) { var a = num(s.step) || 0, p = num(s.stepPct) || 0; return Math.max(0.01, rnd(Math.max(a, bb * p / 100), 2)); }
   /* Ending in 9 applies only to a price increase. A cut stays on the exact penny (1p under the buy box, or the normal 2dp cut). A 9-ending raise must not go through the cap or the floor. */
   function up9(x) { var c = Math.round(r6(x) * 100); return (c + ((9 - c % 10) + 10) % 10) / 100; }
+  /* Highest price ending in 9 that is at or under x. */
+  function down9(x) { var c = Math.round(r6(x) * 100); return (c - ((c % 10 - 9 + 10) % 10)) / 100; }
+  /* Losing, but already cheaper than the buy box, and the SKU has sold. Raise into [buy box−15p, buy box−10p], highest price ending in 9; if none, buy box−10p. Never over the cap, never under the floor, and only when the result is above the current price. */
+  function losingCloser(bb, cur, cap, fl) {
+    var bb2 = rnd(bb, 2), hi = rnd(bb2 - 0.10, 2), lo = rnd(bb2 - 0.15, 2), nine = down9(hi);
+    var target = nine + 1e-9 >= lo ? nine : hi;
+    if (cap != null && target > cap + 1e-9) {
+      var under = down9(cap);
+      if (!(under > cur + 1e-9)) return { why: 'Losing – already cheaper, cap' };
+      target = under;
+    }
+    if (!(target > cur + 1e-9)) return { why: 'Losing – already cheaper, no raise above the current price' };
+    if (fl != null && target < fl - 1e-9) return { why: 'Losing – already cheaper, at floor' };
+    return { price: rnd(target, 2) };
+  }
   function end9(p, cur, fl, lim, cap) {
     if (!(p > cur)) return p;
     var c = Math.round(r6(p) * 100), q = c + ((9 - (c % 10) + 10) % 10), v = q / 100;
@@ -336,7 +351,16 @@
     if (s.keepTrees && isXmasTree(o.title, o.sku)) { r.why = 'Christmas tree – price kept as it is (your decision 3 Nov)'; return r; }
     var C0 = calc(a, cur), set = function (act, p, why, lim, fl9) { p = end9(p, cur, fl9 == null ? fl : fl9, lim, cap); var C = calc(a, p); r.act = act; r.sugg = rnd(p, 2); r.profit = C.profit; r.pc = C.pc; r.gain = rnd(C.pr - C0.pr, 2); r.why = why; };
     if (!o.win) {
-      if (cur < rnd(bb, 2)) { r.why = 'We are already cheaper (' + g(cur) + ') than ' + seller + ' (' + g(bb) + ') – B&Q picked them for another reason'; return r; }
+      if (cur < rnd(bb, 2)) {
+        if (!(o.sales >= 1)) { r.why = 'Losing – already cheaper, 0 sales: kept'; return r; }
+        var closer = losingCloser(bb, cur, cap, fl);
+        if (closer.price == null) { r.why = closer.why; return r; }
+        var Cc = calc(a, closer.price);
+        if (!(Cc.profit > 0) || Cc.pc < SAFE_MIN - 1e-9 || (o.china && Cc.pc < CHINA_FLOOR - 1e-9)) { r.why = 'Losing – already cheaper, at floor'; return r; }
+        r.act = 'Raise'; r.sugg = closer.price; r.profit = Cc.profit; r.pc = Cc.pc; r.gain = rnd(Cc.pr - C0.pr, 2);
+        r.why = 'Losing – already cheaper: raise to 10–15p under buy box, ends in 9';
+        return r;
+      }
       var need = rnd(bb - bbStep(bb, s), 2), t = need, capped = false; r.need = need;
       if (cap != null && t > cap) { t = cap; capped = true; }
       if (t < fl) { r.act = "Can't win (floor)"; r.why = 'To win we need ' + g(need) + ' (under ' + seller + ' ' + g(bb) + '), but our floor is ' + g(fl) + ' (' + pc(o.floorPct) + ' on cost)'; return r; }

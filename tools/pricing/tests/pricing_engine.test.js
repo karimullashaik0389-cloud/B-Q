@@ -151,6 +151,57 @@ t('optional penny trims: cap-only, <=5p and <=5% -> kept (no upload) unless swit
   const o2 = D({ cost: .1, price: r2(cc + .02), bb: null, sales: 0, pc: 0.0001, w: 10 }); if (r2(cc + .02) * .05 < .02) assert.ok(!o2.trim, '5% rule');
   assert.ok(!D({ cost: 2, price: 30, bb: null, sup: 'Ashian Homeware co.,Ltd', sales: 0 }).trim, 'never China');
 });
+t('losing but already cheaper raises 10–15p under the buy box only when it has sales', () => {
+  const Book = require(path.join(__dirname, '..', 'bq_book.js'));
+  function go(o) {
+    const d = D(Object.assign({ cost: 3, w: 500, sup: 'UK Ltd', seller: 'Rival', sales: 4, price: 9.2, bb: 10 }, o));
+    const bb = B.buyBox(d, { fresh: true }, B.BB_DEFAULT);
+    bb.o = d;
+    const x = Book.classify(B, [bb], {})[0];
+    return { d: d, bb: bb, x: x, st: Book.snapshotStatus(B, x, {}) };
+  }
+  const hit = go({ cost: 2.5, bb: 8.84, price: 8.1 });
+  assert.strictEqual(hit.bb.act, 'Raise');
+  assert.strictEqual(hit.bb.sugg, 8.69);
+  assert.strictEqual(hit.bb.why, 'Losing – already cheaper: raise to 10–15p under buy box, ends in 9');
+  assert.strictEqual(hit.st.chk, 'OK');
+  assert.strictEqual(hit.x.inc, 'Yes');
+  assert.strictEqual(hit.x.short, hit.bb.why);
+  const fallback = go({ bb: 10.05, price: 9.2 });
+  assert.strictEqual(fallback.bb.sugg, 9.95);
+  const zero = go({ sales: 0, bb: 10, price: 9.2 });
+  assert.strictEqual(zero.bb.act, 'Keep');
+  assert.strictEqual(zero.bb.sugg, null);
+  assert.strictEqual(zero.bb.why, 'Losing – already cheaper, 0 sales: kept');
+  assert.strictEqual(zero.st.chk, 'NO CHANGE');
+  const close = go({ bb: 10, price: 9.95 });
+  assert.strictEqual(close.bb.sugg, null);
+  assert.ok(/no raise above the current price/.test(close.bb.why));
+  const capped = go({ bb: 20, price: 9.5 });
+  assert.ok(capped.bb.sugg <= capped.d.ceil + 1e-9 && capped.bb.sugg > 9.5);
+  assert.strictEqual(Math.round(capped.bb.sugg * 100) % 10, 9);
+  const over = go({ bb: 20, price: 10.15 });
+  assert.strictEqual(over.bb.sugg, null);
+  assert.strictEqual(over.bb.why, 'Losing – already cheaper, cap');
+  const floor = go({ bb: 9.2, price: 9 });
+  assert.strictEqual(floor.bb.sugg, null);
+  assert.strictEqual(floor.bb.why, 'Losing – already cheaper, at floor');
+  const cn = go({ sup: 'Ashian Homeware', bb: 20, price: 13, sales: 3 });
+  assert.strictEqual(cn.bb.act, 'Raise');
+  assert.ok(cn.bb.sugg > 10);
+  assert.strictEqual(cn.st.chk, 'CHINA RAISE');
+  assert.strictEqual(cn.x.inc, 'No');
+  const heavy = go({ title: '2x Heavy pack', w: 15000, bb: 12, price: 10 });
+  assert.strictEqual(heavy.bb.act, 'Raise');
+  assert.strictEqual(heavy.st.chk, 'CHECK POSTAGE');
+  assert.strictEqual(heavy.x.inc, 'No');
+  const quiet = go({ stock: 0, bb: 12, price: 10 });
+  assert.strictEqual(quiet.bb.sugg, null);
+  assert.ok(/stock/.test(quiet.bb.why));
+  const tree = go({ sku: 'XMA-TRE-GRE-1', title: 'Christmas tree 6ft', bb: 12, price: 10 });
+  assert.strictEqual(tree.bb.sugg, null);
+  assert.ok(/Christmas tree/.test(tree.bb.why));
+});
 console.log('pricing engine: ' + n + ' tests passed');
 // sales30: same rule as the Sales tab (not cancelled, newest order day - 29 days)
 (() => { const D0 = Date.UTC(2026, 10, 2, 10) / 6e4, d = 1440;

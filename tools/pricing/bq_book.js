@@ -34,7 +34,9 @@
     if (r.act === 'Price check') { x.label = 'Price check – not in the upload'; x.why = r.why; return x; }
     var cur = P.rnd(o.price, 2), fl = o.floor, cap = o.china ? null : o.ceil;
     if (r.act === 'Raise') {
-      x.cat = 'raise'; x.sugg = r.sugg; x.label = o.china ? 'Raise – China (review only, never uploaded)' : 'Raise (already winning)';
+      x.cat = 'raise'; x.sugg = r.sugg;
+      x.label = /already cheaper/.test(r.why) ? 'Losing – we are already cheaper' : (o.china ? 'Raise – China (review only, never uploaded)' : 'Raise (already winning)');
+      x.why = r.why || x.why;
       if (o.china) x.inc = 'No';   /* China raises never go to Final upload – review tab only */
       if (chk) x.inc = 'No'; return x;
     }
@@ -93,7 +95,8 @@
       if (o.pc != null && o.pc >= o.floorPct - 1e-9 && (cap == null || cur <= cap + 1e-9)) { x.cat = 't2'; x.tab = 2; x.label = 'Winning, in range'; return x; }
       x.label = cap != null && cur > cap ? 'Winning above the 80% cap – kept' : 'Winning – kept'; return x;
     }
-    x.label = /already cheaper/.test(r.why) ? 'Losing – we are already cheaper' : 'Keep'; return x;
+    if (/^Losing – already cheaper/.test(r.why)) { x.label = r.why; x.why = r.why; return x; }
+    x.label = 'Keep'; return x;
   }
   /* engine check of a price: > 0, profit > £0, at/above the floor, UK at/below the cap, >= 50% (China 100%) */
   function ok(P, o, p) {
@@ -110,7 +113,7 @@
     var o = x.o, k = x.cat, s;
     if (o.dup) s = 'Duplicate SKU row – not priced';
     else if (x.label === 'No data') s = 'No buy box data';
-    else if (k === 'raise') s = o.china ? 'China raise – review only (never in Final upload)' : (!(o.sales >= 1) && o.pc != null && o.pc < P.SAFE_MIN - 1e-9 ? '0 B&Q sales: profit under 50% – raise only to 50% on cost' : (o.pc != null && o.floorPct != null && o.pc < o.floorPct - 1e-9 ? 'Raise to floor (profit under floor %)' : 'Raise: winning with room to the cap'));
+    else if (k === 'raise') s = /^Losing – already cheaper/.test(x.why) ? x.why : (o.china ? 'China raise – review only (never in Final upload)' : (!(o.sales >= 1) && o.pc != null && o.pc < P.SAFE_MIN - 1e-9 ? '0 B&Q sales: profit under 50% – raise only to 50% on cost' : (o.pc != null && o.floorPct != null && o.pc < o.floorPct - 1e-9 ? 'Raise to floor (profit under floor %)' : 'Raise: winning with room to the cap')));
     else if (k === 't4') s = 'Win buy box: 1p under ' + (o.seller || 'rival');
     else if (k === 't5') {
       if (x.weeklyHold) s = 'Margin too low UK – weekly hold until ' + addDays(x.lastChange, WEEKLY_DAYS);
@@ -519,7 +522,7 @@
         engSugg: x.sugg, engInc: st.chk === 'OK' || st.chk === 'OVER CAP' || st.chk === 'CHECK POSTAGE' || st.chk === 'CHINA RAISE' || st.chk === 'WEEKLY HOLD' ? (x.incDefault || x.inc) : 'No', engCheck: st.chk, engReason: x.short || '',
         engProfit: o.profit == null ? null : o.profit, engPc: o.pc == null ? null : o.pc, engFloor: o.floor == null ? null : o.floor,
         engCap: o.china ? null : o.ceil, engFinal: x.sugg, engNewProfit: st.prof,
-        ean: o.ean || '', noData: x.r && x.r.act === 'No data' ? 1 : 0, priceCheck: x.r && x.r.act === 'Price check' ? 1 : 0,
+        ean: o.ean || '', url: o.url || '', noData: x.r && x.r.act === 'No data' ? 1 : 0, priceCheck: x.r && x.r.act === 'Price check' ? 1 : 0,
         sup: o.sup || '', tab: x.tab, cat: x.cat, act: x.r ? x.r.act : '', weekly: x.weeklyHold ? 1 : 0, floorPct: o.floorPct, t5Min: x.t5Min == null ? null : x.t5Min,
         ix: o.ix, accessPc: o.accessPc == null ? null : o.accessPc
       });
@@ -550,7 +553,7 @@
       if (top && sh.key != null) KEY.forEach(function (k, i) { var a = enc(0, sh.key + i); ws[a] = { t: 's', v: k[1] }; sh._mk[a] = k[0]; });
       hrows.forEach(function (row, r) { row.forEach(function (v, k) { ws[enc(r + top, k)] = { t: 's', v: v == null ? '' : String(v), z: HDRF }; }); });
       head.forEach(function (h, k) { var t = htype(h); if (t) sh._hd[enc(hr, k)] = t; });
-      sh.rows.forEach(function (row, i) { row.forEach(function (cl, k) { if (!cl) return; var o = { t: cl.t || 's' }; if (cl.v != null && cl.v !== '') o.v = cl.v; else if (!cl.f) return; if (cl.z) o.z = cl.z; if (cl.f) o.f = cl.f; var a = enc(R0 + i, k); ws[a] = o; if (cl.st) sh._mk[a] = cl.st; }); });
+      sh.rows.forEach(function (row, i) { row.forEach(function (cl, k) { if (!cl) return; var o = { t: cl.t || 's' }; if (cl.v != null && cl.v !== '') o.v = cl.v; else if (!cl.f) return; if (cl.z) o.z = cl.z; if (cl.f) o.f = cl.f; if (cl.l) o.l = cl.l; var a = enc(R0 + i, k); ws[a] = o; if (cl.st) sh._mk[a] = cl.st; }); });
       var nr = R0 + sh.rows.length; ws['!ref'] = X.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: Math.max(nr - 1, R0 - 1), c: Math.max(head.length - 1, 0) } });
       ws['!cols'] = sh.cols.map(function (q, k) {
         var o;

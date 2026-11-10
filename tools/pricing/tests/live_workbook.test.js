@@ -329,4 +329,70 @@ t('a normal download fills tab 8 from other-platform sales and does not invent a
   assert.ok(formulas.indexOf('8 Sells elsewhere') < 0);
 });
 
+t('china zero-sales listing tab does not feed Combined or the finals', () => {
+  const mine = [
+    { sku: 'C0A', title: 'China none A', ean: '501', cost: 2, price: 12, bb: 11, seller: 'Rival', sup: 'Ashian Homeware', w: 500, sales: 0, stock: 2, url: 'https://www.diy.com/departments/a_BQ.prd' },
+    { sku: 'C0B', title: 'China none B', ean: '502', cost: 2, price: 12, bb: 11, seller: 'Rival', sup: 'Ashian Homeware', w: 500, sales: 0, stock: 9, url: 'https://www.diy.com/departments/b_BQ.prd' },
+    { sku: 'C1', title: 'China sold', ean: '503', cost: 2, price: 12, bb: 11, seller: 'Diva Packages', sup: 'Ashian Homeware', w: 500, sales: 3, stock: 20, url: 'https://www.diy.com/departments/c_BQ.prd' },
+    { sku: 'U0', title: 'UK none', ean: '504', cost: 2, price: 12, bb: 11, seller: 'Rival', sup: 'UK Ltd', w: 500, sales: 0, stock: 50, url: 'https://www.diy.com/departments/u_BQ.prd' }
+  ];
+  const d = P.decideAll(mine, {});
+  const bb = P.buyBoxAll(d.rows, Object.fromEntries(d.rows.map(o => [o.ean, 1])), {}, P.BB_DEFAULT);
+  const built = B.build(X, P, { bbr: bb, settings: P.BB_DEFAULT });
+  const name = '9 China 0 sales – listing check';
+  assert.ok(name.length <= 31, name.length);
+  assert.strictEqual(built.counts.t9, 2);
+  const wb = X.read(Buffer.from(built.bytes), { type: 'buffer', cellFormula: true });
+  assert.ok(wb.Sheets[name]);
+  const g = sheetRows(wb, name);
+  assert.deepStrictEqual(g[1].slice(0, 14), ['SKU', 'Product', 'EAN', 'Listing URL', 'Price now', 'Buy box price', 'Buy box seller', 'Winning?', 'Free stock', 'Floor price', 'Profit now %', 'Reason', 'Listing notes', 'Done']);
+  const body = g.slice(2).filter(r => r && r[0]);
+  assert.deepStrictEqual(body.map(r => r[0]), ['C0B', 'C0A']);
+  assert.strictEqual(body[0][8], 9);
+  assert.strictEqual(body[0][7], 'No');
+  const link = wb.Sheets[name].D3;
+  assert.ok(link && link.l && link.l.Target.indexOf('diy.com') > 0, JSON.stringify(link && link.l));
+  const start = JSON.stringify(sheetRows(wb, 'Start here'));
+  assert.ok(start.indexOf('Tab 9 lists every China product') > 0);
+  assert.ok(JSON.stringify(wb.Sheets['6 Combined upload']).indexOf(name) < 0);
+  assert.ok(JSON.stringify(wb.Sheets._Calc).indexOf(name) < 0);
+  const ws = wb.Sheets[name];
+  ws.M3 = { t: 's', v: 'checked the photos' };
+  ws.N3 = { t: 's', v: 'Yes' };
+  const by = {}; built.records.forEach(r => { by[r.sku] = { postAuto: r.basePost, priceNow: r.basePrice, incDefault: r.engInc }; });
+  const prev = B.parseChecks(X, wb, { by: by, yourPrice: true });
+  assert.strictEqual(prev.counts.conflict, 0);
+  assert.ok(!prev.changes.some(c => (c.sku === 'C0A' || c.sku === 'C0B') && (c.post === 'set' || c.inc === 'set' || c.priceNow === 'set' || c.your === 'set')));
+  const wb2 = recalc(built.bytes);
+  ['C0A', 'C0B'].forEach(function (sku) {
+    const rec = built.records.find(r => r.sku === sku);
+    const row = find(wb2, '6 Combined upload', sku);
+    assert.strictEqual(row[22], rec.engCheck);
+    assert.strictEqual(String(row[19] || ''), String(rec.engReason || ''));
+  });
+  assert.ok(!finals(wb2, '7a Final upload UK').some(r => r[0] === 'C0A' || r[0] === 'C0B'));
+});
+
+t('a pasted Postage used column does not stop import of the yellow review cells', () => {
+  function aoa(name, rows) {
+    const ws = X.utils.aoa_to_sheet(rows);
+    X.utils.book_append_sheet(wb, ws, name);
+  }
+  var wb = X.utils.book_new();
+  aoa('1 All', [
+    ['All products'],
+    ['sku', 'Postage used', 'Price now', 'Postage used', 'Postage review', 'Selling price review', 'Your price', 'Include override'],
+    ['ONE', 1.75, 9, 1.75, null, 9.5, null, null]
+  ]);
+  aoa('6 Combined upload', [
+    ['Combined'],
+    ['B&Q SKU', 'Postage review', 'Selling price review', 'Your price', 'Include override'],
+    ['ONE', null, 9, null, null]
+  ]);
+  const prev = B.parseChecks(X, wb, { by: { ONE: { postAuto: 1.75, priceNow: 9, incDefault: 'Yes' } }, yourPrice: true });
+  assert.strictEqual(prev.ok, true);
+  assert.ok(prev.conflicts.some(c => c.indexOf('ONE') === 0 && c.indexOf('priceNow') > 0), JSON.stringify(prev.conflicts));
+  assert.ok(!prev.invalid.some(x => /Postage used|postLegacy/.test(x.why || '')));
+});
+
 console.log('live workbook tests passed:', n);
