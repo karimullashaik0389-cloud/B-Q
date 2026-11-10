@@ -27,7 +27,13 @@ function recalc(bytes) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bqlive-'));
   const src = path.join(dir, 'in.xlsx'), out = path.join(dir, 'out.xlsx');
   fs.writeFileSync(src, Buffer.from(bytes));
-  execFileSync('ssconvert', ['--export-type=Gnumeric_Excel:xlsx2', src, out], { stdio: ['ignore', 'ignore', 'ignore'] });
+  if (fs.existsSync('/usr/bin/ssconvert')) {
+    execFileSync('ssconvert', ['--export-type=Gnumeric_Excel:xlsx2', src, out], { stdio: ['ignore', 'ignore', 'ignore'] });
+  } else {
+    const cdir = path.join(dir, 'lo'); fs.mkdirSync(cdir);
+    execFileSync('soffice', ['--headless', '--nologo', '--nofirststartwizard', '--calc', '--convert-to', 'xlsx', '--outdir', cdir, src], { stdio: ['ignore', 'ignore', 'ignore'] });
+    fs.copyFileSync(path.join(cdir, 'in.xlsx'), out);
+  }
   return X.read(fs.readFileSync(out), { type: 'buffer' });
 }
 function sheetRows(wb, name) { const ws = wb.Sheets[name]; assert.ok(ws, name); return X.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null }); }
@@ -115,19 +121,49 @@ t('Include Yes does not replace a special postage; typing the same postage clear
   if (o.upload) near(finals(wb, '7a Final upload UK').find(r => r[0] === 'GTR')[1], o.final);
 });
 
-t('selling price review recalculates profit; Your price is a separate final and can be blocked', () => {
+t('selling price review recalculates profit; a raise over the cap is blocked, a cut that stays over the cap is allowed', () => {
   const priced = workbook({ checks: { LOW: { priceNow: 30 } } });
   const wb = recalc(priced.bytes);
   const o = B.outcome(P, priced.records.find(r => r.sku === 'LOW'), { priceNow: 30 }, S0);
   const r = find(wb, '6 Combined upload', 'LOW');
   near(r[8], 30); near(r[10], o.profitNow); assert.strictEqual(r[22], o.check);
-  const yours = workbook({ checks: { LOW: { your: 11 } } });
-  const w2 = recalc(yours.bytes);
-  const y = B.outcome(P, yours.records.find(r => r.sku === 'LOW'), { your: 11 }, S0);
-  const row = find(w2, '4 Can win buy box', 'LOW');
-  const comb = find(w2, '6 Combined upload', 'LOW');
-  near(row[15], y.sugg); near(row[23], 11); assert.strictEqual(row[22], 'OVER CAP'); assert.strictEqual(comb[22], 'OVER CAP');
-  assert.ok(!finals(w2, '7a Final upload UK').some(x => x[0] === 'LOW' && x[1] === 11));
+  const cut = workbook({ checks: { LOW: { your: 11, inc: 'Yes' } } });
+  const wCut = recalc(cut.bytes);
+  const yCut = B.outcome(P, cut.records.find(r => r.sku === 'LOW'), { your: 11, inc: 'Yes' }, S0);
+  const rowCut = find(wCut, '4 Can win buy box', 'LOW');
+  const combCut = find(wCut, '6 Combined upload', 'LOW');
+  near(rowCut[15], yCut.sugg); near(rowCut[23], 11); assert.strictEqual(yCut.check, 'OK'); assert.strictEqual(rowCut[22], 'OK'); assert.strictEqual(combCut[22], 'OK');
+  near(finals(wCut, '7a Final upload UK').find(x => x[0] === 'LOW')[1], 11);
+  const raise = workbook({ checks: { LOW: { your: 13, inc: 'Yes' } } });
+  const wRaise = recalc(raise.bytes);
+  const yRaise = B.outcome(P, raise.records.find(r => r.sku === 'LOW'), { your: 13, inc: 'Yes' }, S0);
+  assert.strictEqual(yRaise.check, 'OVER CAP');
+  assert.strictEqual(find(wRaise, '4 Can win buy box', 'LOW')[22], 'OVER CAP');
+  assert.strictEqual(find(wRaise, '6 Combined upload', 'LOW')[22], 'OVER CAP');
+  assert.ok(!finals(wRaise, '7a Final upload UK').some(x => x[0] === 'LOW' && x[1] === 13));
+});
+
+t('a cut from an already over-cap price is OK and goes into 7a; a raise above the cap stays blocked', () => {
+  const row = { sku: 'CAPCUT', title: 'AX Snow Foam 800ml', ean: '200', cost: 0.68, price: 4.99, bb: 4.99, seller: 'Diva Packages', sup: 'UK Ltd', w: 855, sales: 2, stock: 10 };
+  const d = P.decideAll([row], {});
+  const bb = P.buyBoxAll(d.rows, { '200': 1 }, {}, P.BB_DEFAULT);
+  const rec0 = B.build(X, P, { bbr: bb, settings: S0, asOf: '2026-11-09' }).records.find(r => r.sku === 'CAPCUT');
+  assert.ok(rec0.engCap != null && rec0.basePrice > rec0.engCap, 'fixture is already over the cap');
+  assert.notStrictEqual(rec0.engCheck, 'OK');
+  const oCut = B.outcome(P, rec0, { your: 3.99, inc: 'Yes' }, S0);
+  assert.strictEqual(oCut.check, 'OK'); assert.strictEqual(oCut.inc, 'Yes'); assert.ok(oCut.upload); near(oCut.final, 3.99);
+  assert.ok(oCut.newPc > 0.8 && oCut.newPc < 1, 'cut stays above the 80% cap: ' + oCut.newPc);
+  const oRaise = B.outcome(P, rec0, { your: 5.49, inc: 'Yes' }, S0);
+  assert.strictEqual(oRaise.check, 'OVER CAP'); assert.ok(!oRaise.upload);
+  const w0 = recalc(B.build(X, P, { bbr: bb, settings: S0, asOf: '2026-11-09' }).bytes);
+  assert.ok(!finals(w0, '7a Final upload UK').some(x => x[0] === 'CAPCUT'), 'engine does not auto-cut an over-cap keep');
+  const wCut = recalc(B.build(X, P, { bbr: bb, settings: S0, asOf: '2026-11-09', checks: { CAPCUT: { your: 3.99, inc: 'Yes' } } }).bytes);
+  const comb = find(wCut, '6 Combined upload', 'CAPCUT');
+  near(comb[23], 3.99); assert.strictEqual(comb[22], 'OK'); assert.strictEqual(comb[21], 'Yes');
+  near(finals(wCut, '7a Final upload UK').find(x => x[0] === 'CAPCUT')[1], 3.99);
+  const wRaise = recalc(B.build(X, P, { bbr: bb, settings: S0, asOf: '2026-11-09', checks: { CAPCUT: { your: 5.49, inc: 'Yes' } } }).bytes);
+  assert.strictEqual(find(wRaise, '6 Combined upload', 'CAPCUT')[22], 'OVER CAP');
+  assert.ok(!finals(wRaise, '7a Final upload UK').some(x => x[0] === 'CAPCUT' && x[1] === 5.49));
 });
 
 t('two different postage reviews conflict and the old final price is not kept', () => {

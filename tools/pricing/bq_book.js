@@ -98,13 +98,13 @@
     if (/^Losing – already cheaper/.test(r.why)) { x.label = r.why; x.why = r.why; return x; }
     x.label = 'Keep'; return x;
   }
-  /* engine check of a price: > 0, profit > £0, at/above the floor, UK at/below the cap, >= 50% (China 100%) */
+  /* engine check of a price: > 0, profit > £0, at/above the floor, UK not a raise over the cap, >= 50% (China 100%) */
   function ok(P, o, p) {
-    var c = P.calc(o.a, p); return p > 0 && c.profit > 0 && p >= o.floor - 1e-9 && (o.china || o.ceil == null || p <= o.ceil + 1e-9) && c.pc >= P.SAFE_MIN - 1e-9 && (!o.china || c.pc >= P.CHINA_FLOOR - 1e-9);
+    var c = P.calc(o.a, p); return p > 0 && c.profit > 0 && p >= o.floor - 1e-9 && (o.china || o.ceil == null || p <= o.ceil + 1e-9 || (o.price != null && p < o.price - 1e-9)) && c.pc >= P.SAFE_MIN - 1e-9 && (!o.china || c.pc >= P.CHINA_FLOOR - 1e-9);
   }
   /* like ok(), but the minimum price is minFl (tab 5 UK 65% price) instead of o.floor */
   function okAt(P, o, p, minFl) {
-    var c = P.calc(o.a, p); return p > 0 && c.profit > 0 && p >= minFl - 1e-9 && (o.china || o.ceil == null || p <= o.ceil + 1e-9) && c.pc >= P.SAFE_MIN - 1e-9 && (!o.china || c.pc >= P.CHINA_FLOOR - 1e-9);
+    var c = P.calc(o.a, p); return p > 0 && c.profit > 0 && p >= minFl - 1e-9 && (o.china || o.ceil == null || p <= o.ceil + 1e-9 || (o.price != null && p < o.price - 1e-9)) && c.pc >= P.SAFE_MIN - 1e-9 && (!o.china || c.pc >= P.CHINA_FLOOR - 1e-9);
   }
   function parseYMD(d) { var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(d || '')); return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])) : null; }
   function daysBetween(a, b) { var A = parseYMD(a), B = parseYMD(b); if (!A || !B) return 9999; return Math.round((B - A) / 864e5); }
@@ -158,7 +158,7 @@
     var A = o.a, fixed = A.cost * A.mult + A.post + (P.num(A.collab) || 0);
     var prof = P.rnd(P.rnd(J * (1 - P.FEE) - fixed, 6), 2);
     var floorRef = x.t5Min != null ? x.t5Min : o.floor;
-    var chk = (o.check && !S.checkPost && !o.postChecked) ? 'CHECK POSTAGE' : J < floorRef - 1e-5 ? 'UNDER FLOOR' : prof <= 0 ? 'LOSS' : (!o.china && o.ceil != null && J > o.ceil + 1e-5) ? 'OVER CAP' : P.rnd(J, 2) === P.rnd(o.price, 2) ? 'NO CHANGE' : 'OK';
+    var chk = (o.check && !S.checkPost && !o.postChecked) ? 'CHECK POSTAGE' : J < floorRef - 1e-5 ? 'UNDER FLOOR' : prof <= 0 ? 'LOSS' : (!o.china && o.ceil != null && J > o.ceil + 1e-5 && (o.price == null || J > o.price + 1e-5)) ? 'OVER CAP' : P.rnd(J, 2) === P.rnd(o.price, 2) ? 'NO CHANGE' : 'OK';
     return { J: J, chk: chk, prof: prof, floorRef: floorRef };
   }
 
@@ -278,7 +278,7 @@
       var o = x.o, n = i + H0 + 1, A = o.a, fixed = A.cost * A.mult + A.post + (P.num(A.collab) || 0);
       var J = x.sugg, k = P.calc(A, J), prof = P.rnd(P.rnd(J * (1 - F) - fixed, 6), 2), pc = (J * (1 - F) - fixed) / A.cost, s = status(o, J, prof, pc);
       var floorRef = x.t5Min != null ? x.t5Min : o.floor;
-      var chk = J == null || !(J > 0) ? 'NO PRICE' : o.check && !S.checkPost && !o.postChecked ? 'CHECK POSTAGE' : J < floorRef - 1e-5 ? 'UNDER FLOOR' : prof <= 0 ? 'LOSS' : (!o.china && o.ceil != null && J > o.ceil + 1e-5) ? 'OVER CAP' : P.rnd(J, 2) === P.rnd(o.price, 2) ? 'NO CHANGE' : 'OK';
+      var chk = J == null || !(J > 0) ? 'NO PRICE' : o.check && !S.checkPost && !o.postChecked ? 'CHECK POSTAGE' : J < floorRef - 1e-5 ? 'UNDER FLOOR' : prof <= 0 ? 'LOSS' : (!o.china && o.ceil != null && J > o.ceil + 1e-5 && (o.price == null || J > o.price + 1e-5)) ? 'OVER CAP' : P.rnd(J, 2) === P.rnd(o.price, 2) ? 'NO CHANGE' : 'OK';
       var up = x.inc === 'Yes' && chk === 'OK', upU = up && !o.china, upC = up && !!o.china;
       if (upU) okUK++; if (upC) okCN++;
       var f = function (q) { return q.replace(/#/g, n); };
@@ -293,7 +293,7 @@
         { t: 'n', v: pc, f: f('IFERROR((T#*(1-' + F + ')-W#)/D#,"")'), z: PC, st: s },
         c(x.short), { t: 's', v: x.inc, z: YESF },
         { t: 'n', v: J, f: f('IF(O#="",N#,ROUND(O#,2))'), z: M },
-        { t: 's', v: chk, f: f('IF(ISERROR(T#),"BAD PRICE",IF(OR(T#="",T#<=0),"NO PRICE",IF(Z#<>"","CHECK POSTAGE",IF(T#<M#-0.00001,"UNDER FLOOR",IF(P#<=0,"LOSS",IF(AND(X#<>"",T#>X#+0.00001),"OVER CAP",IF(ROUND(T#,2)=ROUND(H#,2),"NO CHANGE","OK")))))))') },
+        { t: 's', v: chk, f: f('IF(ISERROR(T#),"BAD PRICE",IF(OR(T#="",T#<=0),"NO PRICE",IF(Z#<>"","CHECK POSTAGE",IF(T#<M#-0.00001,"UNDER FLOOR",IF(P#<=0,"LOSS",IF(AND(X#<>"",T#>X#+0.00001,OR(H#="",T#>H#+0.00001)),"OVER CAP",IF(ROUND(T#,2)=ROUND(H#,2),"NO CHANGE","OK")))))))') },
         upU ? { t: 'n', v: okUK, f: UPF, z: IN } : { t: 's', v: '', f: UPF },
         c(fixed, M), o.china ? null : c(o.ceil, M), c(o.floorPct, PC), c(o.check && !S.checkPost && !o.postChecked ? o.check : ''),
         upC ? { t: 'n', v: okCN, f: CNF, z: IN } : { t: 's', v: '', f: CNF },
@@ -323,7 +323,7 @@
         var J = x.sugg, A = o.a, fixed = A.cost * A.mult + A.post + (P.num(A.collab) || 0);
         var prof = P.rnd(P.rnd(J * (1 - F) - fixed, 6), 2);
         var floorRef = x.t5Min != null ? x.t5Min : o.floor;
-      var chk = J == null || !(J > 0) ? 'NO PRICE' : o.check && !S.checkPost && !o.postChecked ? 'CHECK POSTAGE' : J < floorRef - 1e-5 ? 'UNDER FLOOR' : prof <= 0 ? 'LOSS' : (!o.china && o.ceil != null && J > o.ceil + 1e-5) ? 'OVER CAP' : P.rnd(J, 2) === P.rnd(o.price, 2) ? 'NO CHANGE' : 'OK';
+      var chk = J == null || !(J > 0) ? 'NO PRICE' : o.check && !S.checkPost && !o.postChecked ? 'CHECK POSTAGE' : J < floorRef - 1e-5 ? 'UNDER FLOOR' : prof <= 0 ? 'LOSS' : (!o.china && o.ceil != null && J > o.ceil + 1e-5 && (o.price == null || J > o.price + 1e-5)) ? 'OVER CAP' : P.rnd(J, 2) === P.rnd(o.price, 2) ? 'NO CHANGE' : 'OK';
         if (chk !== 'OK') return;
         if (seq < rows.length) { rows[seq][0].v = o.sku; rows[seq][1].v = J; rows[seq][1].t = 'n'; }
         seq++;

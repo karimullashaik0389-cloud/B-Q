@@ -1101,7 +1101,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
     if (!(final > 0)) { out.check = 'NO PRICE'; return out; }
     var c = P.calc({ cost: rec.cost, mult: rec.mult, post: post, collab: rec.collab || 0 }, final);
     out.newProfit = c.profit; out.newPc = c.pc;
-    var chk = floorRef != null && final < floorRef - 1e-5 ? 'UNDER FLOOR' : !(c.profit > 0) ? 'LOSS' : (cap != null && final > cap + 1e-5) ? 'OVER CAP' : (c.pc < 0.5 - 1e-9) ? 'UNDER FLOOR' : (rec.china && c.pc < 1 - 1e-9) ? 'UNDER FLOOR' : (rec.china && rec.basePrice != null && final > rec.basePrice + 0.001) ? 'CHINA RAISE' : (rec.basePrice != null && rnd2(final) === rnd2(rec.basePrice)) ? 'NO CHANGE' : 'OK';
+    var chk = floorRef != null && final < floorRef - 1e-5 ? 'UNDER FLOOR' : !(c.profit > 0) ? 'LOSS' : (cap != null && final > cap + 1e-5 && (rec.basePrice == null || final > rec.basePrice + 1e-5)) ? 'OVER CAP' : (c.pc < 0.5 - 1e-9) ? 'UNDER FLOOR' : (rec.china && c.pc < 1 - 1e-9) ? 'UNDER FLOOR' : (rec.china && rec.basePrice != null && final > rec.basePrice + 0.001) ? 'CHINA RAISE' : (rec.basePrice != null && rnd2(final) === rnd2(rec.basePrice)) ? 'NO CHANGE' : 'OK';
     out.check = chk; return out;
   }
 
@@ -1243,9 +1243,9 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
       setF(showNewP, 'IF(AND(' + C(postStat, r) + '="BASE",' + C(priceStat, r) + '="BASE",' + C(yourStat, r) + '="BASE"),IF(' + C(engNewI, r) + '="","",' + C(engNewI, r) + '),' + reNew + ')', M);
       var floorRef = 'IF(AND(' + C(act, r) + '="Can\'t win",' + C(chinaI, r) + '<>1,' + C(t5MinP, r) + '<>""),' + C(t5MinP, r) + ',' + C(floorP, r) + ')';
       var chinaUpNow = 'IF(OR(' + C(chinaI, r) + '<>1,' + C(showFinal, r) + '="",' + C(priceU, r) + '="",NOT(ISNUMBER(' + C(showFinal, r) + ')),NOT(ISNUMBER(' + C(priceU, r) + '))),FALSE,' + C(showFinal, r) + '>' + C(priceU, r) + '+0.001)';
-      var reChk = 'IF(' + C(weekly, r) + '=1,"WEEKLY HOLD",IF(' + chinaUpNow + ',"CHINA RAISE",IF(AND(' + C(packI, r) + '=1,' + SB.checkPost + '=0,' + C(postStat, r) + '="BASE"),"CHECK POSTAGE",IF(OR(' + C(showFinal, r) + '="",NOT(ISNUMBER(' + C(showFinal, r) + '))),"NO CHANGE",IF(' + C(showFinal, r) + '<=0,"NO PRICE",IF(' + prof(C(showFinal, r)) + '<=0,"LOSS",IF(AND(' + floorRef + '<>"",' + C(showFinal, r) + '<' + floorRef + '-0.00001),"UNDER FLOOR",IF(IF(' + C(capP, r) + '="",FALSE,' + C(showFinal, r) + '>' + C(capP, r) + '+0.00001),"OVER CAP",IF(' + pcOf(C(showFinal, r)) + '<' + SB.safeMin + '-0.000000001,"UNDER FLOOR",IF(AND(' + C(chinaI, r) + '=1,' + pcOf(C(showFinal, r)) + '<1-0.000000001),"UNDER FLOOR",IF(AND(' + C(priceU, r) + '<>"",ROUND(' + C(showFinal, r) + ',2)=ROUND(' + C(priceU, r) + ',2)),"NO CHANGE","OK")))))))))))';
+      var reChk = 'IF(' + C(weekly, r) + '=1,"WEEKLY HOLD",IF(' + chinaUpNow + ',"CHINA RAISE",IF(AND(' + C(packI, r) + '=1,' + SB.checkPost + '=0,' + C(postStat, r) + '="BASE"),"CHECK POSTAGE",IF(OR(' + C(showFinal, r) + '="",NOT(ISNUMBER(' + C(showFinal, r) + '))),"NO CHANGE",IF(' + C(showFinal, r) + '<=0,"NO PRICE",IF(' + prof(C(showFinal, r)) + '<=0,"LOSS",IF(AND(' + floorRef + '<>"",' + C(showFinal, r) + '<' + floorRef + '-0.00001),"UNDER FLOOR",IF(AND(' + C(capP, r) + '<>"",' + C(showFinal, r) + '>' + C(capP, r) + '+0.00001,IF(' + C(priceU, r) + '="",TRUE,' + C(showFinal, r) + '>' + C(priceU, r) + '+0.00001)),"OVER CAP",IF(' + pcOf(C(showFinal, r)) + '<' + SB.safeMin + '-0.000000001,"UNDER FLOOR",IF(AND(' + C(chinaI, r) + '=1,' + pcOf(C(showFinal, r)) + '<1-0.000000001),"UNDER FLOOR",IF(AND(' + C(priceU, r) + '<>"",ROUND(' + C(showFinal, r) + ',2)=ROUND(' + C(priceU, r) + ',2)),"NO CHANGE","OK")))))))))))';
       var chinaUpYour = 'IF(OR(' + C(chinaI, r) + '<>1,' + C(yourU, r) + '="",' + C(basePriceI, r) + '="",NOT(ISNUMBER(' + C(yourU, r) + ')),NOT(ISNUMBER(' + C(basePriceI, r) + '))),FALSE,' + C(yourU, r) + '>' + C(basePriceI, r) + '+0.001)';
-      var yourChk = 'IF(' + C(weeklyEngI, r) + '=1,"WEEKLY HOLD",IF(' + chinaUpYour + ',"CHINA RAISE",IF(AND(' + C(packI, r) + '=1,' + SB.checkPost + '=0),"CHECK POSTAGE",IF(' + C(yourU, r) + '<=0,"NO PRICE",IF(' + prof(C(yourU, r)) + '<=0,"LOSS",IF(AND(IF(' + C(t5MinI, r) + '<>"",' + C(t5MinI, r) + ',' + C(engFloorI, r) + ')<>"",' + C(yourU, r) + '<IF(' + C(t5MinI, r) + '<>"",' + C(t5MinI, r) + ',' + C(engFloorI, r) + ')-0.00001),"UNDER FLOOR",IF(IF(' + C(engCapI, r) + '="",FALSE,' + C(yourU, r) + '>' + C(engCapI, r) + '+0.00001),"OVER CAP",IF((' + C(yourU, r) + '*(1-' + SB.fee + ')-(' + C(costI, r) + '*' + C(multI, r) + '+' + C(basePostI, r) + '+' + C(colI, r) + '))/' + C(costI, r) + '<' + SB.safeMin + ',"UNDER FLOOR",IF(AND(' + C(chinaI, r) + '=1,(' + C(yourU, r) + '*(1-' + SB.fee + ')-(' + C(costI, r) + '*' + C(multI, r) + '+' + C(basePostI, r) + '+' + C(colI, r) + '))/' + C(costI, r) + '<1),"UNDER FLOOR",IF(ROUND(' + C(yourU, r) + ',2)=ROUND(' + C(basePriceI, r) + ',2),"NO CHANGE","OK"))))))))))';
+      var yourChk = 'IF(' + C(weeklyEngI, r) + '=1,"WEEKLY HOLD",IF(' + chinaUpYour + ',"CHINA RAISE",IF(AND(' + C(packI, r) + '=1,' + SB.checkPost + '=0),"CHECK POSTAGE",IF(' + C(yourU, r) + '<=0,"NO PRICE",IF(' + prof(C(yourU, r)) + '<=0,"LOSS",IF(AND(IF(' + C(t5MinI, r) + '<>"",' + C(t5MinI, r) + ',' + C(engFloorI, r) + ')<>"",' + C(yourU, r) + '<IF(' + C(t5MinI, r) + '<>"",' + C(t5MinI, r) + ',' + C(engFloorI, r) + ')-0.00001),"UNDER FLOOR",IF(AND(' + C(engCapI, r) + '<>"",' + C(yourU, r) + '>' + C(engCapI, r) + '+0.00001,IF(' + C(basePriceI, r) + '="",TRUE,' + C(yourU, r) + '>' + C(basePriceI, r) + '+0.00001)),"OVER CAP",IF((' + C(yourU, r) + '*(1-' + SB.fee + ')-(' + C(costI, r) + '*' + C(multI, r) + '+' + C(basePostI, r) + '+' + C(colI, r) + '))/' + C(costI, r) + '<' + SB.safeMin + ',"UNDER FLOOR",IF(AND(' + C(chinaI, r) + '=1,(' + C(yourU, r) + '*(1-' + SB.fee + ')-(' + C(costI, r) + '*' + C(multI, r) + '+' + C(basePostI, r) + '+' + C(colI, r) + '))/' + C(costI, r) + '<1),"UNDER FLOOR",IF(ROUND(' + C(yourU, r) + ',2)=ROUND(' + C(basePriceI, r) + ',2),"NO CHANGE","OK"))))))))))';
       setF(showCheck, 'IF(OR(' + C(postStat, r) + '="CONFLICT",' + C(priceStat, r) + '="CONFLICT",' + C(yourStat, r) + '="CONFLICT",' + C(incStat, r) + '="CONFLICT"),"CONFLICT",IF(OR(' + C(postStat, r) + '="INVALID",' + C(priceStat, r) + '="INVALID",' + C(yourStat, r) + '="INVALID",' + C(incStat, r) + '="INVALID"),"INVALID",IF(AND(' + C(postStat, r) + '="BASE",' + C(priceStat, r) + '="BASE",' + C(yourStat, r) + '="BASE"),' + C(engCheckI, r) + ',IF(AND(' + C(postStat, r) + '="BASE",' + C(priceStat, r) + '="BASE"),' + yourChk + ',' + reChk + '))))');
       setF(showInc, 'IF(OR(' + C(showCheck, r) + '="CONFLICT",' + C(showCheck, r) + '="INVALID"),"No",IF(' + C(incStat, r) + '="OK",IF(' + C(incVal, r) + '="No","No",IF(' + C(showCheck, r) + '="OK","Yes","No")),IF(AND(' + C(postStat, r) + '="BASE",' + C(priceStat, r) + '="BASE",' + C(yourStat, r) + '="BASE"),' + C(engIncI, r) + ',IF(' + C(showCheck, r) + '="OK","Yes","No"))))');
       setF(showWhy, 'IF(AND(' + C(postStat, r) + '="BASE",' + C(priceStat, r) + '="BASE",' + C(yourStat, r) + '="BASE",' + C(incStat, r) + '="BASE"),' + C(engReasonI, r) + ',IF(' + C(showCheck, r) + '="CONFLICT","Two tabs have different review numbers for this SKU. Clear one so only one value remains.",IF(' + C(showCheck, r) + '="INVALID","A review cell is not a valid number. Postage may be 0. Prices must be above 0.",IF(' + C(showCheck, r) + '="CHECK POSTAGE","Heavy pack: type the checked postage in Postage review (0 is allowed). Include Yes alone does not clear it.",IF(' + C(showCheck, r) + '="CHINA RAISE","China raise is review only and is not on the upload.",IF(' + C(showCheck, r) + '="WEEKLY HOLD","Margin too low (UK) was already changed in the last 3 days.",IF(' + C(showCheck, r) + '="OK",IF(' + C(yourStat, r) + '="OK","Your price (final override)","Suggestion recalculated from the review"),' + C(showCheck, r) + ')))))))');
@@ -1283,7 +1283,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
         var aligned = name === T6;
         return [v(rec.sku), v(rec.title), v(rec.uk), v(rec.cost, M), fml(showPost, rr, M, aligned), inputCell(rec, 'post', M), v(rec.stock, IN), v(rec.sales, IN), fml(showPrice, rr, M, aligned), inputCell(rec, 'priceNow', M), fml(showProfit, rr, M, aligned), fml(showPc, rr, PC, aligned), v(rec.bb, M), v(rec.seller), fml(showFloor, rr, M, aligned), fml(showSugg, rr, M, aligned), inputCell(rec, 'your', M), fml(showNewP, rr, M, aligned), { t: 'n', f: 'IF(OR(R' + rr + '="",D' + rr + '=""),"",R' + rr + '/D' + rr + ')', z: PC }, fml(showWhy, rr, null, aligned), inputCell(rec, 'inc'), fml(showInc, rr, null, aligned), fml(showCheck, rr, null, aligned), fml(showFinal, rr, M, aligned), fml(upUK, rr, IN, aligned), fml(upCN, rr, IN, aligned)];
       });
-      return { name: name, top: top || REVNOTE, cols: REVHEAD.map(function (h, i) { return [h, null, i === 1 || i === 19 ? 40 : 14]; }), rows: rows, freeze: { x: 1, y: 2 }, filter: true, inputs: [5, 9, 16, 20], notes: { 'Postage review': 'Type a postage, or 0. Leave blank to keep Postage used. This does not read a file on your computer by itself.', 'Selling price review': 'Corrects the current selling price. The suggestion is recalculated. This is not Your price.', 'Your price': 'Optional final price. Safety rules still apply. Leave blank to use the suggestion.', 'Include override': 'Yes or No. Blank keeps the automatic decision. Yes cannot bypass a floor, the cap, a China raise, a weekly hold or postage that is still unchecked.' } };
+      return { name: name, top: top || REVNOTE, cols: REVHEAD.map(function (h, i) { return [h, null, i === 1 || i === 19 ? 40 : 14]; }), rows: rows, freeze: { x: 1, y: 2 }, filter: true, inputs: [5, 9, 16, 20], notes: { 'Postage review': 'Type a postage, or 0. Leave blank to keep Postage used. This does not read a file on your computer by itself.', 'Selling price review': 'Corrects the current selling price. The suggestion is recalculated. This is not Your price.', 'Your price': 'Optional final price. Safety rules still apply. Leave blank to use the suggestion.', 'Include override': 'Yes or No. Blank keeps the automatic decision. Yes cannot bypass a floor, a raise over the cap, a China raise, a weekly hold or postage that is still unchecked.' } };
     }
     var byTab = { 2: [], 3: [], 4: [], 5: [], china: [] };
     recs.forEach(function (rec) { if (byTab[rec.tab]) byTab[rec.tab].push(rec); if (rec.cat === 'raise' && rec.china) byTab.china.push(rec); });
@@ -1322,7 +1322,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
         ['One SKU, many tabs', 'Type the correction on the tab you are reviewing. Combined and Final follow that SKU. You do not retype it.'],
         ['If two tabs disagree', 'The row shows CONFLICT and stays off the upload. Clear one yellow cell so only one value is left. The file cannot tell which edit was last.'],
         ['Heavy packs', 'Multi-packs at or above 14999g, or with no weight, stay off the upload until Postage review has a number (0 is allowed).'],
-        ['What never uploads', 'A loss, a price under the floor, a price over the UK cap, a China raise, a UK margin cut repeated within 3 days, a conflict, or an invalid number.'],
+        ['What never uploads', 'A loss, a price under the floor, a raise over the UK cap, a China raise, a UK margin cut repeated within 3 days, a conflict, or an invalid number.'],
         ['Losing, already cheaper', 'We are below the buy box but still losing. If the product sold on B&Q in the last 30 days, the suggestion rises to 10–15p under the buy box and ends in 9. With 0 sales the price stays. It never goes over the 80% cap or under the floor. A China increase stays on the review tab and is not uploaded.'],
         ['China, 0 sales', 'Tab 9 lists every China product with no B&Q sales in 30 days, so the listing can be checked. Listing notes and Done stay on that tab. They do not change Combined, the final prices, or the upload.'],
         ['Final tabs', '7a and 7b are the B&Q upload layout. They fill themselves. Do not type on them.'],
@@ -1634,7 +1634,8 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
   return { make: make, outcome: outcome, parseChecks: parseChecks, normStore: normStore, applyPreview: applyPreview, backup: backup, restoreBackup: restoreBackup, forceCalc: forceCalc, shareFormulas: shareFormulas, T6: T6, T8: T8, SRC: SRC };
 });
 </script>
-<script>/* B&Q dashboard – "7-tab pricing workbook" (4 Nov 2026). One shared file for the browser (window.BQBook) and the Node tests.
+<script>
+/* B&Q dashboard – "7-tab pricing workbook" (4 Nov 2026). One shared file for the browser (window.BQBook) and the Node tests.
    Input = the Pricing tab's buy box results (BQP.buyBoxAll rows), the Access B&QBB3 sheet (array of rows) and the B&Q template header rows.
    All maths comes from bq_price.js (window.BQP / require). No data, keys or passwords in this file. Nothing is sent anywhere. */
 (function (root, f) { var m = f(); if (typeof module === 'object' && module.exports) module.exports = m; else root.BQBook = m; })(this, function () {
@@ -1734,13 +1735,13 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
     if (/^Losing – already cheaper/.test(r.why)) { x.label = r.why; x.why = r.why; return x; }
     x.label = 'Keep'; return x;
   }
-  /* engine check of a price: > 0, profit > £0, at/above the floor, UK at/below the cap, >= 50% (China 100%) */
+  /* engine check of a price: > 0, profit > £0, at/above the floor, UK not a raise over the cap, >= 50% (China 100%) */
   function ok(P, o, p) {
-    var c = P.calc(o.a, p); return p > 0 && c.profit > 0 && p >= o.floor - 1e-9 && (o.china || o.ceil == null || p <= o.ceil + 1e-9) && c.pc >= P.SAFE_MIN - 1e-9 && (!o.china || c.pc >= P.CHINA_FLOOR - 1e-9);
+    var c = P.calc(o.a, p); return p > 0 && c.profit > 0 && p >= o.floor - 1e-9 && (o.china || o.ceil == null || p <= o.ceil + 1e-9 || (o.price != null && p < o.price - 1e-9)) && c.pc >= P.SAFE_MIN - 1e-9 && (!o.china || c.pc >= P.CHINA_FLOOR - 1e-9);
   }
   /* like ok(), but the minimum price is minFl (tab 5 UK 65% price) instead of o.floor */
   function okAt(P, o, p, minFl) {
-    var c = P.calc(o.a, p); return p > 0 && c.profit > 0 && p >= minFl - 1e-9 && (o.china || o.ceil == null || p <= o.ceil + 1e-9) && c.pc >= P.SAFE_MIN - 1e-9 && (!o.china || c.pc >= P.CHINA_FLOOR - 1e-9);
+    var c = P.calc(o.a, p); return p > 0 && c.profit > 0 && p >= minFl - 1e-9 && (o.china || o.ceil == null || p <= o.ceil + 1e-9 || (o.price != null && p < o.price - 1e-9)) && c.pc >= P.SAFE_MIN - 1e-9 && (!o.china || c.pc >= P.CHINA_FLOOR - 1e-9);
   }
   function parseYMD(d) { var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(d || '')); return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])) : null; }
   function daysBetween(a, b) { var A = parseYMD(a), B = parseYMD(b); if (!A || !B) return 9999; return Math.round((B - A) / 864e5); }
@@ -1794,7 +1795,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
     var A = o.a, fixed = A.cost * A.mult + A.post + (P.num(A.collab) || 0);
     var prof = P.rnd(P.rnd(J * (1 - P.FEE) - fixed, 6), 2);
     var floorRef = x.t5Min != null ? x.t5Min : o.floor;
-    var chk = (o.check && !S.checkPost && !o.postChecked) ? 'CHECK POSTAGE' : J < floorRef - 1e-5 ? 'UNDER FLOOR' : prof <= 0 ? 'LOSS' : (!o.china && o.ceil != null && J > o.ceil + 1e-5) ? 'OVER CAP' : P.rnd(J, 2) === P.rnd(o.price, 2) ? 'NO CHANGE' : 'OK';
+    var chk = (o.check && !S.checkPost && !o.postChecked) ? 'CHECK POSTAGE' : J < floorRef - 1e-5 ? 'UNDER FLOOR' : prof <= 0 ? 'LOSS' : (!o.china && o.ceil != null && J > o.ceil + 1e-5 && (o.price == null || J > o.price + 1e-5)) ? 'OVER CAP' : P.rnd(J, 2) === P.rnd(o.price, 2) ? 'NO CHANGE' : 'OK';
     return { J: J, chk: chk, prof: prof, floorRef: floorRef };
   }
 
@@ -1914,7 +1915,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
       var o = x.o, n = i + H0 + 1, A = o.a, fixed = A.cost * A.mult + A.post + (P.num(A.collab) || 0);
       var J = x.sugg, k = P.calc(A, J), prof = P.rnd(P.rnd(J * (1 - F) - fixed, 6), 2), pc = (J * (1 - F) - fixed) / A.cost, s = status(o, J, prof, pc);
       var floorRef = x.t5Min != null ? x.t5Min : o.floor;
-      var chk = J == null || !(J > 0) ? 'NO PRICE' : o.check && !S.checkPost && !o.postChecked ? 'CHECK POSTAGE' : J < floorRef - 1e-5 ? 'UNDER FLOOR' : prof <= 0 ? 'LOSS' : (!o.china && o.ceil != null && J > o.ceil + 1e-5) ? 'OVER CAP' : P.rnd(J, 2) === P.rnd(o.price, 2) ? 'NO CHANGE' : 'OK';
+      var chk = J == null || !(J > 0) ? 'NO PRICE' : o.check && !S.checkPost && !o.postChecked ? 'CHECK POSTAGE' : J < floorRef - 1e-5 ? 'UNDER FLOOR' : prof <= 0 ? 'LOSS' : (!o.china && o.ceil != null && J > o.ceil + 1e-5 && (o.price == null || J > o.price + 1e-5)) ? 'OVER CAP' : P.rnd(J, 2) === P.rnd(o.price, 2) ? 'NO CHANGE' : 'OK';
       var up = x.inc === 'Yes' && chk === 'OK', upU = up && !o.china, upC = up && !!o.china;
       if (upU) okUK++; if (upC) okCN++;
       var f = function (q) { return q.replace(/#/g, n); };
@@ -1929,7 +1930,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
         { t: 'n', v: pc, f: f('IFERROR((T#*(1-' + F + ')-W#)/D#,"")'), z: PC, st: s },
         c(x.short), { t: 's', v: x.inc, z: YESF },
         { t: 'n', v: J, f: f('IF(O#="",N#,ROUND(O#,2))'), z: M },
-        { t: 's', v: chk, f: f('IF(ISERROR(T#),"BAD PRICE",IF(OR(T#="",T#<=0),"NO PRICE",IF(Z#<>"","CHECK POSTAGE",IF(T#<M#-0.00001,"UNDER FLOOR",IF(P#<=0,"LOSS",IF(AND(X#<>"",T#>X#+0.00001),"OVER CAP",IF(ROUND(T#,2)=ROUND(H#,2),"NO CHANGE","OK")))))))') },
+        { t: 's', v: chk, f: f('IF(ISERROR(T#),"BAD PRICE",IF(OR(T#="",T#<=0),"NO PRICE",IF(Z#<>"","CHECK POSTAGE",IF(T#<M#-0.00001,"UNDER FLOOR",IF(P#<=0,"LOSS",IF(AND(X#<>"",T#>X#+0.00001,OR(H#="",T#>H#+0.00001)),"OVER CAP",IF(ROUND(T#,2)=ROUND(H#,2),"NO CHANGE","OK")))))))') },
         upU ? { t: 'n', v: okUK, f: UPF, z: IN } : { t: 's', v: '', f: UPF },
         c(fixed, M), o.china ? null : c(o.ceil, M), c(o.floorPct, PC), c(o.check && !S.checkPost && !o.postChecked ? o.check : ''),
         upC ? { t: 'n', v: okCN, f: CNF, z: IN } : { t: 's', v: '', f: CNF },
@@ -1959,7 +1960,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
         var J = x.sugg, A = o.a, fixed = A.cost * A.mult + A.post + (P.num(A.collab) || 0);
         var prof = P.rnd(P.rnd(J * (1 - F) - fixed, 6), 2);
         var floorRef = x.t5Min != null ? x.t5Min : o.floor;
-      var chk = J == null || !(J > 0) ? 'NO PRICE' : o.check && !S.checkPost && !o.postChecked ? 'CHECK POSTAGE' : J < floorRef - 1e-5 ? 'UNDER FLOOR' : prof <= 0 ? 'LOSS' : (!o.china && o.ceil != null && J > o.ceil + 1e-5) ? 'OVER CAP' : P.rnd(J, 2) === P.rnd(o.price, 2) ? 'NO CHANGE' : 'OK';
+      var chk = J == null || !(J > 0) ? 'NO PRICE' : o.check && !S.checkPost && !o.postChecked ? 'CHECK POSTAGE' : J < floorRef - 1e-5 ? 'UNDER FLOOR' : prof <= 0 ? 'LOSS' : (!o.china && o.ceil != null && J > o.ceil + 1e-5 && (o.price == null || J > o.price + 1e-5)) ? 'OVER CAP' : P.rnd(J, 2) === P.rnd(o.price, 2) ? 'NO CHANGE' : 'OK';
         if (chk !== 'OK') return;
         if (seq < rows.length) { rows[seq][0].v = o.sku; rows[seq][1].v = J; rows[seq][1].t = 'n'; }
         seq++;
