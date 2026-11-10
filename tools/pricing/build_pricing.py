@@ -273,6 +273,15 @@ for r in range(3, D.max_row + 1):
 for i, x in enumerate(up):
     D.cell(i + 3, 1).value = x['sku']; D.cell(i + 3, 2).value = round(x['finalp'], 2)
 u.save(up_path); log('saved', up_path, len(up), 'rows')
+
+# Last selling-price change per SKU (tab 5 UK 3-day hold). Built from daily offers + uploaded price CSVs.
+try:
+    import price_changes as _pc
+    priceChanges, pc_meta = _pc.build_price_changes(as_of=A.date)
+    log('price-change log:', pc_meta['label'], 'dates', pc_meta.get('dates'))
+except Exception as e:
+    priceChanges, pc_meta = {}, {'as_of': A.date, 'label': 'none', 'count': 0}
+    log('price-change log skipped:', type(e).__name__, e)
 if A.enc:
     sys.path.insert(0, '/workspace/bq/hosting/build'); os.environ.setdefault('BQ_PASSWORD_FILE', '/workspace/bq/KEEP/secrets/dashboard_password.txt'); import bqcrypt
     names = [h for h in engine_hdr() if h in hdr0]; ix = [hdr0.index(h) for h in names]
@@ -280,7 +289,8 @@ if A.enc:
     tpl = {n: [[c.value for c in r] for r in tw[n].iter_rows()] for n in tw.sheetnames}
     tpl['Data'] = tpl['Data'][:2]
     doc = {'meta': {'created': datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'), 'access': os.path.basename(acc), 'access_date': acc_date,
-                    'imported_label': imp_label, 'sales_label': sales_label, 'sales_last': sales_last, 'imported': len(imported), 'engine': 'bq_price v1', 'built_with_bb': bb_label, 'upload_rows_at_build': len(up)},
-           'aoa': [names] + [[jv(r[k]) if k < len(r) else None for k in ix] for r in aoa[1:]], 'imported': imported, 'sales30': sales30, 'template': tpl}
+                    'imported_label': imp_label, 'sales_label': sales_label, 'sales_last': sales_last, 'imported': len(imported), 'engine': 'bq_price v1', 'built_with_bb': bb_label, 'upload_rows_at_build': len(up), 'as_of': A.date, 'price_changes': len(priceChanges), 'price_changes_label': pc_meta.get('label','')},
+           'aoa': [names] + [[jv(r[k]) if k < len(r) else None for k in ix] for r in aoa[1:]], 'imported': imported, 'sales30': sales30, 'template': tpl,
+           'priceChanges': priceChanges, 'asOf': A.date}
     open(A.enc, 'wb').write(bqcrypt.encrypt(json.dumps(doc, separators=(',', ':'), default=str).encode('utf-8'))); log('saved', A.enc)
 print(json.dumps({'pricing': pricing_path, 'upload': up_path, 'upload_rows': len(up)}))
