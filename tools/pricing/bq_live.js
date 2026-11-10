@@ -4,9 +4,9 @@
 (function (root, f) { var m = f(); if (typeof module === 'object' && module.exports) module.exports = m; else root.BQLive = m; })(this, function () {
   'use strict';
   var M = '£#,##0.00', PC = '0.0%', IN = '#,##0', YESF = '0;-0;0;@';
-  var T1 = '1 All', T2 = '2 Winning in range', T3 = '3 Winning 0 sales', T4 = '4 Can win buy box', T5 = '5 Margin too low', T6 = '6 Combined upload', TC = 'China raises (review only)', T7A = '7a Final upload UK', T7B = '7b Final upload China', T8 = '8 Sells elsewhere not B&Q', T9 = '9 China 0 sales – listing check', START = 'Start here', CALC = '_Calc', SET = '_Set';
-  /* review-tab columns: A sku … F postage review, J selling-price review, Q your price, U include override */
-  var SRC = [[T1, 'AO', 'AP', 'AQ', 'AR'], [T2, 'F', 'J', 'Q', 'U'], [T3, 'F', 'J', 'Q', 'U'], [T4, 'F', 'J', 'Q', 'U'], [T5, 'F', 'J', 'Q', 'U'], [T6, 'F', 'J', 'Q', 'U'], [TC, 'F', 'J', 'Q', 'U']];
+  var T1 = '1 All', T2 = '2 Winning in range', T3 = '3 Winning 0 sales', T4 = '4 Can win buy box', T5 = '5 Margin too low', T6 = '6 Combined upload', TC = 'China raises (review only)', T7A = '7a Final upload UK', T7B = '7b Final upload China', T8 = '8 Sells elsewhere not B&Q', T9 = '9 China 0 sales – listing check', T_LOSE = 'Losing although cheaper', T_CANT = "Losing – can't win above floor", T_FIX = 'Fix before it comes back', START = 'Start here', CALC = '_Calc', SET = '_Set';
+  /* review-tab yellow inputs after the redesign: O postage review, T selling-price review, J your price, P include override */
+  var SRC = [[T1, 'AO', 'AP', 'AQ', 'AR'], [T2, 'O', 'T', 'J', 'P'], [T3, 'O', 'T', 'J', 'P'], [T4, 'O', 'T', 'J', 'P'], [T5, 'O', 'T', 'J', 'P'], [T6, 'O', 'T', 'J', 'P'], [TC, 'O', 'T', 'J', 'P']];
   function L(n) { var s = ''; n++; while (n > 0) { var m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; }
   function num(v) { if (v == null || v === '') return null; if (typeof v === 'number') return isFinite(v) ? v : null; var t = String(v).replace(/[£,\s\u00a0]/g, ''); return /^[+-]?(\d+\.?\d*|\.\d+)$/.test(t) ? +t : null; }
   function rnd2(n) { return Math.round(n * 100) / 100; }
@@ -23,7 +23,8 @@
       o.inc = inc; o.upload = o.check === 'OK' && inc === 'Yes'; return o;
     }
     if (postE == null && priceE == null && yourE == null) return pack({ check: rec.engCheck, inc: rec.engInc, sugg: rec.engSugg, final: rec.engSugg, post: rec.basePost, price: rec.basePrice, profitNow: rec.engProfit, newProfit: rec.engNewProfit, floor: rec.engFloor, reason: rec.engReason });
-    if (postE == null && priceE == null) return pack(judgeYour(P, rec, yourE, S));
+    if (P.useRules) P.useRules(S);
+    if (postE == null && priceE == null) { var jy = pack(judgeYour(P, rec, yourE, S)); if (P.clearRules) P.clearRules(); return jy; }
     var raw = { sku: rec.sku, title: rec.title, ean: rec.ean, cost: rec.cost, price: priceE != null ? priceE : rec.basePrice, bb: rec.bb, seller: rec.seller, sup: rec.sup, w: rec.w, sales: rec.sales, collab: rec.collab, stock: rec.stock, variant: '', pc: rec.accessPc, offerFlag: rec.offer, liveSeen: rec.liveSeen };
     if (postE != null) raw.postYour = postE;
     var d = P.decide(raw, {});
@@ -31,16 +32,16 @@
     var b = P.buyBox(d, { fresh: rec.fresh !== 0, rival: rec.rival != null ? { p: rec.rival, s: 'Other', d: '' } : null, seasonal: rec.seasonal === 1 }, bbS);
     b.o = d;
     var x = classify(P, [b], S)[0];
-    return pack(judgeSim(P, x, yourE, S));
+    var js = pack(judgeSim(P, x, yourE, S)); if (P.clearRules) P.clearRules(); return js;
   }
   function judgeYour(P, rec, your, S) {
     var o = { sugg: rec.engSugg, post: rec.basePost, price: rec.basePrice, profitNow: rec.engProfit, floor: rec.engFloor, final: your, inc: rec.engInc };
     if (rec.weekly) { o.check = 'WEEKLY HOLD'; return o; }
     if (rec.china && your > (rec.basePrice || 0) + 0.001) { o.check = 'CHINA RAISE'; return o; }
     if (rec.packCheck && !(S && S.checkPost)) { o.check = 'CHECK POSTAGE'; return o; }
-    return finishMoney(P, rec, your, rec.basePost, rec.cat === 't5' && !rec.china ? rec.t5Min : rec.engFloor, rec.engCap, o);
+    return finishMoney(P, rec, your, rec.basePost, rec.cat === 't5' && !rec.china ? rec.t5Min : rec.engFloor, rec.engCap, o, S);
   }
-  function judgeSim(P, x, your) {
+  function judgeSim(P, x, your, S) {
     var o = x.o, post = o.post, price = o.price;
     var out = { sugg: x.sugg, post: post, price: price, profitNow: o.profit, floor: o.floor, final: your != null ? your : x.sugg };
     if (x.weeklyHold) { out.check = 'WEEKLY HOLD'; out.final = null; out.sugg = null; return out; }
@@ -50,22 +51,31 @@
     var final = your != null ? your : x.sugg;
     var floorRef = x.cat === 't5' && !o.china && x.t5Min != null ? x.t5Min : o.floor;
     var rec = { cost: o.cost, mult: o.mult, collab: o.collab || 0, basePrice: price, china: o.china ? 1 : 0 };
-    return finishMoney(P, rec, final, post, floorRef, o.china ? null : o.ceil, out);
+    return finishMoney(P, rec, final, post, floorRef, o.china ? null : o.ceil, out, S);
   }
-  function finishMoney(P, rec, final, post, floorRef, cap, out) {
+  function finishMoney(P, rec, final, post, floorRef, cap, out, S) {
     out.final = final;
     if (final == null || !(post != null) || !(rec.cost > 0)) { out.check = 'NO CHANGE'; return out; }
     if (!(final > 0)) { out.check = 'NO PRICE'; return out; }
     var c = P.calc({ cost: rec.cost, mult: rec.mult, post: post, collab: rec.collab || 0 }, final);
     out.newProfit = c.profit; out.newPc = c.pc;
-    var chk = floorRef != null && final < floorRef - 1e-5 ? 'UNDER FLOOR' : !(c.profit > 0) ? 'LOSS' : (cap != null && final > cap + 1e-5 && (rec.basePrice == null || final > rec.basePrice + 1e-5)) ? 'OVER CAP' : (c.pc < 0.5 - 1e-9) ? 'UNDER FLOOR' : (rec.china && c.pc < 1 - 1e-9) ? 'UNDER FLOOR' : (rec.china && rec.basePrice != null && final > rec.basePrice + 0.001) ? 'CHINA RAISE' : (rec.basePrice != null && rnd2(final) === rnd2(rec.basePrice)) ? 'NO CHANGE' : 'OK';
+    var safe = (S && S.safeMin != null) ? S.safeMin : (P.safeOf ? P.safeOf() : 0.5);
+    var chF = (S && S.chinaFloor != null) ? S.chinaFloor : (P.chinaFloorOf ? P.chinaFloorOf() : 1);
+    var chk = floorRef != null && final < floorRef - 1e-5 ? 'UNDER FLOOR' : !(c.profit > 0) ? 'LOSS' : (cap != null && final > cap + 1e-5 && (rec.basePrice == null || final > rec.basePrice + 1e-5)) ? 'OVER CAP' : (c.pc < safe - 1e-9) ? 'UNDER FLOOR' : (rec.china && c.pc < chF - 1e-9) ? 'UNDER FLOOR' : (rec.china && rec.basePrice != null && final > rec.basePrice + 0.001) ? 'CHINA RAISE' : (rec.basePrice != null && rnd2(final) === rnd2(rec.basePrice)) ? 'NO CHANGE' : 'OK';
     out.check = chk; return out;
   }
 
   function make(recs, input, P, saved, S) {
     input = input || {}; saved = saved || {}; S = Object.assign({}, P.BB_DEFAULT || {}, S || {});
     var asOf = xDate(S.asOf || (input && input.asOf) || '');
-    var setRows = [['fee', 0.15], ['ukMax', 0.8], ['safeMin', 0.5], ['minChange', 0.1], ['t3buf', 0.05], ['t5cut', 0.05], ['t5ukFloor', 0.6], ['t5ukMin', 0.65], ['t5HoldDays', 3], ['step', S.step == null ? 0.01 : S.step], ['stepPct', S.stepPct || 0], ['minGain', S.minGain == null ? 0.1 : S.minGain], ['raisePct', S.raisePct == null ? 0.05 : S.raisePct], ['xmas', S.xmas === false ? 0 : 1], ['raiseNoSales', S.raiseNoSales ? 1 : 0], ['noStockKeep', S.noStockKeep === false ? 0 : 1], ['keepTrees', S.keepTrees === false ? 0 : 1], ['useStale', S.useStale ? 1 : 0], ['checkPost', S.checkPost ? 1 : 0], ['asOf', asOf == null ? '' : asOf], ['packGrams', 14999]];
+    function sv(k, d) { return S[k] != null && S[k] !== '' ? S[k] : d; }
+    var setRows = [['fee', sv('fee', 0.15)], ['ukMax', sv('ukMax', 0.8)], ['safeMin', sv('safeMin', 0.5)], ['minChange', sv('minChange', 0.1)], ['t3buf', sv('t3buf', 0.05)], ['t5cut', sv('t5cut', 0.05)], ['t5ukFloor', sv('t5ukFloor', 0.6)], ['t5ukMin', sv('t5ukMin', 0.65)], ['t5HoldDays', sv('t5HoldDays', 3)], ['step', sv('step', 0.01)], ['stepPct', S.stepPct || 0], ['minGain', S.minGain == null ? 0.1 : S.minGain], ['raisePct', S.raisePct == null ? 0.05 : S.raisePct], ['xmas', S.xmas === false ? 0 : 1], ['raiseNoSales', S.raiseNoSales ? 1 : 0], ['noStockKeep', S.noStockKeep === false ? 0 : 1], ['keepTrees', S.keepTrees === false ? 0 : 1], ['useStale', S.useStale ? 1 : 0], ['checkPost', S.checkPost ? 1 : 0], ['asOf', asOf == null ? '' : asOf], ['packGrams', sv('packGrams', 14999)], ['chinaFloor', sv('chinaFloor', 1)], ['ukSoldFloor', sv('ukSoldFloor', 0.5)], ['ukBand1', sv('ukBand1', 0.8)], ['ukBand5', sv('ukBand5', 0.7)], ['ukBand10', sv('ukBand10', 0.6)], ['ukBandRest', sv('ukBandRest', 0.5)], ['cost1', sv('cost1', 1)], ['cost5', sv('cost5', 5)], ['cost10', sv('cost10', 10)], ['closeHi', sv('closeHi', 0.10)], ['closeLo', sv('closeLo', 0.15)], ['zeroSalesRaise', sv('zeroSalesRaise', 0.5)], ['band1w', 2000], ['band1p', 1.75], ['band2w', 15200], ['band2p', 2.3], ['band3w', 20000], ['band3p', 8], ['band4w', 25000], ['band4p', 9], ['band5w', 30000], ['band5p', 10.5], ['overBand', sv('overBand', 15)]];
+    if (Array.isArray(S.bands) && S.bands.length) {
+      var bi; for (bi = 0; bi < 5 && bi < S.bands.length; bi++) {
+        var pair = S.bands[bi];
+        setRows.forEach(function (r) { if (r[0] === 'band' + (bi + 1) + 'w') r[1] = pair[0]; if (r[0] === 'band' + (bi + 1) + 'p') r[1] = pair[1]; });
+      }
+    }
     var SB = {}; setRows.forEach(function (r, i) { SB[r[0]] = "'" + SET + "'!$B$" + (i + 2); });
     var names = [];
     function add(name) { names.push(name); return names.length - 1; }
@@ -81,7 +91,7 @@
     var raiseT = add('raiseT'), raiseC = add('raiseC'), gain = add('gain'), closePx = add('closePx'), act = add('act'), weekly = add('weekly');
     var t5ukR = add('t5ukR'), t5ukC = add('t5ukC'), t5cnR = add('t5cnR'), t5s = add('t5s');
     var t3q = add('t3q'), t3fb = add('t3fb'), t3m = add('t3m'), t3c = add('t3c'), t3s = add('t3s'), reSugg = add('reSugg');
-    var showPost = add('showPost'), showPrice = add('showPrice'), showProfit = add('showProfit'), showPc = add('showPc'), showFloor = add('showFloor'), showSugg = add('showSugg'), showFinal = add('showFinal'), showNewP = add('showNewP'), showCheck = add('showCheck'), showInc = add('showInc'), showWhy = add('showWhy'), runUK = add('runUK'), runCN = add('runCN'), upUK = add('upUK'), upCN = add('upCN');
+    var showPost = add('showPost'), showPrice = add('showPrice'), showProfit = add('showProfit'), showPc = add('showPc'), showFloor = add('showFloor'), showSugg = add('showSugg'), showFinal = add('showFinal'), showNewP = add('showNewP'), showCheck = add('showCheck'), showInc = add('showInc'), showWhy = add('showWhy'), runUK = add('runUK'), runCN = add('runCN'), upUK = add('upUK'), upCN = add('upCN'), showCap = add('showCap'), showNewPc = add('showNewPc');
     function C(i, r) { return L(i) + r; }
     function ref(i) { return L(i); }
     function pull(m, sheet, col, range) { var rg = range.replace(/\$A/g, '$' + col); return 'IF(' + m + '="","",IF(LEN(TRIM(INDEX(\'' + sheet + '\'!' + rg + ',' + m + ')&""))=0,"",INDEX(\'' + sheet + '\'!' + rg + ',' + m + ')))'; }
@@ -95,6 +105,11 @@
     function priceMaxF(r, frac) { return 'ROUNDDOWN(ROUND((' + C(fixed, r) + '+' + C(names.indexOf('cost'), r) + '*(' + frac + '))/(1-' + SB.fee + '),6),2)'; }
     var costI = names.indexOf('cost'), multI = names.indexOf('mult'), colI = names.indexOf('collab'), chinaI = names.indexOf('china'), salesI = names.indexOf('sales'), bbI = names.indexOf('bb'), winI = names.indexOf('win'), stockI = names.indexOf('stock'), treeI = names.indexOf('tree'), freshI = names.indexOf('fresh'), packI = names.indexOf('packCheck'), lastI = names.indexOf('lastChange'), rivalI = names.indexOf('rival'), seaI = names.indexOf('seasonal'), basePostI = names.indexOf('basePost'), basePriceI = names.indexOf('basePrice'), noDataI = names.indexOf('noData'), pCheckI = names.indexOf('priceCheck'), engSuggI = names.indexOf('engSugg'), engIncI = names.indexOf('engInc'), engCheckI = names.indexOf('engCheck'), engReasonI = names.indexOf('engReason'), engProfitI = names.indexOf('engProfit'), engPcI = names.indexOf('engPc'), engFloorI = names.indexOf('engFloor'), engCapI = names.indexOf('engCap'), engNewI = names.indexOf('engNewProfit'), weeklyEngI = names.indexOf('weeklyEng'), t5MinI = names.indexOf('t5Min'), engActI = names.indexOf('engAct');
 
+    recs = recs.slice().sort(function (a, b) {
+      var pa = (a.engNewProfit != null && a.cost > 0) ? a.engNewProfit / a.cost : (a.engPc != null ? a.engPc : 999);
+      var pb = (b.engNewProfit != null && b.cost > 0) ? b.engNewProfit / b.cost : (b.engPc != null ? b.engPc : 999);
+      return pa - pb || (a.sku < b.sku ? -1 : a.sku > b.sku ? 1 : 0);
+    });
     var nAll = (input.aoa && input.aoa.length > 1) ? input.aoa.length - 1 : recs.length, nTab = { 2: 0, 3: 0, 4: 0, 5: 0, china: 0 };
     recs.forEach(function (rec) { if (nTab[rec.tab] != null) nTab[rec.tab]++; if (rec.cat === 'raise' && rec.china) nTab.china++; });
     function bound(n) { return '$A$3:$A$' + Math.max(4, 2 + (n || 0)); }
@@ -147,7 +162,7 @@
       setF(fixed, 'IF(' + C(postU, r) + '="","",' + C(costI, r) + '*' + C(multI, r) + '+' + C(postU, r) + '+' + C(colI, r) + ')', M);
       setF(profitNow, 'IF(OR(' + C(postU, r) + '="",' + C(priceU, r) + '=""),"",ROUND(ROUND(' + C(priceU, r) + '*(1-' + SB.fee + ')-' + C(fixed, r) + ',6),2))', M);
       setF(pcNow, 'IF(OR(' + C(profitNow, r) + '="",' + C(costI, r) + '="",' + C(costI, r) + '<=0),"",(' + C(priceU, r) + '*(1-' + SB.fee + ')-' + C(fixed, r) + ')/' + C(costI, r) + ')', PC);
-      setF(floorPct, 'IF(' + C(chinaI, r) + '=1,1,IF(' + C(salesI, r) + '>=1,0.5,IF(' + C(costI, r) + '<1,0.8,IF(' + C(costI, r) + '<5,0.7,IF(' + C(costI, r) + '<10,0.6,0.5)))))', PC);
+      setF(floorPct, 'IF(' + C(chinaI, r) + '=1,' + SB.chinaFloor + ',IF(' + C(salesI, r) + '>=1,' + SB.ukSoldFloor + ',IF(' + C(costI, r) + '<' + SB.cost1 + ',' + SB.ukBand1 + ',IF(' + C(costI, r) + '<' + SB.cost5 + ',' + SB.ukBand5 + ',IF(' + C(costI, r) + '<' + SB.cost10 + ',' + SB.ukBand10 + ',' + SB.ukBandRest + ')))))', PC);
       setF(floorP, 'IF(' + C(fixed, r) + '="","",IF(' + C(chinaI, r) + '=1,' + priceFor(r, C(floorPct, r)) + ',MIN(' + priceFor(r, C(floorPct, r)) + ',' + priceMaxF(r, SB.ukMax) + ')))', M);
       setF(capP, 'IF(OR(' + C(fixed, r) + '="",' + C(chinaI, r) + '=1),"",' + priceMaxF(r, SB.ukMax) + ')', M);
       setF(t5MinP, 'IF(OR(' + C(fixed, r) + '="",' + C(chinaI, r) + '=1),"",MIN(' + priceFor(r, SB.t5ukMin) + ',' + priceMaxF(r, SB.ukMax) + '))', M);
@@ -161,13 +176,13 @@
       setH(raiseC, 'IF(' + C(raiseT, r) + '="","",IF(' + C(capP, r) + '="",' + C(raiseT, r) + ',IF(' + C(raiseT, r) + '>' + C(capP, r) + ',' + C(capP, r) + ',' + C(raiseT, r) + ')))', M);
       setH(gain, 'IF(OR(' + C(raiseC, r) + '="",' + C(priceU, r) + '=""),"",(' + C(raiseC, r) + '-' + C(priceU, r) + ')*(1-' + SB.fee + '))', M);
       var bbRound = 'ROUND(' + C(bbI, r) + ',2)';
-      var closeHi = 'ROUND(' + bbRound + '-0.1,2)';
-      var closeLo = 'ROUND(' + bbRound + '-0.15,2)';
+      var closeHi = 'ROUND(' + bbRound + '-' + SB.closeHi + ',2)';
+      var closeLo = 'ROUND(' + bbRound + '-' + SB.closeLo + ',2)';
       function down9f(expr) { var cents = 'ROUND((' + expr + ')*100,0)'; return '((' + cents + '-MOD(MOD(' + cents + ',10)-9+10,10))/100)'; }
       var closeIdeal = 'IF(' + down9f(closeHi) + '>=' + closeLo + '-0.000000001,' + down9f(closeHi) + ',' + closeHi + ')';
       var closeCap = 'IF(' + C(capP, r) + '="",' + closeIdeal + ',IF(' + closeIdeal + '<=' + C(capP, r) + '+0.000000001,' + closeIdeal + ',' + down9f(C(capP, r)) + '))';
       setH(closePx, 'IF(OR(' + C(bbI, r) + '="",NOT(ISNUMBER(' + C(bbI, r) + ')),' + C(bbI, r) + '<=0,' + C(priceU, r) + '="",' + C(salesI, r) + '<1),"",IF(AND(' + closeCap + '>' + C(priceU, r) + '+0.000000001,OR(' + C(floorP, r) + '="",' + closeCap + '>=' + C(floorP, r) + '-0.000000001)),' + closeCap + ',""))', M);
-      var raiseLine = 'IF(' + C(chinaI, r) + '=1,' + C(floorPct, r) + ',IF(' + C(salesI, r) + '>=1,' + C(floorPct, r) + ',' + SB.safeMin + '))';
+      var raiseLine = 'IF(' + C(chinaI, r) + '=1,' + C(floorPct, r) + ',IF(' + C(salesI, r) + '>=1,' + C(floorPct, r) + ',' + SB.zeroSalesRaise + '))';
       var already = 'IF(' + C(salesI, r) + '<1,"Keep",IF(AND(ISNUMBER(' + C(closePx, r) + '),' + C(closePx, r) + '>' + C(priceU, r) + '),"Closer","Keep"))';
       var actF = 'IF(' + C(noDataI, r) + '=1,"No data",IF(' + C(pCheckI, r) + '=1,"Price check",IF(OR(' + C(postU, r) + '="",' + C(priceU, r) + '="",NOT(ISNUMBER(' + C(costI, r) + ')),' + C(costI, r) + '<=0),"No data",IF(AND(' + C(freshI, r) + '=0,' + SB.useStale + '=0),"No data",IF(AND(ISNUMBER(' + C(stockI, r) + '),' + C(stockI, r) + '<=0,' + SB.noStockKeep + '=1),"Keep",IF(AND(' + C(treeI, r) + '=1,' + SB.keepTrees + '=1),"Keep",IF(' + C(winI, r) + '<>1,IF(OR(' + C(bbI, r) + '="",NOT(ISNUMBER(' + C(bbI, r) + ')),' + C(bbI, r) + '<=0),"No data",IF(' + C(priceU, r) + '<ROUND(' + C(bbI, r) + ',2),' + already + ',IF(' + C(tLow, r) + '="","",IF(' + C(tLow, r) + '<' + C(floorP, r) + ',"Can\'t win","Lower")))),IF(OR(' + C(pcNow, r) + '="",' + raiseLine + '=""),"Raise",IF(' + C(pcNow, r) + '<' + raiseLine + '-0.000000001,"Raise",IF(IF(' + C(capP, r) + '="",FALSE,' + C(priceU, r) + '>=' + C(capP, r) + '-0.000000001),"Keep",IF(AND(' + C(salesI, r) + '<1,' + SB.raiseNoSales + '=0),"Keep",IF(OR(' + C(raiseC, r) + '="",NOT(' + C(raiseC, r) + '>' + C(priceU, r) + ')),"Keep",IF(' + C(gain, r) + '<' + SB.minGain + ',"Keep","Raise")))))))))))))';
       setH(act, actF);
@@ -184,10 +199,10 @@
       setH(t3m, 'IF(OR(' + C(t3q, r) + '="",' + C(t3fb, r) + '=""),"",MAX(' + C(t3q, r) + ',' + C(t3fb, r) + '))', M);
       setH(t3c, 'IF(' + C(t3m, r) + '="","",IF(' + C(capP, r) + '="",' + C(t3m, r) + ',IF(' + C(t3m, r) + '>' + C(capP, r) + ',' + C(capP, r) + ',' + C(t3m, r) + ')))', M);
       setH(t3s, 'IF(OR(' + C(priceU, r) + '="",' + C(t3c, r) + '=""),"",IF(AND(' + C(chinaI, r) + '<>1,' + C(t3c, r) + '>=' + C(priceU, r) + '),"",IF(ABS(' + C(priceU, r) + '-' + C(t3c, r) + ')<' + SB.minChange + ',"",IF(' + okUK(C(t3c, r), C(t3fb, r)) + ',' + C(t3c, r) + ',""))))', M);
-      var raisePx = 'IF(AND(' + C(chinaI, r) + '<>1,' + C(salesI, r) + '<1),' + priceFor(r, SB.safeMin) + ',' + C(floorP, r) + ')';
+      var raisePx = 'IF(AND(' + C(chinaI, r) + '<>1,' + C(salesI, r) + '<1),' + priceFor(r, SB.zeroSalesRaise) + ',' + C(floorP, r) + ')';
       var up9r = '(ROUND(' + raisePx + '*100,0)+MOD(9-MOD(ROUND(' + raisePx + '*100,0),10)+10,10))/100';
       var raiseUp = 'IF(' + raisePx + '="","",IF(OR(' + up9r + '<=0,IF(' + C(capP, r) + '="",FALSE,' + up9r + '>' + C(capP, r) + ')),' + raisePx + ',' + up9r + '))';
-      var raiseLine2 = 'IF(' + C(chinaI, r) + '=1,' + C(floorPct, r) + ',IF(' + C(salesI, r) + '>=1,' + C(floorPct, r) + ',' + SB.safeMin + '))';
+      var raiseLine2 = 'IF(' + C(chinaI, r) + '=1,' + C(floorPct, r) + ',IF(' + C(salesI, r) + '>=1,' + C(floorPct, r) + ',' + SB.zeroSalesRaise + '))';
       setH(reSugg, 'IF(OR(' + C(act, r) + '="",' + C(act, r) + '="No data",' + C(act, r) + '="Price check"),"",IF(' + C(act, r) + '="Closer",' + C(closePx, r) + ',IF(' + C(act, r) + '="Lower",' + C(bbSugg, r) + ',IF(' + C(act, r) + '="Raise",IF(OR(' + C(pcNow, r) + '="",' + C(pcNow, r) + '<' + raiseLine2 + '),' + raiseUp + ',' + C(raiseC, r) + '),IF(' + C(act, r) + '="Can\'t win",' + C(t5s, r) + ',IF(AND(' + C(winI, r) + '=1,' + C(salesI, r) + '<1,' + C(treeI, r) + '<>1,OR(NOT(ISNUMBER(' + C(stockI, r) + ')),' + C(stockI, r) + '>0,' + SB.noStockKeep + '=0)),' + C(t3s, r) + ',""))))))', M);
       setF(showPost, 'IF(' + C(postU, r) + '="","",' + C(postU, r) + ')', M);
       setF(showPrice, 'IF(' + C(priceU, r) + '="","",' + C(priceU, r) + ')', M);
@@ -205,7 +220,11 @@
       var yourChk = 'IF(' + C(weeklyEngI, r) + '=1,"WEEKLY HOLD",IF(' + chinaUpYour + ',"CHINA RAISE",IF(AND(' + C(packI, r) + '=1,' + SB.checkPost + '=0),"CHECK POSTAGE",IF(' + C(yourU, r) + '<=0,"NO PRICE",IF(' + prof(C(yourU, r)) + '<=0,"LOSS",IF(AND(IF(' + C(t5MinI, r) + '<>"",' + C(t5MinI, r) + ',' + C(engFloorI, r) + ')<>"",' + C(yourU, r) + '<IF(' + C(t5MinI, r) + '<>"",' + C(t5MinI, r) + ',' + C(engFloorI, r) + ')-0.00001),"UNDER FLOOR",IF(AND(' + C(engCapI, r) + '<>"",' + C(yourU, r) + '>' + C(engCapI, r) + '+0.00001,IF(' + C(basePriceI, r) + '="",TRUE,' + C(yourU, r) + '>' + C(basePriceI, r) + '+0.00001)),"OVER CAP",IF((' + C(yourU, r) + '*(1-' + SB.fee + ')-(' + C(costI, r) + '*' + C(multI, r) + '+' + C(basePostI, r) + '+' + C(colI, r) + '))/' + C(costI, r) + '<' + SB.safeMin + ',"UNDER FLOOR",IF(AND(' + C(chinaI, r) + '=1,(' + C(yourU, r) + '*(1-' + SB.fee + ')-(' + C(costI, r) + '*' + C(multI, r) + '+' + C(basePostI, r) + '+' + C(colI, r) + '))/' + C(costI, r) + '<1),"UNDER FLOOR",IF(ROUND(' + C(yourU, r) + ',2)=ROUND(' + C(basePriceI, r) + ',2),"NO CHANGE","OK"))))))))))';
       setF(showCheck, 'IF(OR(' + C(postStat, r) + '="CONFLICT",' + C(priceStat, r) + '="CONFLICT",' + C(yourStat, r) + '="CONFLICT",' + C(incStat, r) + '="CONFLICT"),"CONFLICT",IF(OR(' + C(postStat, r) + '="INVALID",' + C(priceStat, r) + '="INVALID",' + C(yourStat, r) + '="INVALID",' + C(incStat, r) + '="INVALID"),"INVALID",IF(AND(' + C(postStat, r) + '="BASE",' + C(priceStat, r) + '="BASE",' + C(yourStat, r) + '="BASE"),' + C(engCheckI, r) + ',IF(AND(' + C(postStat, r) + '="BASE",' + C(priceStat, r) + '="BASE"),' + yourChk + ',' + reChk + '))))');
       setF(showInc, 'IF(OR(' + C(showCheck, r) + '="CONFLICT",' + C(showCheck, r) + '="INVALID"),"No",IF(' + C(incStat, r) + '="OK",IF(' + C(incVal, r) + '="No","No",IF(' + C(showCheck, r) + '="OK","Yes","No")),IF(AND(' + C(postStat, r) + '="BASE",' + C(priceStat, r) + '="BASE",' + C(yourStat, r) + '="BASE"),' + C(engIncI, r) + ',IF(' + C(showCheck, r) + '="OK","Yes","No"))))');
-      setF(showWhy, 'IF(AND(' + C(postStat, r) + '="BASE",' + C(priceStat, r) + '="BASE",' + C(yourStat, r) + '="BASE",' + C(incStat, r) + '="BASE"),' + C(engReasonI, r) + ',IF(' + C(showCheck, r) + '="CONFLICT","Two tabs have different review numbers for this SKU. Clear one so only one value remains.",IF(' + C(showCheck, r) + '="INVALID","A review cell is not a valid number. Postage may be 0. Prices must be above 0.",IF(' + C(showCheck, r) + '="CHECK POSTAGE","Heavy pack: type the checked postage in Postage review (0 is allowed). Include Yes alone does not clear it.",IF(' + C(showCheck, r) + '="CHINA RAISE","China raise is review only and is not on the upload.",IF(' + C(showCheck, r) + '="WEEKLY HOLD","Margin too low (UK) was already changed in the last 3 days.",IF(' + C(showCheck, r) + '="OK",IF(' + C(yourStat, r) + '="OK","Your price (final override)","Suggestion recalculated from the review"),' + C(showCheck, r) + ')))))))');
+      var whyCore = 'IF(AND(' + C(postStat, r) + '="BASE",' + C(priceStat, r) + '="BASE",' + C(yourStat, r) + '="BASE",' + C(incStat, r) + '="BASE"),' + C(engReasonI, r) + ',IF(' + C(showCheck, r) + '="CONFLICT","Two tabs have different review numbers for this SKU. Clear one so only one value remains.",IF(' + C(showCheck, r) + '="INVALID","A review cell is not a valid number. Postage may be 0. Prices must be above 0.",IF(' + C(showCheck, r) + '="CHECK POSTAGE","Heavy pack: type the checked postage in Postage review (0 is allowed). Include Yes alone does not clear it.",IF(' + C(showCheck, r) + '="CHINA RAISE","China raise is review only and is not on the upload.",IF(' + C(showCheck, r) + '="WEEKLY HOLD","Margin too low (UK) was already changed in the last 3 days.",IF(' + C(showCheck, r) + '="OK",IF(' + C(yourStat, r) + '="OK","Your price (final override)","Suggestion recalculated from the review"),' + C(showCheck, r) + ')))))))';
+      var bigNote = 'IF(OR(' + C(showFinal, r) + '="",' + C(priceU, r) + '="",' + C(priceU, r) + '=0),"",IF(ABS(' + C(showFinal, r) + '-' + C(priceU, r) + ')/ABS(' + C(priceU, r) + ')>0.2,"Big move: more than 20% change. ",""))';
+      setF(showWhy, 'IF(AND(' + C(postStat, r) + '="BASE",' + C(priceStat, r) + '="BASE",' + C(yourStat, r) + '="BASE",' + C(incStat, r) + '="BASE"),' + C(engReasonI, r) + ',' + bigNote + '&(' + whyCore + '))');
+      setF(showCap, 'IF(AND(' + C(postStat, r) + '="BASE",' + C(priceStat, r) + '="BASE"),IF(' + C(engCapI, r) + '="","",' + C(engCapI, r) + '),' + C(capP, r) + ')', M);
+      setF(showNewPc, 'IF(OR(' + C(showNewP, r) + '="",' + C(costI, r) + '=""),"",' + C(showNewP, r) + '/' + C(costI, r) + ')', PC);
       var qualUK = 'AND(' + C(showInc, r) + '="Yes",' + C(showCheck, r) + '="OK",' + C(2, r) + '="UK")';
       var qualCN = 'AND(' + C(showInc, r) + '="Yes",' + C(showCheck, r) + '="OK",' + C(2, r) + '="China")';
       setF(runUK, (idx === 0 ? 'IF(' + qualUK + ',1,0)' : C(runUK, r - 1) + '+IF(' + qualUK + ',1,0)'));
@@ -232,37 +251,80 @@
       if (field === 'inc' && (c.inc === 'Yes' || c.inc === 'No')) return { t: 's', v: c.inc, z: YESF };
       return null;
     }
-    var REVHEAD = ['B&Q SKU', 'Product', 'UK/China', 'Estimated cost', 'Postage used', 'Postage review', 'Free stock', 'B&Q 30d sales', 'Price now used', 'Selling price review', 'Profit now £', 'Profit now %', 'Buy box price', 'Buy box seller', 'Floor price', 'Suggested price', 'Your price', 'New profit £', 'New profit %', 'Reason', 'Include override', 'Include used', 'Check', 'Final price', 'Upload UK #', 'Upload China #'];
-    var REVNOTE = 'Yellow cells are the only place to type. Blank = keep the calculated value. Postage may be 0. Selling price review replaces the current price and the suggestion is worked out again. Your price is the final price you want instead of the suggestion. Include override is Yes or No (blank = automatic). Profit, Combined and Final update in Excel. Do not type in the white columns.';
-    function revSheet(name, list, top) {
+    var VIS = [
+      ['B&Q SKU', null, 18], ['Product', null, 36], ['Check', null, 16], ['Estimated cost', M, 14], ['UK/China', null, 12],
+      ['Selling price', M, 14], ['Floor price', M, 12], ['Suggested price', M, 14], ['Profit now %', PC, 12], ['Your price', M, 12],
+      ['New profit %', PC, 12], ['Buy box seller', null, 18], ['Buy box price', M, 14], ['Postage used', M, 14], ['Postage review', M, 14],
+      ['Include override', null, 14], ['Final price', M, 12], ['Reason', null, 44], ['B&Q 30d sales', IN, 12]
+    ];
+    var GRP = [
+      ['Selling price review', M, 18], ['Profit now £', M, 12], ['New profit £', M, 12], ['Include used', null, 12],
+      ['Upload UK #', IN, 12], ['Upload China #', IN, 12], ['Free stock', IN, 12], ['Cap price', M, 12]
+    ];
+    var REVNOTE = 'Yellow cells are the only place to type. Blank = keep the calculated value. Postage may be 0. Selling price review replaces the current price and the suggestion is worked out again. Your price is the final price you want instead of the suggestion. Include override is Yes or No (blank = automatic). Other columns are in the collapsed group on the right (click +).';
+    var CF_KEY = 'Colour key on profit %: RED = loss · AMBER = under the floor · BLUE = over the 80% cap · no colour = fine.';
+    function profitCf(last) {
+      function rules(pc, used) {
+        return [
+          ['neg', 'AND(ISNUMBER(' + pc + '),' + pc + '<0)'],
+          ['under', 'AND(ISNUMBER(' + pc + '),' + pc + '>=0,ISNUMBER(' + used + '),ISNUMBER($G3),' + used + '<$G3-0.00001)'],
+          ['blue', 'AND(ISNUMBER(' + pc + '),' + pc + '>=0,ISNUMBER(' + used + '),ISNUMBER($AA3),' + used + '>$AA3+0.00001)']
+        ];
+      }
+      return [
+        { sqref: 'I3:I' + last, rules: rules('I3', '$F3') },
+        { sqref: 'K3:K' + last, rules: rules('K3', '$Q3') }
+      ];
+    }
+    function revSheet(name, list, top, opts) {
+      opts = opts || {};
+      var aligned = name === T6;
       var rows = list.map(function (rec, i) {
         var rr = i + 3;
-        var aligned = name === T6;
-        return [v(rec.sku), v(rec.title), v(rec.uk), v(rec.cost, M), fml(showPost, rr, M, aligned), inputCell(rec, 'post', M), v(rec.stock, IN), v(rec.sales, IN), fml(showPrice, rr, M, aligned), inputCell(rec, 'priceNow', M), fml(showProfit, rr, M, aligned), fml(showPc, rr, PC, aligned), v(rec.bb, M), v(rec.seller), fml(showFloor, rr, M, aligned), fml(showSugg, rr, M, aligned), inputCell(rec, 'your', M), fml(showNewP, rr, M, aligned), { t: 'n', f: 'IF(OR(R' + rr + '="",D' + rr + '=""),"",R' + rr + '/D' + rr + ')', z: PC }, fml(showWhy, rr, null, aligned), inputCell(rec, 'inc'), fml(showInc, rr, null, aligned), fml(showCheck, rr, null, aligned), fml(showFinal, rr, M, aligned), fml(upUK, rr, IN, aligned), fml(upCN, rr, IN, aligned)];
+        return [
+          v(rec.sku), v(rec.title), fml(showCheck, rr, null, aligned), v(rec.cost, M), v(rec.uk),
+          fml(showPrice, rr, M, aligned), fml(showFloor, rr, M, aligned), fml(showSugg, rr, M, aligned), fml(showPc, rr, PC, aligned),
+          opts.readonly ? null : inputCell(rec, 'your', M),
+          fml(showNewPc, rr, PC, aligned), v(rec.seller), v(rec.bb, M), fml(showPost, rr, M, aligned),
+          opts.readonly ? null : inputCell(rec, 'post', M),
+          opts.readonly ? null : inputCell(rec, 'inc'),
+          fml(showFinal, rr, M, aligned), fml(showWhy, rr, null, aligned), v(rec.sales, IN),
+          opts.readonly ? null : inputCell(rec, 'priceNow', M),
+          fml(showProfit, rr, M, aligned), fml(showNewP, rr, M, aligned), fml(showInc, rr, null, aligned),
+          fml(upUK, rr, IN, aligned), fml(upCN, rr, IN, aligned), v(rec.stock, IN), fml(showCap, rr, M, aligned)
+        ];
       });
-      return { name: name, top: top || REVNOTE, cols: REVHEAD.map(function (h, i) { return [h, null, i === 1 || i === 19 ? 40 : 14]; }), rows: rows, freeze: { x: 1, y: 2 }, filter: true, inputs: [5, 9, 16, 20], notes: { 'Postage review': 'Type a postage, or 0. Leave blank to keep Postage used. This does not read a file on your computer by itself.', 'Selling price review': 'Corrects the current selling price. The suggestion is recalculated. This is not Your price.', 'Your price': 'Optional final price. Safety rules still apply. Leave blank to use the suggestion.', 'Include override': 'Yes or No. Blank keeps the automatic decision. Yes cannot bypass a floor, a raise over the cap, a China raise, a weekly hold or postage that is still unchecked.' } };
+      var cols = VIS.map(function (c) { return c.slice(); }).concat(GRP.map(function (c) { return [c[0], c[1], c[2], 'group']; }));
+      var last = Math.max(3, 2 + rows.length);
+      var out = { name: name, top: (top || REVNOTE) + '  ' + CF_KEY, cols: cols, rows: rows, freeze: { x: 1, y: 2 }, filter: true, cf: profitCf(last), notes: { 'Postage review': 'Type a postage, or 0. Leave blank to keep Postage used.', 'Selling price review': 'Corrects the current selling price. The suggestion is recalculated. This is not Your price.', 'Your price': 'Optional final price. Safety rules still apply. Leave blank to use the suggestion.', 'Include override': 'Yes or No. Blank keeps the automatic decision. Yes cannot bypass a floor, a raise over the cap, a China raise, a weekly hold or postage that is still unchecked.' } };
+      if (!opts.readonly) out.inputs = [14, 19, 9, 15];
+      return out;
     }
     var byTab = { 2: [], 3: [], 4: [], 5: [], china: [] };
     recs.forEach(function (rec) { if (byTab[rec.tab]) byTab[rec.tab].push(rec); if (rec.cat === 'raise' && rec.china) byTab.china.push(rec); });
+    var loseCheap = recs.filter(function (r) { return !r.win && r.bb > 0 && r.basePrice != null && r.basePrice < r.bb - 1e-9 && !r.noData; });
+    var cantWin = recs.filter(function (r) { return r.act === "Can't win (floor)"; });
+    var Book = (typeof BQBook !== 'undefined') ? BQBook : require('./bq_book.js');
+    var inactivePack = Book.inactiveFix ? Book.inactiveFix(P, input.aoa || [], input.offers || (input.settings && input.settings.offers) || {}, S) : { rows: [] };
     var list = [];
-    /* Calculation sheets first so a full pass resolves each SKU once, then the visible tabs read those results. Hidden, so the workbook still opens on Start here. */
+    /* Calculation sheets first so a full pass resolves each SKU once, then the visible tabs read those results. Hidden, so the workbook still opens on Rules. */
     list.push({ name: SET, hide: true, cols: [['Setting', null, 20], ['Value', null, 16]], rows: setRows.map(function (r) { return [v(r[0]), r[1] === '' || r[1] == null ? null : { t: 'n', v: r[1] }]; }), freeze: { x: 0, y: 1 }, filter: false });
     list.push({ name: CALC, hide: true, cols: calcHead, rows: calcRows, freeze: { x: 1, y: 1 }, filter: false });
-    var Book = (typeof BQBook !== 'undefined') ? BQBook : require('./bq_book.js');
-    list.push(Book.rulesSheet());
-    list.push(startSheet(recs));
-    list.push(tab1(recs, input.aoa, showPost, showPrice, showProfit, showPc, showFloor, showSugg, showCheck, showWhy));
-    list.push(revSheet(T2, byTab[2], 'Winning and in range. Type in the yellow cells if a postage or the current price needs a correction.'));
-    list.push(revSheet(T3, byTab[3], 'Winning, 0 sales. A price review recalculates the quarter-gap suggestion. Yellow cells only.'));
-    list.push(revSheet(T4, byTab[4], 'Can win the buy box. Yellow Postage review and Selling price review flow to Combined and Final.'));
-    list.push(revSheet(T5, byTab[5], 'Margin too low. UK cut uses a 60% floor and a 65% minimum, 5% off, and will not repeat within 3 days. Exactly 3 days is allowed. Yellow cells only.'));
-    list.push(revSheet(T6, recs, 'Every product. Filter Check to OK to see upload rows. A suggestion that appears after you type a review shows up here and on Final without retyping. Yellow cells are inputs; white cells are formulas.'));
-    list.push(revSheet(TC, byTab.china, 'China raises — review only. They never go on the upload. Typing a higher price does not put them on Final. Tab 8 is not used.'));
-    list.push(finalSheet(T7A, upUK, showFinal, recs.length, 'UK prices only. Formulas from Combined. Do not type on this tab. China raises are never listed.'));
+    list.push(Book.rulesSheet({ settings: S, recs: recs, asOf: S.asOf || input.asOf || '' }));
+    list.push(revSheet(T6, recs, 'Every product, sorted by projected profit % (losses first). Filter Check to OK to see upload rows. A suggestion that appears after you type a review shows up here and on Final without retyping. Yellow cells are inputs; other columns are in the collapsed group on the right (click +).'));
+    list.push(finalSheet(T7A, upUK, showFinal, recs.length, 'UK prices only. Formulas from Combined. Do not type on this tab. China raises are never listed. Losses and under-floor rows never appear here.'));
     list.push(finalSheet(T7B, upCN, showFinal, recs.length, 'China prices only. Raises are never listed. Do not type on this tab.'));
-    list.push(tab8(input.t8 || []));
+    list.push(revSheet(T4, byTab[4], 'Can win the buy box. Yellow Postage review and Selling price review flow to Combined and Final.'));
+    list.push(revSheet(T3, byTab[3], 'Winning, 0 sales. A price review recalculates the quarter-gap suggestion. Yellow cells only.'));
+    list.push(revSheet(T2, byTab[2], 'Winning and in range. Type in the yellow cells if a postage or the current price needs a correction.'));
+    list.push(loseCheapSheet(loseCheap));
+    list.push(cantWinSheet(cantWin));
+    list.push(revSheet(T5, byTab[5], 'Margin too low. UK cut uses a 60% floor and a 65% minimum, 5% off, and will not repeat within 3 days. Exactly 3 days is allowed. Yellow cells only.'));
+    list.push(tab1(recs, input.aoa, showPost, showPrice, showProfit, showPc, showFloor, showSugg, showCheck, showWhy));
+    list.push(revSheet(TC, byTab.china, 'China raises — review only. They never go on the upload. Typing a higher price does not put them on Final.'));
     list.push(chinaListing(recs));
-    var counts = { all: recs.length, t6: recs.length, t7uk: 0, t7cn: 0, chinaRaiseReview: byTab.china.length, checkPost: 0, t9: recs.filter(function (r) { return r.china && !(r.sales >= 1); }).length };
+    list.push(inactiveSheet(inactivePack.rows || []));
+    var counts = { all: recs.length, t6: recs.length, t7uk: 0, t7cn: 0, chinaRaiseReview: byTab.china.length, checkPost: 0, t9: recs.filter(function (r) { return r.china && !(r.sales >= 1); }).length, loseCheap: loseCheap.length, cantWin: cantWin.length, inactive: (inactivePack.rows || []).length, inactiveMeta: { compared: inactivePack.compared, differ: inactivePack.differ, same: inactivePack.same, skipped: inactivePack.skipped, accessN: inactivePack.accessN } };
     recs.forEach(function (rec) {
       if (rec.engCheck === 'OK' && rec.engInc === 'Yes') { if (rec.uk === 'China') counts.t7cn++; else counts.t7uk++; }
       if (rec.engCheck === 'CHECK POSTAGE') counts.checkPost++;
@@ -270,6 +332,31 @@
     counts.t7 = counts.t7uk + counts.t7cn;
     return { list: list, counts: counts, cols: { showPost: showPost, showPrice: showPrice, showProfit: showProfit, showSugg: showSugg, showFinal: showFinal, showCheck: showCheck, showInc: showInc, upUK: upUK, upCN: upCN } };
 
+
+    function loseCheapSheet(list) {
+      var rows = list.map(function (rec) {
+        var gap = (rec.bb != null && rec.basePrice != null) ? rec.Pgap != null ? rec.Pgap : Math.round((rec.bb - rec.basePrice) * 100) / 100 : null;
+        return [v(rec.sku), v(rec.title), v(rec.seller), v(rec.bb, M), v(rec.basePrice, M), v(gap, M), v(rec.stock, IN), v(''), v(rec.sales, IN), v(rec.engSugg, M), v(rec.engReason || ''), v(rec.engCheck || '')];
+      });
+      if (!rows.length) rows.push([v(''), v('No products where we are cheaper than the buy box but still losing.'), v(''), null, null, null, null, v(''), null, null, v(''), v('')]);
+      return { name: T_LOSE, top: 'REVIEW ONLY. We are cheaper than the buy box but still losing. This tab does not add rows to 7a or 7b. The 10–15p raise suggestion (ending in 9) is shown when the product sold on B&Q in the last 30 days and the rules allow it.', cols: [['B&Q SKU', null, 18], ['Product', null, 36], ['Buy box seller', null, 18], ['Buy box price', M, 14], ['Our price', M, 12], ['Gap', M, 10], ['Free stock', IN, 12], ['Reviews', IN, 10], ['B&Q 30d sales', IN, 12], ['Suggested 10–15p raise', M, 18], ['Reason', null, 44], ['Check', null, 14]], rows: rows, freeze: { x: 1, y: 2 }, filter: true };
+    }
+    function cantWinSheet(list) {
+      var rows = list.map(function (rec) {
+        var below = (rec.bb != null && rec.engFloor != null) ? Math.round((rec.engFloor - rec.bb) * 100) / 100 : null;
+        var note = below == null ? 'Accept, find a cheaper supplier, or stop pushing this listing.' : (below <= 0.5 ? 'The rival is only a little under our floor. Accept the loss of the buy box, or look for a slightly cheaper supplier.' : 'The rival is well under our floor. Accept, find a cheaper supplier, or stop pushing this listing.');
+        return [v(rec.sku), v(rec.title), v(rec.bb, M), v(rec.engFloor, M), v(below, M), v(rec.cost, M), v(rec.basePrice, M), v(rec.engPc, PC), v(note), v(rec.engReason || '')];
+      });
+      if (!rows.length) rows.push([v(''), v("No products where the rival is below our floor."), null, null, null, null, null, null, v(''), v('')]);
+      return { name: T_CANT, top: "REVIEW ONLY. The rival's price is below our floor, so we cannot win the buy box without going under the floor. This tab does not add rows to 7a or 7b. Optional 5% cuts stay on tab 5 and Combined.", cols: [['B&Q SKU', null, 18], ['Product', null, 36], ['Rival price', M, 12], ['Our floor', M, 12], ['How far below the floor', M, 20], ['Estimated cost', M, 14], ['Our price', M, 12], ['Profit now %', PC, 12], ['Note', null, 70], ['Reason', null, 40]], rows: rows, freeze: { x: 1, y: 2 }, filter: true };
+    }
+    function inactiveSheet(list) {
+      var rows = (list || []).map(function (r) {
+        return [v(r.sku), v(r.title), v(r.stock, IN), v(r.price, M), v(r.cost, M), v(r.post, M), v(r.pc, PC), v(r.floor, M), v(r.sugg, M), v(r.reason || '')];
+      });
+      if (!rows.length) rows.push([v(''), v('No inactive products at a loss or under the floor.'), null, null, null, null, null, null, null, v('')]);
+      return { name: T_FIX, top: 'REPORT ONLY. These products are out of stock or not in today’s active offers. Profit is at the current B&Q price (the offers price if we have it, otherwise the Access B&Q_INV.price). They never go on 7a. The suggested price is the floor, ending in 9.', cols: [['B&Q SKU', null, 18], ['Product', null, 36], ['Free stock', IN, 12], ['Our price', M, 12], ['Estimated cost', M, 14], ['Postage', M, 12], ['Profit now %', PC, 12], ['Floor price', M, 12], ['Suggested floor price', M, 18], ['Reason', null, 40]], rows: rows, freeze: { x: 1, y: 2 }, filter: true, cf: [{ sqref: 'G3:G' + Math.max(3, 2 + Math.max(rows.length, 1)), rules: [['neg', 'AND(ISNUMBER(G3),G3<0)'], ['under', 'AND(ISNUMBER(G3),G3>=0,ISNUMBER($D3),ISNUMBER($H3),$D3<$H3-0.00001)']] }] };
+    }
     function startSheet(recs) {
       var lines = [
         ['How to use this workbook', ''],
@@ -285,7 +372,6 @@
         ['Losing, already cheaper', 'We are below the buy box but still losing. If the product sold on B&Q in the last 30 days, the suggestion rises to 10–15p under the buy box and ends in 9. With 0 sales the price stays. It never goes over the 80% cap or under the floor. A China increase stays on the review tab and is not uploaded.'],
         ['China, 0 sales', 'Tab 9 lists every China product with no B&Q sales in 30 days, so the listing can be checked. Listing notes and Done stay on that tab. They do not change Combined, the final prices, or the upload.'],
         ['Final tabs', '7a and 7b are the B&Q upload layout. They fill themselves. Do not type on them.'],
-        ['Tab 8', 'Report only. Edits there do not change Combined or Final.'],
         ['This computer', 'Excel recalculates this file. You do not upload it to the website to see the new profit. The website remembers checks only after you use Import checked workbook, and only in that browser.'],
         ['Products', String(recs.length)]
       ];

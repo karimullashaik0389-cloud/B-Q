@@ -11,6 +11,48 @@
   'use strict';
   var FEE = 0.15, ASHIAN = 2, OTHER = 1.5, UK_MAX = 0.8, CHINA_FLOOR = 1, SAFE_MIN = 0.5, RAISE_AT = 100, RAISE_STEP = 0.1, CHINA_CUT = 0.1;
   var BANDS = [[2000, 1.75, '≤2 kg'], [15200, 2.3, '≤15.2 kg'], [20000, 8, '≤20 kg'], [25000, 9, '≤25 kg'], [30000, 10.5, '≤30 kg']], OVER = [15, 'over 30 kg'];
+  var _R = null;
+  var DEFAULT_RULES = {
+    fee: FEE, ukMax: UK_MAX, safeMin: SAFE_MIN, chinaFloor: CHINA_FLOOR, chinaCut: CHINA_CUT,
+    ukSoldFloor: 0.5, ukBand1: 0.8, ukBand5: 0.7, ukBand10: 0.6, ukBandRest: 0.5,
+    cost1: 1, cost5: 5, cost10: 10,
+    t5cut: 0.05, t5ukFloor: 0.60, t5ukMin: 0.65, t5HoldDays: 3,
+    minChange: 0.10, t3buf: 0.05, step: 0.01,
+    closeHi: 0.10, closeLo: 0.15, packGrams: 14999,
+    bands: BANDS.map(function (b) { return [b[0], b[1], b[2]]; }),
+    overBand: OVER[0],
+    zeroSalesRaise: SAFE_MIN
+  };
+  function rulesOf(s) {
+    var d = DEFAULT_RULES, o = s || {}, r = {};
+    Object.keys(d).forEach(function (k) {
+      if (k === 'bands') r.bands = Array.isArray(o.bands) && o.bands.length ? o.bands : d.bands;
+      else r[k] = o[k] != null && o[k] !== '' ? o[k] : d[k];
+    });
+    return r;
+  }
+  function rulesDiffer(s) {
+    if (!s) return false;
+    var r = rulesOf(s), d = DEFAULT_RULES, k;
+    for (k in d) {
+      if (!Object.prototype.hasOwnProperty.call(d, k)) continue;
+      if (k === 'bands') {
+        var a = r.bands.map(function (b) { return [+b[0], +b[1]]; }), b = d.bands.map(function (x) { return [x[0], x[1]]; });
+        if (JSON.stringify(a) !== JSON.stringify(b)) return true;
+      } else if (+r[k] !== +d[k] && String(r[k]) !== String(d[k])) return true;
+    }
+    return false;
+  }
+  function useRules(s) { _R = (s && rulesDiffer(s)) ? rulesOf(s) : null; return _R; }
+  function clearRules() { _R = null; }
+  function feeOf() { return _R ? _R.fee : FEE; }
+  function ukMaxOf() { return _R ? _R.ukMax : UK_MAX; }
+  function safeOf() { return _R ? _R.safeMin : SAFE_MIN; }
+  function chinaFloorOf() { return _R ? _R.chinaFloor : CHINA_FLOOR; }
+  function chinaCutOf() { return _R ? _R.chinaCut : CHINA_CUT; }
+  function packGramsOf() { return _R ? _R.packGrams : 14999; }
+  function closeHiOf(s) { return (s && s.closeHi != null) ? s.closeHi : (_R ? _R.closeHi : 0.10); }
+  function closeLoOf(s) { return (s && s.closeLo != null) ? s.closeLo : (_R ? _R.closeLo : 0.15); }
   /* number from 8.7, '8.70', '£8.70', '1,234.50', ' 8.7 '; blank / text -> null */
   function num(v) {
     if (v == null) return null;
@@ -26,7 +68,7 @@
   /* Excel ROUNDUP(ROUND(x,6),2) for x >= 0 */
   function ceil2(x) { return Math.ceil(Number((r6(x) * 100).toFixed(6))) / 100; }
   function floor2(x) { return Math.floor(Number((r6(x) * 100).toFixed(6))) / 100; }
-  function band(w) { w = num(w); if (!(w > 0)) return null; for (var i = 0; i < BANDS.length; i++) if (w <= BANDS[i][0]) return { p: BANDS[i][1], lab: BANDS[i][2] }; return { p: OVER[0], lab: OVER[1] }; }
+  function band(w) { w = num(w); if (!(w > 0)) return null; var B = _R ? _R.bands : BANDS, O = _R ? _R.overBand : OVER[0]; for (var i = 0; i < B.length; i++) if (w <= B[i][0]) return { p: B[i][1], lab: B[i][2] || ('≤' + (B[i][0] / 1000) + ' kg') }; return { p: O, lab: 'over ' + (B.length ? (B[B.length - 1][0] / 1000) + ' kg' : 'band') }; }
   /* SPECIAL fixed postage (before Access / weight). Matched on the Variant description text (+ SKU / variant code prefix).
      Source: Karimulla's handwritten note 2 Nov 2026 (KEEP/special_postage_note_2026-11-02.jpg) and the seniors' list
      implemented 26 Oct 2026 (china_products_2026-10-26/work/pricing/build_v3.py). Fixed amounts are never multiplied by pack qty. */
@@ -84,22 +126,29 @@
   /* profit for amt = selling amount of q units. a = {cost, mult, post, collab}
      returns fee, company cost, total cost, exact profit (pr), profit rounded to the penny (profit), profit % on cost (pc) */
   function calc(a, amt, q) {
-    q = q == null ? 1 : q; var col = (num(a.collab) || 0) * q, cost = a.cost * q, company = cost * (a.mult - 1), fee = FEE * amt, post = a.post * q;
-    var total = cost + company + fee + post + col, pr = r6(amt - total);
-    return { cost: cost, company: company, fee: fee, post: post, collab: col, total: total, pr: pr, profit: rnd(pr, 2), pc: cost > 0 ? pr / cost : null };
+    q = q == null ? 1 : q; var col = (num(a.collab) || 0) * q, cost = a.cost * q, company = cost * (a.mult - 1), post = a.post * q;
+    var feeAmt = feeOf() * amt;
+    var total = cost + company + feeAmt + post + col, pr = r6(amt - total);
+    return { cost: cost, company: company, fee: feeAmt, post: post, collab: col, total: total, pr: pr, profit: rnd(pr, 2), pc: cost > 0 ? pr / cost : null };
   }
   /* lowest price giving profit >= f x cost, rounded UP to the penny */
   /* floors / minimum prices round UP to the penny (never under the %); caps round DOWN (never over the %) */
-  function priceFor(a, f) { return ceil2((a.cost * a.mult + a.post + (num(a.collab) || 0) + f * a.cost) / (1 - FEE)); }
-  function priceMax(a, f) { return floor2((a.cost * a.mult + a.post + (num(a.collab) || 0) + f * a.cost) / (1 - FEE)); }
+  function priceFor(a, f) { return ceil2((a.cost * a.mult + a.post + (num(a.collab) || 0) + f * a.cost) / (1 - feeOf())); }
+  function priceMax(a, f) { return floor2((a.cost * a.mult + a.post + (num(a.collab) || 0) + f * a.cost) / (1 - feeOf())); }
   /* floor price: China = round up; UK = round up but never above the 80% cap (only bites when floor and cap are both 80%) */
-  function floorPrice(a, f, china) { var p = priceFor(a, f); return china ? p : Math.min(p, priceMax(a, UK_MAX)); }
+  function floorPrice(a, f, china) { var p = priceFor(a, f); return china ? p : Math.min(p, priceMax(a, ukMaxOf())); }
   /* floor % on cost: China 100%; UK sold in last 30 days 50%; UK no sales by cost <1 80%, <5 70%, <10 60%, else 50%.
      Tab 5 Margin-too-low UK uses a 60% floor (minimum 65%) for that optional cut only – see bq_book.js. */
   function floorOf(china, sales30, cost) {
-    if (china) return { f: CHINA_FLOOR, why: 'China product · 100% on cost' };
-    if (sales30 > 0) return { f: 0.5, why: 'sold in the last 30 days' };
-    return cost < 1 ? { f: 0.8, why: 'no sales lately · cost under £1' } : cost < 5 ? { f: 0.7, why: 'no sales lately · cost £1–£4.99' } : cost < 10 ? { f: 0.6, why: 'no sales lately · cost £5–£9.99' } : { f: 0.5, why: 'no sales lately · cost £10+' };
+    if (!_R) {
+      if (china) return { f: CHINA_FLOOR, why: 'China product · 100% on cost' };
+      if (sales30 > 0) return { f: 0.5, why: 'sold in the last 30 days' };
+      return cost < 1 ? { f: 0.8, why: 'no sales lately · cost under £1' } : cost < 5 ? { f: 0.7, why: 'no sales lately · cost £1–£4.99' } : cost < 10 ? { f: 0.6, why: 'no sales lately · cost £5–£9.99' } : { f: 0.5, why: 'no sales lately · cost £10+' };
+    }
+    var R = _R;
+    if (china) return { f: R.chinaFloor, why: 'China product · ' + Math.round(R.chinaFloor * 100) + '% on cost' };
+    if (sales30 > 0) return { f: R.ukSoldFloor, why: 'sold in the last 30 days' };
+    return cost < R.cost1 ? { f: R.ukBand1, why: 'no sales lately · cost under £' + R.cost1 } : cost < R.cost5 ? { f: R.ukBand5, why: 'no sales lately · cost under £' + R.cost5 } : cost < R.cost10 ? { f: R.ukBand10, why: 'no sales lately · cost under £' + R.cost10 } : { f: R.ukBandRest, why: 'no sales lately · cost £' + R.cost10 + '+' };
   }
   /* multi-pack: title starts with a number > 1 then 'x' (same as =IFERROR(--LEFT(C,SEARCH("x",C)-1)>1,FALSE)) */
   function packN(title) {
@@ -115,7 +164,7 @@
     var n = packN(title), out = [], wt = num(w);
     if (n) {
       if (wt == null || !(wt > 0)) out.push('Multi-pack x' + n + ' (no weight)');
-      else if (wt >= 14999) out.push('Multi-pack x' + n + ' (≥14999g)');
+      else if (wt >= packGramsOf()) out.push('Multi-pack x' + n + ' (≥' + packGramsOf() + 'g)');
     }
     return out.join(' | ');
   }
@@ -144,22 +193,22 @@
     var a = { cost: cost, mult: mult, post: post, collab: o.collab };
     o.a = a; o.fixed = fixedCost(a);
     var C = calc(a, cur); o.fee = C.fee; o.company = C.company; o.total = C.total; o.profit = C.profit; o.pr = C.pr; o.pc = C.pc;
-    var Fl = floorOf(china, sales, cost); o.floorPct = Fl.f; o.floorWhy = Fl.why; o.floor = floorPrice(a, Fl.f, china); o.ceil = china ? null : priceMax(a, UK_MAX);
+    var Fl = floorOf(china, sales, cost); o.floorPct = Fl.f; o.floorWhy = Fl.why; o.floor = floorPrice(a, Fl.f, china); o.ceil = china ? null : priceMax(a, ukMaxOf());
     var bb1 = bb != null ? rnd(bb - 0.01, 2) : null, raw, step = false;
     /* China rules A and B (Karimulla 2 Nov 2026) run BEFORE 'already winning', so they apply winning or not.
        A: under the 100% floor -> raise to the floor price. Every China increase is review only and is never uploaded.
        B: no sales in 30 days -> cut 10% (round down), never below 105% profit on cost. If the price now is already under that 105% price, the lift is review only and is not uploaded. */
-    if (china && cur > 0 && C.pc < CHINA_FLOOR - 1e-9) {
+    if (china && cur > 0 && C.pc < chinaFloorOf() - 1e-9) {
       raw = o.floor; o.chinaUp = true; o.rule = 'A China under 100% floor – raise to floor';
       o.reason = 'China product at ' + Math.round(C.pc * 100) + '% – raise to 100% floor £' + o.floor.toFixed(2);
     } else if (china && cur > 0 && sales < 1) {
-      var stop = priceFor(a, CHINA_FLOOR + 0.05);
+      var stop = priceFor(a, chinaFloorOf() + 0.05);
       o.chinaMin = stop;
       if (rnd(cur, 2) <= rnd(stop, 2)) {
         if (rnd(cur, 2) < rnd(stop, 2) - 0.001) { raw = stop; o.chinaUp = true; o.rule = 'B China 0 sales – 105% is above the price now, review only'; }
         else { raw = 'At 105% on cost – kept'; o.rule = 'B China 0 sales – already at 105% on cost'; }
       } else {
-        var cut = floor2(cur * (1 - CHINA_CUT));
+        var cut = floor2(cur * (1 - chinaCutOf()));
         raw = cut < stop ? stop : cut;
         if (!(rnd(raw, 2) < rnd(cur, 2) - 0.001)) { raw = 'At 105% on cost – kept'; o.rule = 'B China 0 sales – already at 105% on cost'; }
         else { o.chinaCut = true; o.rule = cut < stop ? 'B China 0 sales – cut 10%, stopped at 105% on cost' : 'B China 0 sales – cut 10%'; }
@@ -167,8 +216,8 @@
       o.reason = 'China, no sales in 30 days – not below 105% on cost (£' + stop.toFixed(2) + ')';
     } else if (o.win) {
       raw = 'Already winning'; o.rule = '1 Already winning – kept';
-      if (!china && sales >= RAISE_AT && C.pc < UK_MAX - 1e-9) {
-        var sp = Math.min(priceFor(a, Math.min(UK_MAX, C.pc + RAISE_STEP)), priceMax(a, UK_MAX));
+      if (!china && sales >= RAISE_AT && C.pc < ukMaxOf() - 1e-9) {
+        var sp = Math.min(priceFor(a, Math.min(ukMaxOf(), C.pc + RAISE_STEP)), priceMax(a, ukMaxOf()));
         if (sp > cur) { raw = sp; step = true; o.rule = '1 Winning, 100+ sales – raise 10% (max 80%)'; }
       }
     } else if (china) {
@@ -207,8 +256,8 @@
     /* ABSOLUTE SAFETY: a changed price must be > 0, profit > £0 and >= 50% on cost; China rule prices >= 100% */
     if (o.changed) {
       if (!(o.finalp > 0) || F.profit <= 0) { o.why = 'Loss – blocked'; if (your != null) o.status = 'Loss – blocked'; }
-      else if (F.pc < SAFE_MIN - 1e-9) { o.why = 'Under 50% – blocked'; if (your != null) o.status = 'Under 50% – blocked'; }
-      else if (china && F.pc < CHINA_FLOOR - 1e-9) { o.why = 'Under 100% China – blocked'; if (your != null) o.status = 'Under 100% China – blocked'; }
+      else if (F.pc < safeOf() - 1e-9) { o.why = 'Under 50% – blocked'; if (your != null) o.status = 'Under 50% – blocked'; }
+      else if (china && F.pc < chinaFloorOf() - 1e-9) { o.why = 'Under 100% China – blocked'; if (your != null) o.status = 'Under 100% China – blocked'; }
       else if (china && o.finalp > cur + 0.001) { o.why = 'China raise – review only'; if (your != null) o.status = 'Raise – held for review'; }
       else if (o.check && !opt.checkPost && !o.postChecked) o.why = 'Check postage first';
       else if (r.dup) o.why = 'Duplicate SKU';
@@ -313,8 +362,8 @@
   /* Highest price ending in 9 that is at or under x. */
   function down9(x) { var c = Math.round(r6(x) * 100); return (c - ((c % 10 - 9 + 10) % 10)) / 100; }
   /* Losing, but already cheaper than the buy box, and the SKU has sold. Raise into [buy box−15p, buy box−10p], highest price ending in 9; if none, buy box−10p. Never over the cap, never under the floor, and only when the result is above the current price. */
-  function losingCloser(bb, cur, cap, fl) {
-    var bb2 = rnd(bb, 2), hi = rnd(bb2 - 0.10, 2), lo = rnd(bb2 - 0.15, 2), nine = down9(hi);
+  function losingCloser(bb, cur, cap, fl, s) {
+    var bb2 = rnd(bb, 2), hi = rnd(bb2 - closeHiOf(s), 2), lo = rnd(bb2 - closeLoOf(s), 2), nine = down9(hi);
     var target = nine + 1e-9 >= lo ? nine : hi;
     if (cap != null && target > cap + 1e-9) {
       var under = down9(cap);
@@ -353,10 +402,10 @@
     if (!o.win) {
       if (cur < rnd(bb, 2)) {
         if (!(o.sales >= 1)) { r.why = 'Losing – already cheaper, 0 sales: kept'; return r; }
-        var closer = losingCloser(bb, cur, cap, fl);
+        var closer = losingCloser(bb, cur, cap, fl, s);
         if (closer.price == null) { r.why = closer.why; return r; }
         var Cc = calc(a, closer.price);
-        if (!(Cc.profit > 0) || Cc.pc < SAFE_MIN - 1e-9 || (o.china && Cc.pc < CHINA_FLOOR - 1e-9)) { r.why = 'Losing – already cheaper, at floor'; return r; }
+        if (!(Cc.profit > 0) || Cc.pc < safeOf() - 1e-9 || (o.china && Cc.pc < chinaFloorOf() - 1e-9)) { r.why = 'Losing – already cheaper, at floor'; return r; }
         r.act = 'Raise'; r.sugg = closer.price; r.profit = Cc.profit; r.pc = Cc.pc; r.gain = rnd(Cc.pr - C0.pr, 2);
         r.why = 'Losing – already cheaper: raise to 10–15p under buy box, ends in 9';
         return r;
@@ -368,8 +417,8 @@
     } else {
       /* 10 Nov 2026: a product with 0 B&Q sales is raised only when profit is under 50% on cost, and only up to that 50% price. The 80/70/60% bands stay the floor for cuts, not for this raise. Products with sales still rise to their floor. */
       var zeroUk = !o.china && !(o.sales >= 1);
-      var raiseAt = zeroUk ? SAFE_MIN : o.floorPct;
-      var raisePx = zeroUk ? priceFor(a, SAFE_MIN) : fl;
+      var raiseAt = zeroUk ? (_R && _R.zeroSalesRaise != null ? _R.zeroSalesRaise : SAFE_MIN) : o.floorPct;
+      var raisePx = zeroUk ? priceFor(a, (_R && _R.zeroSalesRaise != null ? _R.zeroSalesRaise : SAFE_MIN)) : fl;
       if (C0.pc < raiseAt - 1e-9) { set('Raise', raisePx, zeroUk ? '0 B&Q sales, profit under 50% on cost – raise only to 50%' : 'We win, but ' + pc(C0.pc) + ' is under our ' + pc(o.floorPct) + ' floor – raise to the floor', x.rival && x.rival.p > cur ? x.rival.p : null, zeroUk ? raisePx : null); }
       else if (zeroUk && C0.pc < o.floorPct - 1e-9) { r.why = '0 B&Q sales: profit already >= 50%, not raised'; return r; }
       else if (cap != null && cur >= cap) { r.why = 'We win at or above the 80% cap (' + g(cap) + ') – keep'; return r; }
@@ -389,8 +438,8 @@
     }
     /* absolute safety: never under the floor, never over the cap, never a loss, never under 50% (China 100%) */
     if (r.sugg != null) {
-      var minPx = (r.act === 'Raise' && !o.china && !(o.sales >= 1)) ? priceFor(a, SAFE_MIN) : fl;
-      var bad = !(r.sugg > 0) || !(r.profit > 0) || r.sugg < minPx - 1e-9 || (cap != null && r.sugg > up9(cap) + 1e-9) || r.pc < SAFE_MIN - 1e-9 || (o.china && r.pc < CHINA_FLOOR - 1e-9);
+      var minPx = (r.act === 'Raise' && !o.china && !(o.sales >= 1)) ? priceFor(a, (_R && _R.zeroSalesRaise != null ? _R.zeroSalesRaise : SAFE_MIN)) : fl;
+      var bad = !(r.sugg > 0) || !(r.profit > 0) || r.sugg < minPx - 1e-9 || (cap != null && r.sugg > up9(cap) + 1e-9) || r.pc < safeOf() - 1e-9 || (o.china && r.pc < chinaFloorOf() - 1e-9);
       if (bad) { r.act = 'Keep'; r.why = 'Safety check stopped ' + g(r.sugg) + ' – kept'; r.sugg = null; r.profit = null; r.pc = null; r.gain = null; }
       else if (r.sugg === cur) { r.act = 'Keep'; r.why = 'Already at the suggested price'; r.sugg = null; r.profit = null; r.pc = null; r.gain = null; }
     }
@@ -416,5 +465,5 @@
   }
   return { FEE: FEE, sales30: sales30, bbMap: bbMap, ukTime: ukTime, fromAccess: fromAccess, eanOf: eanOf, HDR: HDR, ASHIAN: ASHIAN, OTHER: OTHER, UK_MAX: UK_MAX, SAFE_MIN: SAFE_MIN, CHINA_FLOOR: CHINA_FLOOR, CHINA_CUT: CHINA_CUT, RAISE_AT: RAISE_AT, BANDS: BANDS, OVER: OVER,
     num: num, rnd: rnd, ceil2: ceil2, band: band, postage: postage, postageSrc: postageSrc, postInfo: postInfo, specialRule: specialRule, heavyCode: heavyCode, SPECIAL: SPECIAL, HEAVY: HEAVY, isChina: isChina, multOf: multOf, fixedCost: fixedCost,
-    TRIM: TRIM, end9: end9, calc: calc, priceFor: priceFor, priceMax: priceMax, floorPrice: floorPrice, floor2: floor2, floorOf: floorOf, packN: packN, checkPost: checkPost, decide: decide, decideAll: decideAll, buyBox: buyBox, buyBoxAll: buyBoxAll, bbFromScrape: bbFromScrape, BB_DEFAULT: BB_DEFAULT, isSeasonal: isSeasonal, isXmasTree: isXmasTree, bbStep: bbStep, CHECK_G: 14999, VERSION: 'bq_price v5 2026-11-09 pack14999 checks' };
+    TRIM: TRIM, end9: end9, DEFAULT_RULES: DEFAULT_RULES, rulesOf: rulesOf, rulesDiffer: rulesDiffer, useRules: useRules, clearRules: clearRules, feeOf: feeOf, ukMaxOf: ukMaxOf, safeOf: safeOf, chinaFloorOf: chinaFloorOf, packGramsOf: packGramsOf, calc: calc, priceFor: priceFor, priceMax: priceMax, floorPrice: floorPrice, floor2: floor2, floorOf: floorOf, packN: packN, checkPost: checkPost, decide: decide, decideAll: decideAll, buyBox: buyBox, buyBoxAll: buyBoxAll, bbFromScrape: bbFromScrape, BB_DEFAULT: BB_DEFAULT, isSeasonal: isSeasonal, isXmasTree: isXmasTree, bbStep: bbStep, CHECK_G: 14999, VERSION: 'bq_price v5 2026-11-09 pack14999 checks' };
 });
