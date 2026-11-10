@@ -18,7 +18,7 @@ button{font:inherit;cursor:pointer;border:0;-webkit-tap-highlight-color:transpar
 .primary:disabled{opacity:.6}
 .msg{min-height:22px;margin-top:14px;font-size:15px;color:#FCA5A5}
 .big{display:flex;flex-direction:column;align-items:flex-start;width:100%;padding:22px 20px;margin-bottom:14px;border-radius:16px;background:#F8FAFC;color:#0F172A;text-align:left;border-left:8px solid #FF6600}
-a.big{text-decoration:none;-webkit-tap-highlight-color:transparent}.big b{font-size:21px}.big span{font-size:14px;color:#64748B;margin-top:4px}
+a.big{text-decoration:none;-webkit-tap-highlight-color:transparent}.big.miss span{color:#B45309;font-weight:600}.big b{font-size:21px}.big span{font-size:14px;color:#64748B;margin-top:4px}
 .ghost{background:transparent;color:#94A3B8;border:1px solid #334155;padding:12px 16px;border-radius:12px;font-size:15px;margin-top:8px}
 .hide{display:none!important}
 #viewer{position:fixed;inset:0;background:#F8FAFC;z-index:5}
@@ -95,7 +95,7 @@ table.bt{border-collapse:collapse;width:100%;font-size:14px}.bt th,.bt td{paddin
    Keys are kept in sessionStorage (bqDashSession.v1) so sales.html, orders.html,
    Listings and the hub tabs open without asking again. Optional “Remember me”
    still wraps keys in localStorage for this device. Password never printed. */
-var FILES={sales:"sales.enc",orders:"orders.enc",selling:"productselling.enc"},ITER=600000,AUX_HEX="94ccba845e4963161cceda2f070f59d4",LS1="bqDashKeys.v1",LS2="bqDashKeys.v2";
+var FILES={sales:"sales.enc",orders:"orders.enc",selling:"productselling.enc"},REQ={sales:1,orders:1},OPT_NAME={selling:"Products selling"},ITER=600000,AUX_HEX="94ccba845e4963161cceda2f070f59d4",LS1="bqDashKeys.v1",LS2="bqDashKeys.v2";
 var $=function(i){return document.getElementById(i)};
 function auxSalt(){var u=new Uint8Array(16);for(var i=0;i<16;i++)u[i]=parseInt(AUX_HEX.substr(i*2,2),16);return u}
 var keys={},bufs={},curUrl=null,te=new TextDecoder(),te2=new TextEncoder(),mode="main";
@@ -108,8 +108,9 @@ function parts(buf){var u=new Uint8Array(buf);
  if(u.length<48||String.fromCharCode(u[0],u[1],u[2],u[3])!=="BQE1")throw new Error("badfile");
  return{salt:u.subarray(4,20),iv:u.subarray(20,32),ct:u.subarray(32)}}
 function getBuf(d){if(bufs[d])return Promise.resolve(bufs[d]);
- return fetch(FILES[d],{cache:"no-cache"}).then(function(r){if(!r.ok)throw new Error(d==="selling"&&r.status===404?"missing":"net");return r.arrayBuffer()})
- .then(function(b){bufs[d]=b;return b})}
+ /* Sales and Orders are required. Optional card files (Products selling): a 404, 503, network error or bad file = "missing", never fatal. */
+ return fetch(FILES[d],{cache:"no-cache"}).then(function(r){if(!r.ok)throw new Error(REQ[d]?"net":"missing");return r.arrayBuffer()})
+ .then(function(b){if(!REQ[d])parts(b);bufs[d]=b;return b}).catch(function(e){if(!REQ[d])throw new Error("missing");throw e})}
 function kdf(pw,salt,ext,use){var c=crypto.subtle;
  return c.importKey("raw",te2.encode(pw),"PBKDF2",false,["deriveKey"]).then(function(base){
  return c.deriveKey({name:"PBKDF2",hash:"SHA-256",salt:salt,iterations:ITER},base,{name:"AES-GCM",length:256},ext,use)})}
@@ -122,7 +123,7 @@ function tryMain(pw){var nk={};
   return kdf(pw,p.salt,true,["decrypt"]).then(function(k){nk[d]={key:k,salt:p.salt.slice()};return decrypt(k,p)})})}))
  .then(function(){return getBuf("selling").then(function(b){var p=parts(b);
   return kdf(pw,p.salt,true,["decrypt"]).then(function(k){return decrypt(k,p).then(function(){nk.selling={key:k,salt:p.salt.slice()}})})})
-  .catch(function(e){if(e&&e.message==="missing")return;throw e})})
+  .catch(function(){delete nk.selling;return})})
  .then(function(){return kdf(pw,auxSalt(),true,["encrypt","decrypt"])}).then(function(k){nk.aux={key:k,salt:auxSalt()};return addListingsKey(pw,nk)})}
 function addListingsKey(pw,nk){if(!pw||(nk&&nk.listings))return Promise.resolve(nk);
  return fetch("listings/data.enc",{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error("net");return r.arrayBuffer()}).then(function(b){
@@ -140,10 +141,10 @@ function unwrap(pw){var o=stored();if(!o)return Promise.reject(new Error("none")
  .then(function(plain){var inner=JSON.parse(te.decode(plain)),nk={};
   if(!inner.aux)throw new Error("stale");
   var names=Object.keys(FILES).concat(["aux"]);if(inner.listings)names.push("listings");
-  return Promise.all(names.map(function(d){if(!inner[d]){if(d==="selling")return Promise.resolve();throw new Error("x")}
+  return Promise.all(names.map(function(d){if(!inner[d]){if(!REQ[d])return Promise.resolve();throw new Error("x")}
    return crypto.subtle.importKey("raw",unb64(inner[d].key),{name:"AES-GCM"},true,d==="aux"?["encrypt","decrypt"]:["decrypt"]).then(function(k){nk[d]={key:k,salt:unb64(inner[d].salt)}})}))
   .then(function(){return nk})})}
-function fresh(nk){return Promise.all(Object.keys(FILES).map(function(d){return getBuf(d).then(function(b){if(!nk[d])throw new Error("stale");return sameSalt(nk[d].salt,parts(b).salt)}).catch(function(e){if(d==="selling"&&e&&e.message==="missing")return true;throw e})}))
+function fresh(nk){return Promise.all(Object.keys(FILES).filter(function(d){return REQ[d]}).map(function(d){return getBuf(d).then(function(b){if(!nk[d])throw new Error("stale");return sameSalt(nk[d].salt,parts(b).salt)})}))
  .then(function(r){return r.every(Boolean)})}
 function setMode(m,msg){mode=m;
  $("lh").textContent=OPEN?(OPEN==="sales"?"Sales":OPEN==="orders"?"Orders":"Products selling"):"B&Q Dashboards";
@@ -159,8 +160,12 @@ function afterUnlock(nk){keys=nk;$("pw").value="";$("msg").textContent="";
  return stashSession().then(function(){
   var n=null;try{n=new URLSearchParams(location.search).get("next")}catch(e){}
   if(n&&/^[\w./\-]+$/.test(n)&&n.indexOf("..")<0&&n.charAt(0)!=="/"&&n.indexOf(":")<0){location.href=n;return}
-  show("menu");if(OPEN)open(OPEN);
+  show("menu");markOptional();if(OPEN)open(OPEN);
  })}
+/* An optional card whose nightly file is missing (or not unlocked) says so on that card only. */
+function markOptional(){Object.keys(OPT_NAME).forEach(function(d){var a=document.querySelector('a.big[href="productselling.html"]');if(!a)return;
+  var set=function(miss){var s=a.querySelector("span");if(!s)return;if(!s.getAttribute("data-t"))s.setAttribute("data-t",s.textContent);s.textContent=miss?"Nightly file missing – the next nightly build adds it":s.getAttribute("data-t");a.classList.toggle("miss",!!miss)};
+  if(keys[d]){set(false);return}getBuf(d).then(function(){set(false)},function(){set(true)})})}
 
 $("lf").addEventListener("submit",function(ev){ev.preventDefault();
  var pw=$("pw").value;if(!pw){$("msg").textContent="Please type the password.";return}
@@ -182,6 +187,7 @@ $("lf").addEventListener("submit",function(ev){ev.preventDefault();
 
 function open(d){busy(true);
  getBuf(d).then(function(b){var p=parts(b),k=keys[d];
+  if(!REQ[d]&&(!k||!sameSalt(k.salt,p.salt)))throw new Error("optstale");
   if(!k||!sameSalt(k.salt,p.salt))throw new Error("stale");
   return decrypt(k.key,p)}).then(function(plain){
   if(curUrl)URL.revokeObjectURL(curUrl);
@@ -189,7 +195,8 @@ function open(d){busy(true);
   setFrame(curUrl);$("viewer").classList.remove("hide");
   document.title=d==="sales"?"B&Q Sales":d==="orders"?"B&Q Orders":"B&Q Products selling";busy(false)})
  .catch(function(e){busy(false);
-  if(e&&e.message==="missing"){alert("Products selling is not on the site yet. The nightly build publishes productselling.enc.");return}
+  if(e&&e.message==="missing"){markOptional();if(window.__bqMiss)return;window.__bqMiss=1;alert((OPT_NAME[d]||"This dashboard")+": nightly file missing. The next nightly build publishes it. Sales and Orders still work.");return}
+  if(e&&e.message==="optstale"){alert((OPT_NAME[d]||"This dashboard")+" was updated after you unlocked. Lock and type the password again to open it. Sales and Orders still work.");return}
   if(e&&e.message==="net"){alert("Couldn’t load the dashboard. Check your connection.");return}
   lock("Please enter the main password again (the dashboards were updated).")})}
 function setFrame(u){var f=$("frame");try{f.contentWindow.location.replace(u)}catch(e){f.src=u}}
@@ -199,7 +206,7 @@ function back(){if(OPEN){location.href="index.html";return}
 function clearSession(){try{sessionStorage.removeItem("bqDashSession.v1");sessionStorage.removeItem("bqDashReturn");sessionStorage.removeItem("bqDashGo");localStorage.removeItem("bqListKey.v1")}catch(e){}}
 function lock(msg){clearSession();forget();keys={};bufs={};back();if(window.BQTabs)BQTabs.close();setMode("main",msg||"")}
 function stashSession(){if(!keys||!keys.aux)return Promise.resolve();
- var ds=Object.keys(FILES).concat(["aux"]).concat(keys.listings?["listings"]:[]),inner={};
+ var ds=Object.keys(FILES).filter(function(d){return keys[d]}).concat(["aux"]).concat(keys.listings?["listings"]:[]),inner={};
  return Promise.all(ds.map(function(d){return crypto.subtle.exportKey("raw",keys[d].key).then(function(raw){inner[d]={salt:b64(keys[d].salt),key:b64(new Uint8Array(raw))}})}))
   .then(function(){try{sessionStorage.setItem("bqDashSession.v1",JSON.stringify({v:1,inner:inner}))}catch(e){}})}
 /* Restore unlocked keys for this tab (sales.html / orders.html / return from Listings). */
@@ -208,7 +215,7 @@ function restoreSession(){
  try{sessionStorage.removeItem("bqDashReturn")}catch(e){}
  if(!o||o.v!==1||!o.inner||!o.inner.aux||!o.inner.sales||!o.inner.orders)return Promise.resolve(false);
  var nk={},names=Object.keys(FILES).concat(["aux"]).concat(o.inner.listings?["listings"]:[]);
- return Promise.all(names.map(function(d){if(!o.inner[d]){if(d==="selling")return Promise.resolve();throw new Error("x")}
+ return Promise.all(names.map(function(d){if(!o.inner[d]){if(!REQ[d])return Promise.resolve();throw new Error("x")}
   return crypto.subtle.importKey("raw",unb64(o.inner[d].key),{name:"AES-GCM"},true,d==="aux"?["encrypt","decrypt"]:["decrypt"]).then(function(k){nk[d]={key:k,salt:unb64(o.inner[d].salt)}})}))
   .then(function(){return fresh(nk)}).then(function(ok){if(!ok)return false;
    return getBuf("sales").then(function(b){return decrypt(nk.sales.key,parts(b)).then(function(){keys=nk;return true})})})
