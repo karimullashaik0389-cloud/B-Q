@@ -24,7 +24,7 @@
   var COL = { cost: 'FFE0E0E0', price: 'FFD6EAF8', profit: 'FFD5F5E3', pct: 'FFE8DAEF' };   /* header bands */
   var STK = ['neg', 'under', 'blue', 'amber', 'green'], ST = { neg: { fill: 'FFD32F2F', font: 'FFFFFFFF' }, under: { fill: 'FFFFC107' }, blue: { fill: 'FF90CAF9' }, amber: { fill: 'FFFFE082' }, green: { fill: 'FFC8E6C9' } };
   var LEGEND = 'Colour key on profit %: RED = loss · AMBER = under the floor · BLUE = over the 80% cap · no colour = fine.';
-  var RULE3 = 'We win but sold 0 on B&Q in 30 days. Suggested = price now minus a quarter of the gap to the floor (selling − (selling − floor)/4), rounded to the penny, but never below the floor + 5% (rounded up), never over the 80% cap, and only if the price drops by at least 10p. Projected profit and % are at that price.';
+  var RULE3 = 'We win but sold 0 on B&Q in 30 days. Suggested = price now minus a quarter of the gap to the floor (selling − (selling − floor)/4), rounded to the penny, but never below the floor + 5% (rounded up), never over the 80% cap, and only if the price drops by at least 10p. UK only: if the price now is already over the 80% cap, we drop to the cap price even when that is below the floor + 5% buffer, but never below the floor, and only if the drop is at least 10p. China is unchanged. Projected profit and % are at that price.';
   var RULE5 = 'OPTIONAL – Margin too low. UK: uses a 60% floor on cost for this cut only (other tabs keep the normal cost-band floors); suggested = 5% off price now, rounded to the penny, never below the 65% price (floor + 5 points), never over the 80% cap, only if the drop is at least 10p, and not if the price changed in the last 3 days. Exactly 3 days is allowed. China: 5% off, never below the normal 100% floor. Does not win the buy box – it only makes the price more attractive.';
 
   var RULES_TITLE = 'Our pricing rules';
@@ -51,7 +51,7 @@
     '7a Final upload UK: the UK prices to copy into your B&Q CSV. Do not type on this tab.',
     '7b Final upload China: China cuts only, never raises. Copy into your B&Q CSV if there is a row. Do not type on this tab.',
     '4 Can win buy box: we can go 1p under the winner and still stay above the floor.',
-    '3 Winning 0 sales: we hold the buy box but sold 0 on B&Q – there may be a small cut toward the floor to help it sell.',
+    '3 Winning 0 sales: we hold the buy box but sold 0 on B&Q – there may be a small cut toward the floor to help it sell. UK only: if the price is already over the 80% cap, we drop to the cap price (never below the floor), even when that is below the floor + 5% buffer.',
     '2 Winning in range: we hold the buy box and profit is between the floor and the cap – nothing to do.',
     'Losing although cheaper: we are cheaper than the buy box but still losing. Review only. If it sold on B&Q, there may be a 10–15p raise ending in 9.',
     "Losing – can't win above floor: the rival's price is below our floor. Review only. Accept, find a cheaper supplier, or stop pushing the listing.",
@@ -170,7 +170,14 @@
           x.why = 'China raise – review only. The 105% minimum does not put a higher price on the upload.';
           return x;
         }
-        if (gap >= MIN_CHANGE - 1e-9 && s3 >= fb - 1e-9 && ok(P, o, s3)) { x.sugg = s3; x.why = o.china ? 'China, no sales – cut toward the floor, not below 105% on cost.' : 'We win but sold 0 in 30 days – lower a quarter of the way toward the floor (stops at floor + 5%).'; }
+        /* UK only: if we already win, sold 0, and the price is over the 80% cap, drop to the cap
+           even when that is below the floor+5% buffer. Never go below the floor. China is unchanged. */
+        var ukCapDrop = !o.china && cap != null && cur > cap + 1e-9 && Math.abs(s3 - P.rnd(cap, 2)) < 1e-9 && s3 >= fl - 1e-9;
+        if (gap >= MIN_CHANGE - 1e-9 && ok(P, o, s3) && (s3 >= fb - 1e-9 || ukCapDrop)) {
+          x.sugg = s3;
+          if (ukCapDrop && s3 < fb - 1e-9) { x.ukCapDrop = true; x.why = 'UK, 0 sales, over the 80% cap – drop to the cap price'; }
+          else x.why = o.china ? 'China, no sales – cut toward the floor, not below 105% on cost.' : 'We win but sold 0 in 30 days – lower a quarter of the way toward the floor (stops at floor + 5%).';
+        }
         else { x.why = o.china ? 'China, no sales – already at or within 10p of the 105% minimum.' : 'We win but sold 0 in 30 days – no cut suggested: the price is already close to the floor (within 10p of floor + 5%, or already at/under floor + 5%).'; }
         if (chk) x.inc = 'No'; return x;
       }
@@ -206,6 +213,7 @@
       if (x.sugg == null) s = o.china ? 'China, no sales – already at the 105% minimum' : '0 B&Q sales: already near the floor';
       else if (o.china && o.price != null && x.sugg > o.price + 0.001) s = 'China, no sales – lift to 105% profit on cost';
       else if (o.china) s = 'China, no sales – cut toward the floor, not below 105% on cost';
+      else if (x.ukCapDrop) s = 'UK, 0 sales, over the 80% cap – drop to the cap price';
       else s = '0 B&Q sales: quarter-gap cut toward the floor';
     }
     else if (k === 't2') s = 'Winning, in range – no change';

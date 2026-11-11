@@ -198,7 +198,8 @@
       setH(t3fb, 'IF(' + C(floorP, r) + '="","",IF(AND(' + C(chinaI, r) + '=1,' + C(salesI, r) + '<1,' + C(chinaMin, r) + '<>""),' + C(chinaMin, r) + ',ROUNDUP(' + C(floorP, r) + '*(1+' + SB.t3buf + '),2)))', M);
       setH(t3m, 'IF(OR(' + C(t3q, r) + '="",' + C(t3fb, r) + '=""),"",MAX(' + C(t3q, r) + ',' + C(t3fb, r) + '))', M);
       setH(t3c, 'IF(' + C(t3m, r) + '="","",IF(' + C(capP, r) + '="",' + C(t3m, r) + ',IF(' + C(t3m, r) + '>' + C(capP, r) + ',' + C(capP, r) + ',' + C(t3m, r) + ')))', M);
-      setH(t3s, 'IF(OR(' + C(priceU, r) + '="",' + C(t3c, r) + '=""),"",IF(AND(' + C(chinaI, r) + '<>1,' + C(t3c, r) + '>=' + C(priceU, r) + '),"",IF(ABS(' + C(priceU, r) + '-' + C(t3c, r) + ')<' + SB.minChange + ',"",IF(' + okUK(C(t3c, r), C(t3fb, r)) + ',' + C(t3c, r) + ',""))))', M);
+      var t3ok = 'OR(' + okUK(C(t3c, r), C(t3fb, r)) + ',AND(' + C(chinaI, r) + '<>1,' + C(capP, r) + '<>"",' + C(priceU, r) + '>' + C(capP, r) + '+0.000000001,ABS(' + C(t3c, r) + '-' + C(capP, r) + ')<0.00001,' + okUK(C(t3c, r), C(floorP, r)) + '))';
+      setH(t3s, 'IF(OR(' + C(priceU, r) + '="",' + C(t3c, r) + '=""),"",IF(AND(' + C(chinaI, r) + '<>1,' + C(t3c, r) + '>=' + C(priceU, r) + '),"",IF(ABS(' + C(priceU, r) + '-' + C(t3c, r) + ')<' + SB.minChange + ',"",IF(' + t3ok + ',' + C(t3c, r) + ',""))))', M);
       var raisePx = 'IF(AND(' + C(chinaI, r) + '<>1,' + C(salesI, r) + '<1),' + priceFor(r, SB.zeroSalesRaise) + ',' + C(floorP, r) + ')';
       var up9r = '(ROUND(' + raisePx + '*100,0)+MOD(9-MOD(ROUND(' + raisePx + '*100,0),10)+10,10))/100';
       var raiseUp = 'IF(' + raisePx + '="","",IF(OR(' + up9r + '<=0,IF(' + C(capP, r) + '="",FALSE,' + up9r + '>' + C(capP, r) + ')),' + raisePx + ',' + up9r + '))';
@@ -315,7 +316,7 @@
     list.push(finalSheet(T7A, upUK, showFinal, recs.length, 'UK prices only. Formulas from Combined. Do not type on this tab. China raises are never listed. Losses and under-floor rows never appear here.'));
     list.push(finalSheet(T7B, upCN, showFinal, recs.length, 'China prices only. Raises are never listed. Do not type on this tab.'));
     list.push(revSheet(T4, byTab[4], 'Can win the buy box. Yellow Postage review and Selling price review flow to Combined and Final.'));
-    list.push(revSheet(T3, byTab[3], 'Winning, 0 sales. A price review recalculates the quarter-gap suggestion. Yellow cells only.'));
+    list.push(revSheet(T3, byTab[3], 'Winning, 0 sales. A price review recalculates the suggestion (a quarter-gap cut, or for UK products already over the 80% cap, a drop to the cap price). Yellow cells only.'));
     list.push(revSheet(T2, byTab[2], 'Winning and in range. Type in the yellow cells if a postage or the current price needs a correction.'));
     list.push(loseCheapSheet(loseCheap));
     list.push(cantWinSheet(cantWin));
