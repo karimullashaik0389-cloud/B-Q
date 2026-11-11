@@ -152,7 +152,7 @@ t('selling price review recalculates profit; a raise over the cap is blocked, a 
 });
 
 t('a cut from an already over-cap price is OK and goes into 7a; a raise above the cap stays blocked', () => {
-  const row = { sku: 'CAPCUT', title: 'AX Snow Foam 800ml', ean: '200', cost: 0.68, price: 4.99, bb: 4.99, seller: 'Diva Packages', sup: 'UK Ltd', w: 855, sales: 2, stock: 10 };
+  const row = { sku: 'CAPCUT', title: 'AX Snow Foam 800ml', ean: '200', cost: 0.68, price: 4.99, bb: 4.99, seller: 'Diva Packages', sup: 'UK Ltd', w: 855, pc: 1.70, sales: 2, stock: 10 };
   const d = P.decideAll([row], {});
   const bb = P.buyBoxAll(d.rows, { '200': 1 }, {}, P.BB_DEFAULT);
   const rec0 = B.build(X, P, { bbr: bb, settings: S0, asOf: '2026-11-09' }).records.find(r => r.sku === 'CAPCUT');
@@ -287,7 +287,7 @@ t('the dashboard pages include the import control and the live calculator', () =
 
 t('negative postage is invalid and 14998g still uses the normal band', () => {
   assert.strictEqual(P.checkPost('3 x Bag', 14998), '');
-  assert.strictEqual(P.postage(null, 14998, '3 x Bag', []), 2.3);
+  assert.strictEqual(P.postage(null, 14998, '3 x Bag', []), 2.45);
   assert.ok(/14999/.test(P.checkPost('3 x Bag', 14999)));
   const built = workbook();
   const wb = X.read(Buffer.from(built.bytes), { type: 'buffer', cellFormula: true });
@@ -442,7 +442,7 @@ t('Rules is the first visible sheet, is plain text, and does not change 7a or 7b
   assert.deepStrictEqual(wb.SheetNames.slice(0, 4), ['_Set', '_Calc', 'Rules', '6 Combined upload']);
   const text = sheetRows(wb, 'Rules').map(r => (r || []).join(' ')).join('\n');
   assert.ok(text.indexOf('15%') >= 0);
-  assert.ok(text.indexOf('£1.75') >= 0);
+  assert.ok(text.indexOf('£1.90') >= 0);
   assert.ok(text.indexOf('14,999') >= 0);
   assert.ok(text.indexOf('80% profit cap only blocks a raise') >= 0);
   assert.ok(text.indexOf('10–15p under the buy box') >= 0);

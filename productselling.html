@@ -496,12 +496,13 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
      profit = price - total cost      profit % = profit / estimated cost
      postage (in this order): 1 your typed postage; 2 special fixed rules (Karimulla's seniors' list, 26 Oct + 2 Nov 2026 notes, see SPECIAL);
        3 description code H123/H063/H077 over 15.2kg: DPD 14 (<=20kg) / 15 (<=25kg) / 17 (<=30kg); 4 Access 'Postage Cost' if > 0;
-       5 weight band on the (total pack) weight: <=2000g 1.75, <=15200g 2.30, <=20000g 8, <=25000g 9, <=30000g 10.50, else 15. A multi-pack is ONE parcel. Check-postage only for multi-packs with weight >=14999g (or missing weight).
+       5 weight band on the (total pack) weight: <=2000g 1.90, <=15200g 2.45, <=20000g 8, <=25000g 9, <=30000g 10.50, else 15. A multi-pack is ONE parcel. Check-postage only for multi-packs with weight >=14999g (or missing weight).
+       If Access postage equals an old band rate (£1.75 or £2.30, within 0.5p), it is used at the new rate (£1.90 or £2.45). Other Access amounts stay as they are. The mapping is in Settings.
    No data and no keys in this file. */
 (function (root, f) { var m = f(); if (typeof module === 'object' && module.exports) module.exports = m; else root.BQP = m; })(this, function () {
   'use strict';
   var FEE = 0.15, ASHIAN = 2, OTHER = 1.5, UK_MAX = 0.8, CHINA_FLOOR = 1, SAFE_MIN = 0.5, RAISE_AT = 100, RAISE_STEP = 0.1, CHINA_CUT = 0.1;
-  var BANDS = [[2000, 1.75, '≤2 kg'], [15200, 2.3, '≤15.2 kg'], [20000, 8, '≤20 kg'], [25000, 9, '≤25 kg'], [30000, 10.5, '≤30 kg']], OVER = [15, 'over 30 kg'];
+  var BANDS = [[2000, 1.9, '≤2 kg'], [15200, 2.45, '≤15.2 kg'], [20000, 8, '≤20 kg'], [25000, 9, '≤25 kg'], [30000, 10.5, '≤30 kg']], OVER = [15, 'over 30 kg'];
   var _R = null;
   var DEFAULT_RULES = {
     fee: FEE, ukMax: UK_MAX, safeMin: SAFE_MIN, chinaFloor: CHINA_FLOOR, chinaCut: CHINA_CUT,
@@ -512,12 +513,16 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
     closeHi: 0.10, closeLo: 0.15, packGrams: 14999,
     bands: BANDS.map(function (b) { return [b[0], b[1], b[2]]; }),
     overBand: OVER[0],
-    zeroSalesRaise: SAFE_MIN
+    accessMap: [[1.75, 1.9], [2.3, 2.45]],
+    accessMapTol: 0.005,
+    zeroSalesRaise: SAFE_MIN,
+    floorLift: 1
   };
   function rulesOf(s) {
     var d = DEFAULT_RULES, o = s || {}, r = {};
     Object.keys(d).forEach(function (k) {
       if (k === 'bands') r.bands = Array.isArray(o.bands) && o.bands.length ? o.bands : d.bands;
+      else if (k === 'accessMap') r.accessMap = accessMapFrom(o, d);
       else r[k] = o[k] != null && o[k] !== '' ? o[k] : d[k];
     });
     return r;
@@ -530,6 +535,9 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
       if (k === 'bands') {
         var a = r.bands.map(function (b) { return [+b[0], +b[1]]; }), b = d.bands.map(function (x) { return [x[0], x[1]]; });
         if (JSON.stringify(a) !== JSON.stringify(b)) return true;
+      } else if (k === 'accessMap') {
+        var am = function (m) { return (m || []).map(function (p) { return [+p[0], +p[1]]; }); };
+        if (JSON.stringify(am(r.accessMap)) !== JSON.stringify(am(d.accessMap))) return true;
       } else if (+r[k] !== +d[k] && String(r[k]) !== String(d[k])) return true;
     }
     return false;
@@ -544,6 +552,14 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
   function packGramsOf() { return _R ? _R.packGrams : 14999; }
   function closeHiOf(s) { return (s && s.closeHi != null) ? s.closeHi : (_R ? _R.closeHi : 0.10); }
   function closeLoOf(s) { return (s && s.closeLo != null) ? s.closeLo : (_R ? _R.closeLo : 0.15); }
+  /* When on (default), a UK suggestion that would sit under its own floor is lifted to that floor
+     (already rounded up to the penny). Cuts stay cuts, raises stay raises. Never over the 80% cap, never a loss.
+     Floors themselves are unchanged. China is not lifted. Turn off with Settings floorLift = 0. */
+  function floorLiftOf() {
+    var r = _R || DEFAULT_RULES;
+    if (r.floorLift === false || r.floorLift === 0 || r.floorLift === '0') return false;
+    return true;
+  }
   /* number from 8.7, '8.70', '£8.70', '1,234.50', ' 8.7 '; blank / text -> null */
   function num(v) {
     if (v == null) return null;
@@ -560,6 +576,33 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
   function ceil2(x) { return Math.ceil(Number((r6(x) * 100).toFixed(6))) / 100; }
   function floor2(x) { return Math.floor(Number((r6(x) * 100).toFixed(6))) / 100; }
   function band(w) { w = num(w); if (!(w > 0)) return null; var B = _R ? _R.bands : BANDS, O = _R ? _R.overBand : OVER[0]; for (var i = 0; i < B.length; i++) if (w <= B[i][0]) return { p: B[i][1], lab: B[i][2] || ('≤' + (B[i][0] / 1000) + ' kg') }; return { p: O, lab: 'over ' + (B.length ? (B[B.length - 1][0] / 1000) + ' kg' : 'band') }; }
+  /* Settings mapping: Access postage that equals an old band rate (within accessMapTol, default 0.5p) is used at the new rate.
+     Raw Access 'Postage Cost' is left unchanged on the row (accessPc). Applied in postInfo, so fromAccess + decideAll
+     (dashboard Pricing tab and the nightly refresh_and_publish / build_pricing path) pick it up automatically. */
+  function accessMapFrom(o, d) {
+    o = o || {}; d = d || DEFAULT_RULES;
+    if (Array.isArray(o.accessMap)) return o.accessMap;
+    var pairs = [], i, a, b;
+    for (i = 1; i <= 5; i++) {
+      a = num(o['accessMap' + i + 'old']); b = num(o['accessMap' + i + 'new']);
+      if (a != null && b != null) pairs.push([a, b]);
+    }
+    return pairs.length ? pairs : (d.accessMap || []);
+  }
+  function accessMapOf() {
+    var r = _R || DEFAULT_RULES;
+    return { map: r.accessMap || DEFAULT_RULES.accessMap || [], tol: r.accessMapTol != null ? r.accessMapTol : (DEFAULT_RULES.accessMapTol != null ? DEFAULT_RULES.accessMapTol : 0.005) };
+  }
+  function mapAccessPostage(p) {
+    p = num(p);
+    if (p == null || !(p > 0)) return { p: p, mapped: false };
+    var M = accessMapOf(), tol = M.tol != null ? M.tol : 0.005, i, old, neu;
+    for (i = 0; i < M.map.length; i++) {
+      old = num(M.map[i][0]); neu = num(M.map[i][1]);
+      if (old != null && neu != null && Math.abs(p - old) <= tol + 1e-12) return { p: neu, mapped: true, from: old };
+    }
+    return { p: p, mapped: false };
+  }
   /* SPECIAL fixed postage (before Access / weight). Matched on the Variant description text (+ SKU / variant code prefix).
      Source: Karimulla's handwritten note 2 Nov 2026 (KEEP/special_postage_note_2026-11-02.jpg) and the seniors' list
      implemented 26 Oct 2026 (china_products_2026-10-26/work/pricing/build_v3.py). Fixed amounts are never multiplied by pack qty. */
@@ -604,7 +647,12 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
     var k = specialRule(title, code); if (k) return { p: SPECIAL[k][1], src: 'Special: ' + SPECIAL[k][0], kind: 'special', rule: k };
     var h = heavyCode(title), wt = num(w);
     if (h && wt > HEAVY_FROM && wt <= HEAVY[HEAVY.length - 1][0]) for (var i = 0; i < HEAVY.length; i++) if (wt <= HEAVY[i][0]) return { p: HEAVY[i][1], src: 'DPD ' + h + ' ' + HEAVY[i][2], kind: 'heavy' };
-    var p = num(pc); if (p != null && p > 0) return { p: p, src: 'Access postage' + (h ? ' (' + h + ')' : ''), kind: 'access' };
+    var p = num(pc); if (p != null && p > 0) {
+      var m = mapAccessPostage(p), src = 'Access postage';
+      if (m.mapped) src += ' £' + rnd(p, 2).toFixed(2) + ' at the new rate £' + rnd(m.p, 2).toFixed(2);
+      if (h) src += ' (' + h + ')';
+      return { p: m.p, src: src, kind: 'access', accessMapped: !!m.mapped };
+    }
     var b = band(w); return b ? { p: b.p, src: (b.p >= 8 && b.p <= 10.5 ? 'DPD ' : 'Weight band ') + b.lab + (packN(title) ? ' (pack weight, one parcel)' : ''), kind: 'band' } : { p: null, src: 'No postage or weight', kind: 'none' };
   }
   /* postage: (pc, w) = Access / weight only (old callers); (pc, w, title, code[, typed]) = all rules incl. special */
@@ -719,7 +767,8 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
     } else if (sales >= 1) {
       if (bb == null) { raw = 'No competitor – kept'; o.rule = '2 UK sold – no competitor, kept'; }
       else if (bb1 < o.floor) { raw = 'Margin too low'; o.rule = '2 UK sold – margin too low, kept'; }
-      else { raw = Math.min(o.ceil, bb1); o.rule = bb1 > o.ceil ? '2 UK sold – capped at 80%' : '2 UK sold – 1p under BB'; }
+      else if (bb1 > o.ceil && !(bb1 < cur - 1e-9)) { raw = o.ceil; o.rule = '2 UK sold – capped at 80%'; }
+      else { raw = bb1; o.rule = '2 UK sold – 1p under BB'; }
     } else {
       if (bb == null) { raw = o.ceil; o.rule = '3 UK 0 sales – no competitor, 80%'; }
       else if (bb1 < o.floor) { raw = 'Margin too low'; o.rule = '3 UK 0 sales – margin too low, kept'; }
@@ -841,7 +890,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
      o = decide(row) output.  x = {fresh: today's buy box check worked for this EAN, rival: {p, s, d} newest OTHER seller seen holding the box,
      seasonal: Christmas product}.  s = settings (BB_DEFAULT).  Returns {act, sugg, profit, pc, gain, why, need}.
      act: 'Lower to win' | 'Raise' | "Can't win (floor)" | 'Keep' | 'No data'.  sugg is only set for Lower to win / Raise, and is never
-     under the floor, never over the UK 80% cap, never a loss (checked again at the end – if not, act becomes Keep). */
+     under the floor, never a loss. A raise is never over the UK 80% cap. A CUT to 1p under the competitor, on a UK product with sales, may stay above the cap. 0-sales UK cuts still stop at the cap (checked again at the end – if not, act becomes Keep). */
   var BB_DEFAULT = { step: 0.01, stepPct: 0, minGain: 0.10, raisePct: 0.05, raiseNoSales: false, noStockKeep: true, useStale: false, xmas: true, keepTrees: true };
   /* Christmas trees (XMAS TREE 5/6/7/8/10FT, SKU XMA-TRE-GRE-…): Karimulla 3 Nov 2026 – keep the tree prices as they are (no raise, no lower). Not tree bags / stands / spray. */
   function isXmasTree(title, sku) { return /\b(?:xmas|christmas)\s+tree\s+\d+\s*(?:ft|feet|foot)\b/i.test(String(title || '')) || /^XMA-TRE-GRE-/i.test(String(sku || '')); }
@@ -902,7 +951,10 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
         return r;
       }
       var need = rnd(bb - bbStep(bb, s), 2), t = need, capped = false; r.need = need;
-      if (cap != null && t > cap) { t = cap; capped = true; }
+      /* 11 Nov 2026: UK with sales – a CUT to 1p under the competitor is not clamped to the 80% cap.
+         The cap still blocks raises. 0-sales UK still clamps to the cap. China has no cap. */
+      var soldCut = !o.china && o.sales >= 1 && t < cur - 1e-9;
+      if (cap != null && t > cap && !soldCut) { t = cap; capped = true; }
       if (t < fl) { r.act = "Can't win (floor)"; r.why = 'To win we need ' + g(need) + ' (under ' + seller + ' ' + g(bb) + '), but our floor is ' + g(fl) + ' (' + pc(o.floorPct) + ' on cost)'; return r; }
       set('Lower to win', t, capped ? 'Under ' + seller + ' ' + g(bb) + ' at our 80% cap ' + g(t) : (need === rnd(bb - 0.01, 2) ? '1p' : g(bb - need)) + ' under ' + seller + ' ' + g(bb) + '; floor ' + g(fl), bb);
     } else {
@@ -927,10 +979,28 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
         set('Raise', t2, why, rv && rv.p > cur ? rv.p : null);
       }
     }
-    /* absolute safety: never under the floor, never over the cap, never a loss, never under 50% (China 100%) */
+    /* If a UK suggestion would sit under its own floor, lift it to the floor price (rounded up to the penny).
+       Only when that keeps a raise a raise (or a cut a cut), stays at/under the cap, and is not a loss. China unchanged. */
+    if (r.sugg != null && floorLiftOf() && !o.china && fl != null && r.sugg < fl - 1e-9) {
+      var lift = fl;
+      if (cap != null && lift > cap + 1e-9) lift = cap;
+      var CLift = calc(a, lift);
+      var stayRaise = (r.act === 'Raise' || r.sugg > cur + 1e-9) && lift > cur + 1e-9;
+      var stayCut = (r.act === 'Lower to win' || r.sugg < cur - 1e-9) && lift < cur - 1e-9;
+      if ((stayRaise || stayCut) && CLift.profit > 0 && CLift.pc >= safeOf() - 1e-9 && (cap == null || lift <= cap + 1e-9 || stayCut)) {
+        r.sugg = rnd(lift, 2);
+        r.profit = CLift.profit;
+        r.pc = CLift.pc;
+        r.gain = rnd(CLift.pr - C0.pr, 2);
+        if (stayRaise && !(o.sales >= 1)) r.why = '0 B&Q sales, profit under 50% on cost – raise to the floor (just at/above the floor %)';
+        else r.why = (r.why || '') + ' – lifted to the floor';
+      }
+    }
+    /* absolute safety: never under the floor (when floorLift is on), never over the cap, never a loss, never under 50% (China 100%) */
     if (r.sugg != null) {
-      var minPx = (r.act === 'Raise' && !o.china && !(o.sales >= 1)) ? priceFor(a, (_R && _R.zeroSalesRaise != null ? _R.zeroSalesRaise : SAFE_MIN)) : fl;
-      var bad = !(r.sugg > 0) || !(r.profit > 0) || r.sugg < minPx - 1e-9 || (cap != null && r.sugg > up9(cap) + 1e-9) || r.pc < safeOf() - 1e-9 || (o.china && r.pc < chinaFloorOf() - 1e-9);
+      var minPx = (!floorLiftOf() && r.act === 'Raise' && !o.china && !(o.sales >= 1)) ? priceFor(a, (_R && _R.zeroSalesRaise != null ? _R.zeroSalesRaise : SAFE_MIN)) : fl;
+      var overCapRaise = cap != null && r.sugg > up9(cap) + 1e-9 && !(r.sugg < cur - 1e-9);
+      var bad = !(r.sugg > 0) || !(r.profit > 0) || r.sugg < minPx - 1e-9 || overCapRaise || r.pc < safeOf() - 1e-9 || (o.china && r.pc < chinaFloorOf() - 1e-9);
       if (bad) { r.act = 'Keep'; r.why = 'Safety check stopped ' + g(r.sugg) + ' – kept'; r.sugg = null; r.profit = null; r.pc = null; r.gain = null; }
       else if (r.sugg === cur) { r.act = 'Keep'; r.why = 'Already at the suggested price'; r.sugg = null; r.profit = null; r.pc = null; r.gain = null; }
     }
@@ -955,8 +1025,8 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
     return rows.map(function (o) { var b = buyBox(o, { fresh: !!fresh[o.ean], rival: rivals[o.ean] || null, seasonal: isSeasonal(o.title, o.sku) }, s); b.o = o; return b; });
   }
   return { FEE: FEE, sales30: sales30, bbMap: bbMap, ukTime: ukTime, fromAccess: fromAccess, eanOf: eanOf, HDR: HDR, ASHIAN: ASHIAN, OTHER: OTHER, UK_MAX: UK_MAX, SAFE_MIN: SAFE_MIN, CHINA_FLOOR: CHINA_FLOOR, CHINA_CUT: CHINA_CUT, RAISE_AT: RAISE_AT, BANDS: BANDS, OVER: OVER,
-    num: num, rnd: rnd, ceil2: ceil2, band: band, postage: postage, postageSrc: postageSrc, postInfo: postInfo, specialRule: specialRule, heavyCode: heavyCode, SPECIAL: SPECIAL, HEAVY: HEAVY, isChina: isChina, multOf: multOf, fixedCost: fixedCost,
-    TRIM: TRIM, end9: end9, DEFAULT_RULES: DEFAULT_RULES, rulesOf: rulesOf, rulesDiffer: rulesDiffer, useRules: useRules, clearRules: clearRules, feeOf: feeOf, ukMaxOf: ukMaxOf, safeOf: safeOf, chinaFloorOf: chinaFloorOf, packGramsOf: packGramsOf, calc: calc, priceFor: priceFor, priceMax: priceMax, floorPrice: floorPrice, floor2: floor2, floorOf: floorOf, packN: packN, checkPost: checkPost, decide: decide, decideAll: decideAll, buyBox: buyBox, buyBoxAll: buyBoxAll, bbFromScrape: bbFromScrape, BB_DEFAULT: BB_DEFAULT, isSeasonal: isSeasonal, isXmasTree: isXmasTree, bbStep: bbStep, CHECK_G: 14999, VERSION: 'bq_price v5 2026-11-09 pack14999 checks' };
+    num: num, rnd: rnd, ceil2: ceil2, band: band, mapAccessPostage: mapAccessPostage, accessMapFrom: accessMapFrom, postage: postage, postageSrc: postageSrc, postInfo: postInfo, specialRule: specialRule, heavyCode: heavyCode, SPECIAL: SPECIAL, HEAVY: HEAVY, isChina: isChina, multOf: multOf, fixedCost: fixedCost,
+    TRIM: TRIM, end9: end9, DEFAULT_RULES: DEFAULT_RULES, rulesOf: rulesOf, rulesDiffer: rulesDiffer, useRules: useRules, clearRules: clearRules, feeOf: feeOf, ukMaxOf: ukMaxOf, safeOf: safeOf, chinaFloorOf: chinaFloorOf, packGramsOf: packGramsOf, floorLiftOf: floorLiftOf, calc: calc, priceFor: priceFor, priceMax: priceMax, floorPrice: floorPrice, floor2: floor2, floorOf: floorOf, packN: packN, checkPost: checkPost, decide: decide, decideAll: decideAll, buyBox: buyBox, buyBoxAll: buyBoxAll, bbFromScrape: bbFromScrape, BB_DEFAULT: BB_DEFAULT, isSeasonal: isSeasonal, isXmasTree: isXmasTree, bbStep: bbStep, CHECK_G: 14999, VERSION: 'bq_price v9 2026-11-11 floor lift to own floor' };
 });
 </script>
 <script>
@@ -1091,7 +1161,9 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
 </script>
 <script>
 /* Live pricing workbook. Yellow cells are the only inputs. Every profit, suggestion,
-   Combined row and Final upload price is a formula matched by SKU. No macros.
+   Combined row and Final upload price is a formula. Visible tabs use a direct cell
+   on the hidden _Calc row for that SKU (no INDEX/MATCH). Formula cells carry cached
+   values so Excel does not have to calculate on open. No macros.
    Blank input = no opinion. 0 postage is a real input. Two different numbers for one SKU = CONFLICT (neither is chosen). */
 (function (root, f) { var m = f(); if (typeof module === 'object' && module.exports) module.exports = m; else root.BQLive = m; })(this, function () {
   'use strict';
@@ -1159,16 +1231,25 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
 
   function make(recs, input, P, saved, S) {
     input = input || {}; saved = saved || {}; S = Object.assign({}, P.BB_DEFAULT || {}, S || {});
+    var Book = (typeof BQBook !== 'undefined') ? BQBook : (typeof require === 'function' ? require('./bq_book.js') : null);
     var asOf = xDate(S.asOf || (input && input.asOf) || '');
     function sv(k, d) { return S[k] != null && S[k] !== '' ? S[k] : d; }
-    var setRows = [['fee', sv('fee', 0.15)], ['ukMax', sv('ukMax', 0.8)], ['safeMin', sv('safeMin', 0.5)], ['minChange', sv('minChange', 0.1)], ['t3buf', sv('t3buf', 0.05)], ['t5cut', sv('t5cut', 0.05)], ['t5ukFloor', sv('t5ukFloor', 0.6)], ['t5ukMin', sv('t5ukMin', 0.65)], ['t5HoldDays', sv('t5HoldDays', 3)], ['step', sv('step', 0.01)], ['stepPct', S.stepPct || 0], ['minGain', S.minGain == null ? 0.1 : S.minGain], ['raisePct', S.raisePct == null ? 0.05 : S.raisePct], ['xmas', S.xmas === false ? 0 : 1], ['raiseNoSales', S.raiseNoSales ? 1 : 0], ['noStockKeep', S.noStockKeep === false ? 0 : 1], ['keepTrees', S.keepTrees === false ? 0 : 1], ['useStale', S.useStale ? 1 : 0], ['checkPost', S.checkPost ? 1 : 0], ['asOf', asOf == null ? '' : asOf], ['packGrams', sv('packGrams', 14999)], ['chinaFloor', sv('chinaFloor', 1)], ['ukSoldFloor', sv('ukSoldFloor', 0.5)], ['ukBand1', sv('ukBand1', 0.8)], ['ukBand5', sv('ukBand5', 0.7)], ['ukBand10', sv('ukBand10', 0.6)], ['ukBandRest', sv('ukBandRest', 0.5)], ['cost1', sv('cost1', 1)], ['cost5', sv('cost5', 5)], ['cost10', sv('cost10', 10)], ['closeHi', sv('closeHi', 0.10)], ['closeLo', sv('closeLo', 0.15)], ['zeroSalesRaise', sv('zeroSalesRaise', 0.5)], ['band1w', 2000], ['band1p', 1.75], ['band2w', 15200], ['band2p', 2.3], ['band3w', 20000], ['band3p', 8], ['band4w', 25000], ['band4p', 9], ['band5w', 30000], ['band5p', 10.5], ['overBand', sv('overBand', 15)]];
+    var setRows = [['fee', sv('fee', 0.15)], ['ukMax', sv('ukMax', 0.8)], ['safeMin', sv('safeMin', 0.5)], ['minChange', sv('minChange', 0.1)], ['t3buf', sv('t3buf', 0.05)], ['t5cut', sv('t5cut', 0.05)], ['t5ukFloor', sv('t5ukFloor', 0.6)], ['t5ukMin', sv('t5ukMin', 0.65)], ['t5HoldDays', sv('t5HoldDays', 3)], ['step', sv('step', 0.01)], ['stepPct', S.stepPct || 0], ['minGain', S.minGain == null ? 0.1 : S.minGain], ['raisePct', S.raisePct == null ? 0.05 : S.raisePct], ['xmas', S.xmas === false ? 0 : 1], ['raiseNoSales', S.raiseNoSales ? 1 : 0], ['noStockKeep', S.noStockKeep === false ? 0 : 1], ['keepTrees', S.keepTrees === false ? 0 : 1], ['useStale', S.useStale ? 1 : 0], ['checkPost', S.checkPost ? 1 : 0], ['asOf', asOf == null ? '' : asOf], ['packGrams', sv('packGrams', 14999)], ['chinaFloor', sv('chinaFloor', 1)], ['ukSoldFloor', sv('ukSoldFloor', 0.5)], ['ukBand1', sv('ukBand1', 0.8)], ['ukBand5', sv('ukBand5', 0.7)], ['ukBand10', sv('ukBand10', 0.6)], ['ukBandRest', sv('ukBandRest', 0.5)], ['cost1', sv('cost1', 1)], ['cost5', sv('cost5', 5)], ['cost10', sv('cost10', 10)], ['closeHi', sv('closeHi', 0.10)], ['closeLo', sv('closeLo', 0.15)], ['zeroSalesRaise', sv('zeroSalesRaise', 0.5)], ['floorLift', sv('floorLift', 1)], ['band1w', 2000], ['band1p', 1.9], ['band2w', 15200], ['band2p', 2.45], ['band3w', 20000], ['band3p', 8], ['band4w', 25000], ['band4p', 9], ['band5w', 30000], ['band5p', 10.5], ['overBand', sv('overBand', 15)], ['accessMap1old', 1.75], ['accessMap1new', 1.9], ['accessMap2old', 2.3], ['accessMap2new', 2.45], ['accessMapTol', 0.005]];
     if (Array.isArray(S.bands) && S.bands.length) {
       var bi; for (bi = 0; bi < 5 && bi < S.bands.length; bi++) {
         var pair = S.bands[bi];
         setRows.forEach(function (r) { if (r[0] === 'band' + (bi + 1) + 'w') r[1] = pair[0]; if (r[0] === 'band' + (bi + 1) + 'p') r[1] = pair[1]; });
       }
     }
-    var SB = {}; setRows.forEach(function (r, i) { SB[r[0]] = "'" + SET + "'!$B$" + (i + 2); });
+    if (Array.isArray(S.accessMap) && S.accessMap.length) {
+      var mi; for (mi = 0; mi < 5 && mi < S.accessMap.length; mi++) {
+        var mp = S.accessMap[mi];
+        setRows.forEach(function (r) { if (r[0] === 'accessMap' + (mi + 1) + 'old') r[1] = mp[0]; if (r[0] === 'accessMap' + (mi + 1) + 'new') r[1] = mp[1]; });
+      }
+    }
+    if (S.accessMapTol != null && S.accessMapTol !== '') setRows.forEach(function (r) { if (r[0] === 'accessMapTol') r[1] = S.accessMapTol; });
+    var SB = {}; setRows.forEach(function (r) { SB[r[0]] = 'BQ_' + r[0]; });
+    var setNames = setRows.map(function (r, i) { return { name: 'BQ_' + r[0], ref: SET + '!$B$' + (i + 2) }; });
     var names = [];
     function add(name) { names.push(name); return names.length - 1; }
     ['sku','title','uk','cost','mult','collab','w','sales','stock','bb','win','seller','basePost','basePrice','china','tree','fresh','liveSeen','offer','packN','packCheck','lastChange','rival','seasonal','engSugg','engInc','engCheck','engReason','engProfit','engPc','engFloor','engCap','engNewProfit','noData','priceCheck','weeklyEng','t5Min','engAct','cat'].forEach(add);
@@ -1203,10 +1284,32 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
       return pa - pb || (a.sku < b.sku ? -1 : a.sku > b.sku ? 1 : 0);
     });
     var nAll = (input.aoa && input.aoa.length > 1) ? input.aoa.length - 1 : recs.length, nTab = { 2: 0, 3: 0, 4: 0, 5: 0, china: 0 };
-    recs.forEach(function (rec) { if (nTab[rec.tab] != null) nTab[rec.tab]++; if (rec.cat === 'raise' && rec.china) nTab.china++; });
-    function bound(n) { return '$A$3:$A$' + Math.max(4, 2 + (n || 0)); }
-    var LOOK = [bound(nAll), bound(nTab[2]), bound(nTab[3]), bound(nTab[4]), bound(nTab[5]), bound(recs.length), bound(nTab.china)];
+    recs.forEach(function (rec, idx) {
+      rec._calcRow = idx + 2;
+      if (nTab[rec.tab] != null) nTab[rec.tab]++;
+      if (rec.cat === 'raise' && rec.china) nTab.china++;
+    });
+    var byTab = { 2: [], 3: [], 4: [], 5: [], china: [] };
+    recs.forEach(function (rec) { if (byTab[rec.tab]) byTab[rec.tab].push(rec); if (rec.cat === 'raise' && rec.china) byTab.china.push(rec); });
+    /* Excel row of this SKU on each review tab (data starts at row 3). Baked in so _Calc points at one cell instead of MATCH across a whole column. */
+    var srcRow = [{}, {}, {}, {}, {}, {}, {}];
+    recs.forEach(function (rec) { srcRow[5][rec.sku] = rec._calcRow + 1; });
+    function fillRows(k, list) { list.forEach(function (rec, i) { srcRow[k][rec.sku] = i + 3; }); }
+    fillRows(1, byTab[2]); fillRows(2, byTab[3]); fillRows(3, byTab[4]); fillRows(4, byTab[5]); fillRows(6, byTab.china);
+    var hdAll = (input.aoa && input.aoa[0]) ? input.aoa[0].map(function (h) { return h == null ? '' : String(h); }) : ['sku', 'Variant description', 'Estimated cost', 'Weight', 'B&Q 30d', 'Main supplier name'];
+    var skuAtAll = hdAll.indexOf('sku'); if (skuAtAll < 0) skuAtAll = 0;
+    var t1src = (input.aoa && input.aoa.length > 1) ? input.aoa.slice(1) : recs.map(function (r) { return [r.sku, r.title, r.cost, r.w, r.sales, r.sup]; });
+    t1src.forEach(function (raw, i) {
+      var sku = raw[skuAtAll] == null ? '' : String(raw[skuAtAll]).trim();
+      if (sku && srcRow[0][sku] == null) srcRow[0][sku] = i + 3;
+    });
     function onSheet(rec, k) { return k === 0 || k === 5 || (k === 1 && rec.tab === 2) || (k === 2 && rec.tab === 3) || (k === 3 && rec.tab === 4) || (k === 4 && rec.tab === 5) || (k === 6 && rec.cat === 'raise' && rec.china); }
+    var runUKv = 0, runCNv = 0;
+    function typCache(o, cached) {
+      if (cached == null || cached === '') { o.t = 'str'; o.v = ''; }
+      else if (typeof cached === 'number' && isFinite(cached)) { o.t = 'n'; o.v = cached; }
+      else { o.t = 'str'; o.v = String(cached); }
+    }
     var calcRows = recs.map(function (rec, idx) {
       var r = idx + 2, row = new Array(names.length);
       function setV(i, v, z) { if (v == null || v === '') return; row[i] = { t: typeof v === 'number' ? 'n' : 's', v: v, z: z }; }
@@ -1223,15 +1326,12 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
       setV(33, rec.noData ? 1 : 0); setV(34, rec.priceCheck ? 1 : 0); setV(35, rec.weekly ? 1 : 0); setV(36, rec.t5Min, M); setV(37, rec.act || ''); setV(38, rec.cat || '');
       SRC.forEach(function (src, k) {
         if (!onSheet(rec, k)) return;
-        var m = C(mCols[k], r), rg = LOOK[k];
-        if (k === 5) {
-          var cr = r + 1;
-          function direct(col) { return 'IF(\'' + src[0] + '\'!A' + cr + '=A' + r + ',IF(LEN(TRIM(\'' + src[0] + '\'!' + col + cr + '&""))=0,"",\'' + src[0] + '\'!' + col + cr + '),' + pull('IFERROR(MATCH(A' + r + ',\'' + src[0] + '\'!' + rg + ',0),"")', src[0], col, rg) + ')'; }
-          setF(pCols[k], direct(src[1])); setF(rCols[k], direct(src[2])); setF(yCols[k], direct(src[3])); setF(iCols[k], normInc(direct(src[4])));
-        } else {
-          setF(mCols[k], 'IFERROR(MATCH(A' + r + ',\'' + src[0] + '\'!' + rg + ',0),"")');
-          setF(pCols[k], pull(m, src[0], src[1], rg)); setF(rCols[k], pull(m, src[0], src[2], rg)); setF(yCols[k], pull(m, src[0], src[3], rg)); setF(iCols[k], normInc(pull(m, src[0], src[4], rg)));
-        }
+        var sr = srcRow[k][rec.sku];
+        if (sr == null) return;
+        function directAt(col) { return 'IF(LEN(TRIM(\'' + src[0] + '\'!' + col + sr + '&""))=0,"",\'' + src[0] + '\'!' + col + sr + ')'; }
+        setF(pCols[k], directAt(src[1])); setF(rCols[k], directAt(src[2])); setF(yCols[k], directAt(src[3]));
+        setF(mCols[k], directAt(src[4])); /* raw Include text; normInc stays same-sheet so it can be a shared formula */
+        setF(iCols[k], normInc(C(mCols[k], r)));
       });
       setF(postN, countF(pCols, r)); setF(postBad, badNum(pCols, r, '>=0')); setF(postMin, minF(pCols, r)); setF(postMax, maxF(pCols, r));
       setF(postStat, statF(C(postBad, r), C(postN, r), C(postMax, r), C(postMin, r)));
@@ -1261,7 +1361,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
       setF(chinaMin, 'IF(OR(' + C(chinaI, r) + '<>1,' + C(fixed, r) + '=""),"",' + priceFor(r, '1.05') + ')', M);
       setH(stepAmt, 'MAX(0.01,ROUND(MAX(' + SB.step + ',IF(OR(' + C(bbI, r) + '="",NOT(ISNUMBER(' + C(bbI, r) + '))),0,' + C(bbI, r) + ')*' + SB.stepPct + '/100),2))');
       setH(need, 'IF(OR(' + C(bbI, r) + '="",NOT(ISNUMBER(' + C(bbI, r) + '))),"",ROUND(' + C(bbI, r) + '-' + C(stepAmt, r) + ',2))', M);
-      setH(tLow, 'IF(' + C(need, r) + '="","",IF(' + C(capP, r) + '="",' + C(need, r) + ',IF(' + C(need, r) + '>' + C(capP, r) + ',' + C(capP, r) + ',' + C(need, r) + ')))', M);
+      setH(tLow, 'IF(' + C(need, r) + '="","",IF(OR(' + C(capP, r) + '=""' + ',AND(' + C(chinaI, r) + '<>1,' + C(salesI, r) + '>=1,' + C(need, r) + '<' + C(priceU, r) + '-0.000000001),' + C(need, r) + '<=' + C(capP, r) + '),' + C(need, r) + ',' + C(capP, r) + '))', M);
       setH(eC, '""'); setH(eR, '""'); setH(eQ, '""'); setH(eV, '""');
       setH(bbSugg, 'IF(' + C(tLow, r) + '="","",' + C(tLow, r) + ')', M);
       setH(raiseT, 'IF(AND(ISNUMBER(' + C(rivalI, r) + '),' + C(rivalI, r) + '>' + C(priceU, r) + '),ROUND(' + C(rivalI, r) + '-' + C(stepAmt, r) + ',2),IF(AND(ISNUMBER(' + C(rivalI, r) + '),' + C(rivalI, r) + '<=' + C(priceU, r) + '),"",IF(AND(' + SB.xmas + '=1,' + C(seaI, r) + '=1),"",ROUNDDOWN(' + C(priceU, r) + '*(1+' + SB.raisePct + '),2))))', M);
@@ -1292,9 +1392,10 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
       setH(t3c, 'IF(' + C(t3m, r) + '="","",IF(' + C(capP, r) + '="",' + C(t3m, r) + ',IF(' + C(t3m, r) + '>' + C(capP, r) + ',' + C(capP, r) + ',' + C(t3m, r) + ')))', M);
       var t3ok = 'OR(' + okUK(C(t3c, r), C(t3fb, r)) + ',AND(' + C(chinaI, r) + '<>1,' + C(capP, r) + '<>"",' + C(priceU, r) + '>' + C(capP, r) + '+0.000000001,ABS(' + C(t3c, r) + '-' + C(capP, r) + ')<0.00001,' + okUK(C(t3c, r), C(floorP, r)) + '))';
       setH(t3s, 'IF(OR(' + C(priceU, r) + '="",' + C(t3c, r) + '=""),"",IF(AND(' + C(chinaI, r) + '<>1,' + C(t3c, r) + '>=' + C(priceU, r) + '),"",IF(ABS(' + C(priceU, r) + '-' + C(t3c, r) + ')<' + SB.minChange + ',"",IF(' + t3ok + ',' + C(t3c, r) + ',""))))', M);
-      var raisePx = 'IF(AND(' + C(chinaI, r) + '<>1,' + C(salesI, r) + '<1),' + priceFor(r, SB.zeroSalesRaise) + ',' + C(floorP, r) + ')';
+      var z50 = priceFor(r, SB.zeroSalesRaise);
+      var raisePx = 'IF(AND(' + C(chinaI, r) + '<>1,' + C(salesI, r) + '<1),IF(AND(' + SB.floorLift + '=1,' + C(floorP, r) + '<>"",' + z50 + '<' + C(floorP, r) + '-0.000000001),' + C(floorP, r) + ',' + z50 + '),' + C(floorP, r) + ')';
       var up9r = '(ROUND(' + raisePx + '*100,0)+MOD(9-MOD(ROUND(' + raisePx + '*100,0),10)+10,10))/100';
-      var raiseUp = 'IF(' + raisePx + '="","",IF(OR(' + up9r + '<=0,IF(' + C(capP, r) + '="",FALSE,' + up9r + '>' + C(capP, r) + ')),' + raisePx + ',' + up9r + '))';
+      var raiseUp = 'IF(' + raisePx + '="","",IF(AND(' + SB.floorLift + '=1,' + C(floorP, r) + '<>"",ABS(' + raisePx + '-' + C(floorP, r) + ')<0.000000001),' + raisePx + ',IF(OR(' + up9r + '<=0,IF(' + C(capP, r) + '="",FALSE,' + up9r + '>' + C(capP, r) + ')),' + raisePx + ',' + up9r + ')))';
       var raiseLine2 = 'IF(' + C(chinaI, r) + '=1,' + C(floorPct, r) + ',IF(' + C(salesI, r) + '>=1,' + C(floorPct, r) + ',' + SB.zeroSalesRaise + '))';
       setH(reSugg, 'IF(OR(' + C(act, r) + '="",' + C(act, r) + '="No data",' + C(act, r) + '="Price check"),"",IF(' + C(act, r) + '="Closer",' + C(closePx, r) + ',IF(' + C(act, r) + '="Lower",' + C(bbSugg, r) + ',IF(' + C(act, r) + '="Raise",IF(OR(' + C(pcNow, r) + '="",' + C(pcNow, r) + '<' + raiseLine2 + '),' + raiseUp + ',' + C(raiseC, r) + '),IF(' + C(act, r) + '="Can\'t win",' + C(t5s, r) + ',IF(AND(' + C(winI, r) + '=1,' + C(salesI, r) + '<1,' + C(treeI, r) + '<>1,OR(NOT(ISNUMBER(' + C(stockI, r) + ')),' + C(stockI, r) + '>0,' + SB.noStockKeep + '=0)),' + C(t3s, r) + ',""))))))', M);
       setF(showPost, 'IF(' + C(postU, r) + '="","",' + C(postU, r) + ')', M);
@@ -1324,6 +1425,64 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
       setF(runCN, (idx === 0 ? 'IF(' + qualCN + ',1,0)' : C(runCN, r - 1) + '+IF(' + qualCN + ',1,0)'));
       setF(upUK, 'IF(' + qualUK + ',' + C(runUK, r) + ',"")', IN);
       setF(upCN, 'IF(' + qualCN + ',' + C(runCN, r) + ',"")', IN);
+      /* Cached results so Excel can open without a full calculate. When no review
+         is typed, visible columns equal the engine snapshot already stored in eng* cells. */
+      var sav = saved[rec.sku] || null;
+      var hasPost = !!(sav && sav.post != null);
+      var hasPrice = !!(sav && sav.priceNow != null);
+      var hasYour = !!(sav && sav.your != null);
+      var hasInc = !!(sav && (sav.inc === 'Yes' || sav.inc === 'No'));
+      var oc = null;
+      if (hasPost || hasPrice || hasYour || hasInc) {
+        var edit = {};
+        if (hasPost) edit.post = sav.post;
+        if (hasPrice) edit.priceNow = sav.priceNow;
+        if (hasYour) edit.your = sav.your;
+        if (hasInc) edit.inc = sav.inc;
+        oc = outcome(P, rec, edit, S, Book && Book.classify);
+      }
+      var showCheckV = oc ? oc.check : rec.engCheck;
+      var showIncV = oc ? oc.inc : rec.engInc;
+      var showSuggV = oc && oc.sugg != null ? oc.sugg : rec.engSugg;
+      var showFinalV = oc && oc.final != null ? oc.final : rec.engSugg;
+      var showNewPV = oc && oc.newProfit != null ? oc.newProfit : rec.engNewProfit;
+      var showWhyV = oc && oc.reason ? oc.reason : rec.engReason;
+      var showPostV = oc && oc.post != null ? oc.post : rec.basePost;
+      var showPriceV = oc && oc.price != null ? oc.price : rec.basePrice;
+      var showProfitV = oc && oc.profitNow != null ? oc.profitNow : rec.engProfit;
+      var showFloorV = oc && oc.floor != null ? oc.floor : rec.engFloor;
+      var showPcV = rec.engPc;
+      if (oc && oc.profitNow != null && rec.cost > 0 && (hasPost || hasPrice)) showPcV = oc.profitNow / rec.cost;
+      var qUK = showIncV === 'Yes' && showCheckV === 'OK' && rec.uk === 'UK';
+      var qCN = showIncV === 'Yes' && showCheckV === 'OK' && rec.uk === 'China';
+      runUKv += qUK ? 1 : 0;
+      runCNv += qCN ? 1 : 0;
+      var idleRow = !hasPost && !hasPrice;
+      var ckv = {
+        postN: hasPost ? 1 : 0, postBad: 0, postMin: hasPost ? sav.post : 1e99, postMax: hasPost ? sav.post : -1,
+        postStat: hasPost ? 'OK' : 'BASE', postU: hasPost ? sav.post : rec.basePost,
+        priceN: hasPrice ? 1 : 0, priceBad: 0, priceMin: hasPrice ? sav.priceNow : 1e99, priceMax: hasPrice ? sav.priceNow : -1,
+        priceStat: hasPrice ? 'OK' : 'BASE', priceU: hasPrice ? sav.priceNow : rec.basePrice,
+        yourN: hasYour ? 1 : 0, yourBad: 0, yourMin: hasYour ? sav.your : 1e99, yourMax: hasYour ? sav.your : -1,
+        yourStat: hasYour ? 'OK' : 'BASE', yourU: hasYour ? sav.your : '',
+        incN: hasInc ? 1 : 0, incBad: 0, incFirst: hasInc ? sav.inc : '', incStat: hasInc ? 'OK' : 'BASE', incVal: hasInc ? sav.inc : '',
+        fixed: (function () { var post = hasPost ? sav.post : rec.basePost; if (post == null || !(rec.cost > 0)) return ''; return rec.cost * rec.mult + post + (rec.collab || 0); })(),
+        profitNow: showProfitV, pcNow: showPcV, floorPct: rec.floorPct, floorP: showFloorV, capP: rec.engCap, t5MinP: rec.t5Min,
+        showPost: showPostV, showPrice: showPriceV, showProfit: showProfitV, showPc: showPcV, showFloor: showFloorV,
+        showSugg: showSuggV, showFinal: showFinalV, showNewP: showNewPV, showCheck: showCheckV, showInc: showIncV,
+        showWhy: showWhyV, showCap: rec.engCap, showNewPc: (showNewPV != null && rec.cost > 0) ? showNewPV / rec.cost : '',
+        runUK: runUKv, runCN: runCNv, upUK: qUK ? runUKv : '', upCN: qCN ? runCNv : ''
+      };
+      if (idleRow) {
+        ['stepAmt','need','tLow','eC','eR','eQ','eV','bbSugg','raiseT','raiseC','gain','closePx','act','weekly','t5ukR','t5ukC','t5cnR','t5s','t3q','t3fb','t3m','t3c','t3s','reSugg'].forEach(function (nm) { ckv[nm] = ''; });
+      }
+      var ci;
+      for (ci = 0; ci < names.length; ci++) {
+        if (!row[ci] || !row[ci].f) continue;
+        if (!idleRow && ckv[names[ci]] === undefined) continue; /* leave heavy engine cells uncached when a postage/price review is baked in */
+        typCache(row[ci], ckv[names[ci]] === undefined ? '' : ckv[names[ci]]);
+      }
+      rec._cache = { showCheck: showCheckV, showInc: showIncV, showSugg: showSuggV, showFinal: showFinalV, showNewP: showNewPV, showWhy: showWhyV, showPost: showPostV, showPrice: showPriceV, showProfit: showProfitV, showFloor: showFloorV, showPc: showPcV, showCap: rec.engCap, showNewPc: ckv.showNewPc, upUK: ckv.upUK, upCN: ckv.upCN };
       return row;
     });
     var calcHead = names.map(function (n) { return [n, null, 14, 'hide']; });
@@ -1331,11 +1490,13 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
 
     function v(val, z) { if (val == null || val === '') return null; return { t: typeof val === 'number' ? 'n' : 's', v: val, z: z }; }
     var calcLast = Math.max(4, recs.length + 1);
-    function fml(col, rr, z, aligned) {
-      if (!aligned) return { t: 'n', f: 'IFERROR(INDEX(\'' + CALC + '\'!$' + ref(col) + '$2:$' + ref(col) + '$' + calcLast + ',MATCH(A' + rr + ',\'' + CALC + '\'!$A$2:$A$' + calcLast + ',0)),"")', z: z };
-      var cr = rr - 1;
-      return { t: 'n', f: 'IF(\'' + CALC + '\'!A' + cr + '=A' + rr + ',\'' + CALC + '\'!' + ref(col) + cr + ',IFERROR(INDEX(\'' + CALC + '\'!$' + ref(col) + '$2:$' + ref(col) + '$' + calcLast + ',MATCH(A' + rr + ',\'' + CALC + '\'!$A$2:$A$' + calcLast + ',0)),""))', z: z };
+    function fml(col, rr, z, calcRow, cached) {
+      var cr = calcRow || (rr - 1);
+      var o = { f: 'IF(\'' + CALC + '\'!A' + cr + '=A' + rr + ',\'' + CALC + '\'!' + ref(col) + cr + ',"")', z: z };
+      typCache(o, cached);
+      return o;
     }
+    function cv(rec, key) { return rec._cache ? rec._cache[key] : undefined; }
     function inputCell(rec, field, z) {
       var c = saved[rec.sku]; if (!c) return null;
       if (field === 'post' && c.post != null) return { t: 'n', v: c.post, z: z || M };
@@ -1343,6 +1504,118 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
       if (field === 'your' && c.your != null) return { t: 'n', v: c.your, z: M };
       if (field === 'inc' && (c.inc === 'Yes' || c.inc === 'No')) return { t: 's', v: c.inc, z: YESF };
       return null;
+    }
+    function firstFilledF(refs, empty) {
+      var f = empty || '""';
+      for (var i = refs.length - 1; i >= 0; i--) f = 'IF(' + refs[i] + '<>"",' + refs[i] + ',' + f + ')';
+      return f;
+    }
+    function numConflictF(refs) {
+      if (refs.length < 2) return 'FALSE';
+      var n = '(' + refs.map(function (c) { return 'IF(' + c + '="","",1)'; }).join('+') + ')';
+      var mn = 'MIN(' + refs.map(function (c) { return 'IF(OR(' + c + '="",NOT(ISNUMBER(' + c + '))),1E99,' + c + ')'; }).join(',') + ')';
+      var mx = 'MAX(' + refs.map(function (c) { return 'IF(OR(' + c + '="",NOT(ISNUMBER(' + c + '))),-1E99,' + c + ')'; }).join(',') + ')';
+      return 'AND(' + n + '>=2,ABS(' + mx + '-' + mn + ')>=0.001)';
+    }
+    function incNormF(cell) {
+      return 'IF(' + cell + '="","",IF(OR(UPPER(TRIM(' + cell + '&""))="YES",UPPER(TRIM(' + cell + '&""))="Y"),"Yes",IF(OR(UPPER(TRIM(' + cell + '&""))="NO",UPPER(TRIM(' + cell + '&""))="N"),"No","BAD")))';
+    }
+    function incMergeF(refs) {
+      if (!refs.length) return '""';
+      var norms = refs.map(incNormF);
+      var first = firstFilledF(norms, '""');
+      if (refs.length < 2) return first;
+      var n = '(' + norms.map(function (c) { return 'IF(' + c + '="","",1)'; }).join('+') + ')';
+      var bad = '(' + norms.map(function (c) { return 'IF(' + c + '="BAD",1,0)'; }).join('+') + ')';
+      var differ = '(' + norms.map(function (c) { return 'IF(OR(' + c + '="",' + c + '=' + first + '),0,1)'; }).join('+') + ')';
+      return 'IF(OR(' + bad + '>0,AND(' + n + '>=2,' + differ + '>0)),"CONFLICT",' + first + ')';
+    }
+    function numMergeF(refs) {
+      if (!refs.length) return '""';
+      var first = firstFilledF(refs, '""');
+      if (refs.length < 2) return first;
+      return 'IF(' + numConflictF(refs) + ',"CONFLICT",' + first + ')';
+    }
+    function reviewRefs(rec, name, rr) {
+      var post = [], price = [], your = [], inc = [];
+      for (var k = 0; k < 7; k++) {
+        if (!onSheet(rec, k)) continue;
+        var row = srcRow[k][rec.sku];
+        if (row == null) continue;
+        var sh = SRC[k][0];
+        function cell(col) { return (sh === name && row === rr) ? (col + rr) : ("'" + sh + "'!" + col + row); }
+        post.push(cell(SRC[k][1]));
+        price.push(cell(SRC[k][2]));
+        your.push(cell(SRC[k][3]));
+        inc.push(cell(SRC[k][4]));
+      }
+      return { post: post, price: price, your: your, inc: inc };
+    }
+    function calcDirect(col, rec, rr, z, cached) {
+      return fml(col, rr, z, rec._calcRow, cached);
+    }
+    function toneOf(pc, used, floor, cap) {
+      if (pc != null && typeof pc === 'number' && isFinite(pc) && pc < 0) return 'neg';
+      if (used != null && floor != null && used < floor - 1e-5) return 'under';
+      if (used != null && cap != null && used > cap + 1e-5) return 'blue';
+      return null;
+    }
+    function liteIf(idleF, bakedRef, heavyRef, cached, z) {
+      var o = { f: 'IF(' + idleF + ',' + bakedRef + ',' + heavyRef + ')', z: z };
+      typCache(o, cached);
+      return o;
+    }
+    function liteRow(name, rec, rr, opts) {
+      opts = opts || {};
+      var refs = reviewRefs(rec, name, rr);
+      var c = rec._cache || {};
+      var mp = { f: firstFilledF(refs.post, '""') }; typCache(mp, '');
+      var mq = { f: firstFilledF(refs.price, '""') }; typCache(mq, '');
+      var my = { f: firstFilledF(refs.your, '""') }; typCache(my, '');
+      var mi = { f: firstFilledF(refs.inc, '""') }; typCache(mi, '');
+      var AB = 'AB' + rr, AC = 'AC' + rr, AD = 'AD' + rr, AE = 'AE' + rr;
+      var AF = 'AF' + rr, AG = 'AG' + rr, AH = 'AH' + rr, AI = 'AI' + rr, AJ = 'AJ' + rr, AK = 'AK' + rr, AL = 'AL' + rr, AM = 'AM' + rr, AN = 'AN' + rr, AO = 'AO' + rr, AP = 'AP' + rr, AQ = 'AQ' + rr;
+      var AX = 'AX' + rr, AY = 'AY' + rr, AZ = 'AZ' + rr, BA = 'BA' + rr, BB = 'BB' + rr, BC = 'BC' + rr, BD = 'BD' + rr, BE = 'BE' + rr, BF = 'BF' + rr, BG = 'BG' + rr, BH = 'BH' + rr, BI = 'BI' + rr;
+      var idleAll = 'AND(' + AB + '="",' + AC + '="",' + AD + '="",' + AE + '="")';
+      var idlePP = 'AND(' + AB + '="",' + AC + '="")';
+      function sh(f, baked, z) { var o = { f: f, z: z }; typCache(o, baked); return o; }
+      var checkC = sh('IF(' + idleAll + ',' + AF + ',' + AX + ')', c.showCheck, null);
+      var sellC = sh('IF(' + AC + '="",' + AI + ',' + BA + ')', c.showPrice, M);
+      var floorC = sh('IF(' + idlePP + ',' + AJ + ',' + BB + ')', c.showFloor, M);
+      var suggC = sh('IF(' + idlePP + ',' + AL + ',' + BC + ')', c.showSugg, M);
+      var pcC = sh('IF(' + idlePP + ',' + AM + ',' + BD + ')', c.showPc, PC);
+      var newPcC = sh('IF(OR(V' + rr + '="",D' + rr + '="",D' + rr + '<=0),"",V' + rr + '/D' + rr + ')', c.showNewPc, PC);
+      var postC = sh('IF(' + AB + '="",' + AH + ',' + AZ + ')', c.showPost, M);
+      var finalC = sh('IF(' + idleAll + ',' + AG + ',' + AY + ')', c.showFinal, M);
+      var whyC = sh('IF(' + idleAll + ',' + AP + ',' + BG + ')', c.showWhy, null);
+      var profC = sh('IF(' + idlePP + ',' + AN + ',' + BE + ')', c.showProfit, M);
+      var newPC = sh('IF(' + idleAll + ',' + AO + ',' + BF + ')', c.showNewP, M);
+      var incC = sh('IF(' + idleAll + ',' + AQ + ',' + BH + ')', c.showInc, null);
+      var capC = sh('IF(' + idlePP + ',' + AK + ',' + BI + ')', c.showCap, M);
+      var tI = toneOf(c.showPc, c.showPrice, c.showFloor, rec.engCap);
+      var tK = toneOf(c.showNewPc, c.showFinal, c.showFloor, rec.engCap);
+      if (tI) pcC.st = tI;
+      if (tK) newPcC.st = tK;
+      function val(x, z) { if (x == null || x === '') return { t: 'str', v: '' }; if (typeof x === 'number' && isFinite(x)) return { t: 'n', v: x, z: z }; return { t: 'str', v: String(x), z: z }; }
+      var floorRef = (rec.cat === 't5' && !rec.china && rec.t5Min != null) ? rec.t5Min : (c.showFloor != null ? c.showFloor : rec.engFloor);
+      var helpers = [
+        mp, mq, my, mi,
+        val(c.showCheck), val(c.showFinal, M), val(c.showPost, M), val(c.showPrice, M), val(c.showFloor, M), val(c.showCap, M), val(c.showSugg, M), val(c.showPc, PC), val(c.showProfit, M), val(c.showNewP, M), val(c.showWhy), val(c.showInc), val(c.showNewPc, PC),
+        val(rec.weekly ? 1 : 0), val(rec.packCheck ? 1 : 0), val(floorRef, M), val(rec.mult), val(rec.collab || 0, M),
+        calcDirect(showCheck, rec, rr, null, c.showCheck), calcDirect(showFinal, rec, rr, M, c.showFinal), calcDirect(showPost, rec, rr, M, c.showPost), calcDirect(showPrice, rec, rr, M, c.showPrice), calcDirect(showFloor, rec, rr, M, c.showFloor), calcDirect(showSugg, rec, rr, M, c.showSugg), calcDirect(showPc, rec, rr, PC, c.showPc), calcDirect(showProfit, rec, rr, M, c.showProfit), calcDirect(showNewP, rec, rr, M, c.showNewP), calcDirect(showWhy, rec, rr, null, c.showWhy), calcDirect(showInc, rec, rr, null, c.showInc), calcDirect(showCap, rec, rr, M, c.showCap), calcDirect(showNewPc, rec, rr, PC, c.showNewPc)
+      ];
+      return [
+        v(rec.sku), v(rec.title), checkC, v(rec.cost, M), v(rec.uk),
+        sellC, floorC, suggC, pcC,
+        opts.readonly ? null : inputCell(rec, 'your', M),
+        newPcC, v(rec.seller), v(rec.bb, M), postC,
+        opts.readonly ? null : inputCell(rec, 'post', M),
+        opts.readonly ? null : inputCell(rec, 'inc'),
+        finalC, whyC, v(rec.sales, IN),
+        opts.readonly ? null : inputCell(rec, 'priceNow', M),
+        profC, newPC, incC,
+        v(c.upUK, IN), v(c.upCN, IN), v(rec.stock, IN), capC
+      ].concat(helpers);
     }
     var VIS = [
       ['B&Q SKU', null, 18], ['Product', null, 36], ['Check', null, 16], ['Estimated cost', M, 14], ['UK/China', null, 12],
@@ -1371,37 +1644,23 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
     }
     function revSheet(name, list, top, opts) {
       opts = opts || {};
-      var aligned = name === T6;
       var rows = list.map(function (rec, i) {
-        var rr = i + 3;
-        return [
-          v(rec.sku), v(rec.title), fml(showCheck, rr, null, aligned), v(rec.cost, M), v(rec.uk),
-          fml(showPrice, rr, M, aligned), fml(showFloor, rr, M, aligned), fml(showSugg, rr, M, aligned), fml(showPc, rr, PC, aligned),
-          opts.readonly ? null : inputCell(rec, 'your', M),
-          fml(showNewPc, rr, PC, aligned), v(rec.seller), v(rec.bb, M), fml(showPost, rr, M, aligned),
-          opts.readonly ? null : inputCell(rec, 'post', M),
-          opts.readonly ? null : inputCell(rec, 'inc'),
-          fml(showFinal, rr, M, aligned), fml(showWhy, rr, null, aligned), v(rec.sales, IN),
-          opts.readonly ? null : inputCell(rec, 'priceNow', M),
-          fml(showProfit, rr, M, aligned), fml(showNewP, rr, M, aligned), fml(showInc, rr, null, aligned),
-          fml(upUK, rr, IN, aligned), fml(upCN, rr, IN, aligned), v(rec.stock, IN), fml(showCap, rr, M, aligned)
-        ];
+        return liteRow(name, rec, i + 3, opts);
       });
       var cols = VIS.map(function (c) { return c.slice(); }).concat(GRP.map(function (c) { return [c[0], c[1], c[2], 'group']; }));
+      var HIDE = ['mPost','mPrice','mYour','mInc','bCheck','bFinal','bPost','bPrice','bFloor','bCap','bSugg','bPc','bProfit','bNewP','bWhy','bInc','bNewPc','weekly','pack','floorRef','mult','collab','cCheck','cFinal','cPost','cPrice','cFloor','cSugg','cPc','cProfit','cNewP','cWhy','cInc','cCap','cNewPc'];
+      HIDE.forEach(function (h) { cols.push([h, null, 8, 'hide']); });
       var last = Math.max(3, 2 + rows.length);
-      var out = { name: name, top: (top || REVNOTE) + '  ' + CF_KEY, cols: cols, rows: rows, freeze: { x: 1, y: 2 }, filter: true, cf: profitCf(last), notes: { 'Postage review': 'Type a postage, or 0. Leave blank to keep Postage used.', 'Selling price review': 'Corrects the current selling price. The suggestion is recalculated. This is not Your price.', 'Your price': 'Optional final price. Safety rules still apply. Leave blank to use the suggestion.', 'Include override': 'Yes or No. Blank keeps the automatic decision. Yes cannot bypass a floor, a raise over the cap, a China raise, a weekly hold or postage that is still unchecked.' } };
+      var out = { name: name, top: (top || REVNOTE) + '  ' + CF_KEY, cols: cols, rows: rows, freeze: { x: 1, y: 2 }, filter: true, filterTo: 26, cf: profitCf(last), notes: { 'Postage review': 'Type a postage, or 0. Leave blank to keep Postage used.', 'Selling price review': 'Corrects the current selling price. The suggestion is recalculated. This is not Your price.', 'Your price': 'Optional final price. Safety rules still apply. Leave blank to use the suggestion.', 'Include override': 'Yes or No. Blank keeps the automatic decision. Yes cannot bypass a floor, a raise over the cap, a China raise, a weekly hold or postage that is still unchecked.' } };
       if (!opts.readonly) out.inputs = [14, 19, 9, 15];
       return out;
     }
-    var byTab = { 2: [], 3: [], 4: [], 5: [], china: [] };
-    recs.forEach(function (rec) { if (byTab[rec.tab]) byTab[rec.tab].push(rec); if (rec.cat === 'raise' && rec.china) byTab.china.push(rec); });
     var loseCheap = recs.filter(function (r) { return !r.win && r.bb > 0 && r.basePrice != null && r.basePrice < r.bb - 1e-9 && !r.noData; });
     var cantWin = recs.filter(function (r) { return r.act === "Can't win (floor)"; });
-    var Book = (typeof BQBook !== 'undefined') ? BQBook : require('./bq_book.js');
     var inactivePack = Book.inactiveFix ? Book.inactiveFix(P, input.aoa || [], input.offers || (input.settings && input.settings.offers) || {}, S) : { rows: [] };
     var list = [];
     /* Calculation sheets first so a full pass resolves each SKU once, then the visible tabs read those results. Hidden, so the workbook still opens on Rules. */
-    list.push({ name: SET, hide: true, cols: [['Setting', null, 20], ['Value', null, 16]], rows: setRows.map(function (r) { return [v(r[0]), r[1] === '' || r[1] == null ? null : { t: 'n', v: r[1] }]; }), freeze: { x: 0, y: 1 }, filter: false });
+    list.push({ name: SET, hide: true, cols: [['Setting', null, 20], ['Value', null, 16]], rows: setRows.map(function (r) { return [v(r[0]), r[1] === '' || r[1] == null ? null : { t: 'n', v: r[1] }]; }), freeze: { x: 0, y: 1 }, filter: false, defNames: setNames });
     list.push({ name: CALC, hide: true, cols: calcHead, rows: calcRows, freeze: { x: 1, y: 1 }, filter: false });
     list.push(Book.rulesSheet({ settings: S, recs: recs, asOf: S.asOf || input.asOf || '' }));
     list.push(revSheet(T6, recs, 'Every product, sorted by projected profit % (losses first). Filter Check to OK to see upload rows. A suggestion that appears after you type a review shows up here and on Final without retyping. Yellow cells are inputs; other columns are in the collapsed group on the right (click +).'));
@@ -1478,6 +1737,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
       var t1In = 40;
       while (cols.length < t1In) cols.push([' ', null, 3, 'hide']);
       cols[t1In] = ['Postage review', M, 16]; cols[t1In + 1] = ['Selling price review', M, 18]; cols[t1In + 2] = ['Your price', M, 12]; cols[t1In + 3] = ['Include override', null, 16];
+      ['mPost','mPrice','mYour','mInc','bPost','bPrice','bProfit','bPc','bFloor','bSugg','bCheck','bWhy','cPost','cPrice','cProfit','cPc','cFloor','cSugg','cCheck','cWhy'].forEach(function (h) { cols.push([h, null, 8, 'hide']); });
       SRC[0][1] = L(t1In); SRC[0][2] = L(t1In + 1); SRC[0][3] = L(t1In + 2); SRC[0][4] = L(t1In + 3);
       var body = [];
       var source = (aoa && aoa.length > 1) ? aoa.slice(1) : recs.map(function (r) { return [r.sku, r.title, r.cost, r.w, r.sales, r.sup]; });
@@ -1491,23 +1751,53 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
         var line = hd.map(function (_, j) { return v(raw[j]); });
         while (line.length < cols.length) line.push(null);
         if (rec && !dup) {
-          line[hd.length] = fml(showPost, rr, M); line[hd.length + 1] = fml(showPrice, rr, M); line[hd.length + 2] = fml(showProfit, rr, M); line[hd.length + 3] = fml(showPc, rr, PC); line[hd.length + 4] = fml(showFloor, rr, M); line[hd.length + 5] = fml(showSugg, rr, M); line[hd.length + 6] = fml(showCheck, rr); line[hd.length + 7] = fml(showWhy, rr);
+          var c1 = rec._cache || {};
+          var refs1 = reviewRefs(rec, T1, rr);
+          var t1Idle = 'AND(AS' + rr + '="",AT' + rr + '="",AU' + rr + '="",AV' + rr + '="")';
+          function t1v(x, z) { if (x == null || x === '') return { t: 'str', v: '' }; if (typeof x === 'number' && isFinite(x)) return { t: 'n', v: x, z: z }; return { t: 'str', v: String(x), z: z }; }
+          var m1p = { f: firstFilledF(refs1.post, '""') }; typCache(m1p, '');
+          var m1q = { f: firstFilledF(refs1.price, '""') }; typCache(m1q, '');
+          var m1y = { f: firstFilledF(refs1.your, '""') }; typCache(m1y, '');
+          var m1i = { f: firstFilledF(refs1.inc, '""') }; typCache(m1i, '');
+          line[hd.length] = liteIf(t1Idle, 'AW' + rr, 'BE' + rr, c1.showPost, M);
+          line[hd.length + 1] = liteIf(t1Idle, 'AX' + rr, 'BF' + rr, c1.showPrice, M);
+          line[hd.length + 2] = liteIf(t1Idle, 'AY' + rr, 'BG' + rr, c1.showProfit, M);
+          line[hd.length + 3] = liteIf(t1Idle, 'AZ' + rr, 'BH' + rr, c1.showPc, PC);
+          line[hd.length + 4] = liteIf(t1Idle, 'BA' + rr, 'BI' + rr, c1.showFloor, M);
+          line[hd.length + 5] = liteIf(t1Idle, 'BB' + rr, 'BJ' + rr, c1.showSugg, M);
+          line[hd.length + 6] = liteIf(t1Idle, 'BC' + rr, 'BK' + rr, c1.showCheck, null);
+          line[hd.length + 7] = liteIf(t1Idle, 'BD' + rr, 'BL' + rr, c1.showWhy, null);
           line[t1In] = inputCell(rec, 'post', M); line[t1In + 1] = inputCell(rec, 'priceNow', M); line[t1In + 2] = inputCell(rec, 'your', M); line[t1In + 3] = inputCell(rec, 'inc');
+          line[t1In + 4] = m1p; line[t1In + 5] = m1q; line[t1In + 6] = m1y; line[t1In + 7] = m1i;
+          line[t1In + 8] = t1v(c1.showPost, M); line[t1In + 9] = t1v(c1.showPrice, M); line[t1In + 10] = t1v(c1.showProfit, M); line[t1In + 11] = t1v(c1.showPc, PC);
+          line[t1In + 12] = t1v(c1.showFloor, M); line[t1In + 13] = t1v(c1.showSugg, M); line[t1In + 14] = t1v(c1.showCheck); line[t1In + 15] = t1v(c1.showWhy);
+          line[t1In + 16] = calcDirect(showPost, rec, rr, M, c1.showPost); line[t1In + 17] = calcDirect(showPrice, rec, rr, M, c1.showPrice);
+          line[t1In + 18] = calcDirect(showProfit, rec, rr, M, c1.showProfit); line[t1In + 19] = calcDirect(showPc, rec, rr, PC, c1.showPc);
+          line[t1In + 20] = calcDirect(showFloor, rec, rr, M, c1.showFloor); line[t1In + 21] = calcDirect(showSugg, rec, rr, M, c1.showSugg);
+          line[t1In + 22] = calcDirect(showCheck, rec, rr, null, c1.showCheck); line[t1In + 23] = calcDirect(showWhy, rec, rr, null, c1.showWhy);
         } else if (dup) line[hd.length + 7] = v('Duplicate SKU — type on the first row of this SKU');
         body.push(line);
       });
       /* formulas on _Calc were built with AO before we might have moved t1In. If t1In isn't 40, rebuild is too late.
          Caller must keep access width under 40. We force inputs at 40 and hide gap columns. If hd is long, MATCH still uses column A only if sku is column A.
          Rebuild gather letters: if t1In!==40 the _Calc formulas already say AO. So we MUST place inputs at column 40 (AO). */
-      return { name: T1, top: 'All products. Yellow Postage review, Selling price review, Your price and Include override are at columns AO–AR. Other columns are the Access paste or formulas. Duplicate SKUs: edit the first row only.', cols: cols, rows: body, freeze: { x: 1, y: 2 }, filter: true, inputs: [40, 41, 42, 43] };
+      return { name: T1, top: 'All products. Yellow Postage review, Selling price review, Your price and Include override are at columns AO–AR. Other columns are the Access paste or formulas. Duplicate SKUs: edit the first row only.', cols: cols, rows: body, freeze: { x: 1, y: 2 }, filter: true, filterTo: 43, inputs: [40, 41, 42, 43] };
     }
     function finalSheet(name, upCol, finCol, n, note) {
       var rows = [], N = Math.max(n, 1);
       var skuRg = "'" + CALC + "'!$A$2:$A$" + calcLast;
       var upRg = "'" + CALC + "'!$" + ref(upCol) + "$2:$" + ref(upCol) + "$" + calcLast;
       var finRg = "'" + CALC + "'!$" + ref(finCol) + "$2:$" + ref(finCol) + "$" + calcLast;
+      var listed = recs.filter(function (r) {
+        var inc = r._cache ? r._cache.showInc : r.engInc, chk = r._cache ? r._cache.showCheck : r.engCheck;
+        return inc === 'Yes' && chk === 'OK' && (name === T7A ? r.uk === 'UK' : r.uk === 'China');
+      });
       for (var i = 0; i < N; i++) {
-        rows.push([{ t: 's', f: 'IFERROR(INDEX(' + skuRg + ',MATCH(ROW()-2,' + upRg + ',0)),"")' }, { t: 'n', f: 'IFERROR(INDEX(' + finRg + ',MATCH(ROW()-2,' + upRg + ',0)),"")', z: '0.00' }]);
+        var recU = listed[i], fsku = 'IFERROR(INDEX(' + skuRg + ',MATCH(ROW()-2,' + upRg + ',0)),"")', fprc = 'IFERROR(INDEX(' + finRg + ',MATCH(ROW()-2,' + upRg + ',0)),"")';
+        var skuCell = { f: fsku }, prcCell = { f: fprc, z: '0.00' };
+        typCache(skuCell, recU ? recU.sku : '');
+        typCache(prcCell, recU && recU._cache && recU._cache.showFinal != null ? recU._cache.showFinal : (recU && recU.engSugg != null ? recU.engSugg : ''));
+        rows.push([skuCell, prcCell]);
       }
       var T = (input.template && input.template.Data) || [['Offer SKU', 'Offer price', 'Discount price', 'Discount start date', 'Discount end date'], ['offer-sku', 'price', 'discount-price', 'discount-start-date', 'discount-end-date']];
       return { name: name, cols: [[T[0][0], null, 24], [T[0][1], null, 14], [T[0][2], null, 16], [T[0][3], null, 22], [T[0][4], null, 22]], head2: T[1], rows: rows, freeze: { x: 0, y: 2 }, filter: false, notes: { 0: note } };
@@ -1549,9 +1839,11 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
     var i = Z.FullPaths.findIndex(function (q) { return q.slice(-'xl/workbook.xml'.length) === 'xl/workbook.xml'; });
     if (i < 0) return bytes;
     var s = txt(Z.FileIndex[i].content);
-    if (/<calcPr[\s>]/.test(s)) s = s.replace(/<calcPr\b[^>]*\/?>/, '<calcPr calcMode="auto" fullCalcOnLoad="1" forceFullCalc="1"/>');
-    else s = s.replace('</workbook>', '<calcPr calcMode="auto" fullCalcOnLoad="1" forceFullCalc="1"/></workbook>');
-    /* Hidden sheets still calculate in Excel. Gnumeric's test recalc also calculates them. */
+    var calcTag = '<calcPr calcMode="auto" calcCompleted="1" fullCalcOnLoad="0" forceFullCalc="0" iterate="0" iterateCount="0"/>';
+    if (/<calcPr[\s>]/.test(s)) s = s.replace(/<calcPr\b[^>]*\/?>/, calcTag);
+    else s = s.replace('</workbook>', calcTag + '</workbook>');
+    /* Cached values are written for every formula. Excel should open on those values and only recalc dirty cells after an edit.
+       Hidden sheets still calculate when a dependent cell changes. Gnumeric/LibreOffice test recalc still recalculates them. */
     Z.FileIndex[i].content = bin(s);
     return new Uint8Array(X.CFB.write(Z, { fileType: 'zip', type: 'array', compression: true }));
   }
@@ -1808,13 +2100,14 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
   /* Plain-English reminder, one short line per rule, matching bq_price.js + this file. Do not invent extra rules here. */
   var RULES_LINES = [
     'Profit is the selling price minus B&Q’s 15% fee, the product cost, a company cost (the full cost for China products, half the cost for UK products), postage, and any collab fee.',
-    'Postage is chosen in this order: the postage you type, then the special list (for example an 8ft Christmas tree is £3.30 and a 10ft tree is £4.30), then DPD rates for descriptions ending H123, H063 or H077 (not CH077) over 15.2 kg (£14 up to 20 kg, £15 up to 25 kg, £17 up to 30 kg), then the Access postage, then weight bands of £1.75 / £2.30 / £8 / £9 / £10.50 / £15. A multi-pack is one parcel.',
+    'Postage is chosen in this order: the postage you type, then the special list (for example an 8ft Christmas tree is £3.30 and a 10ft tree is £4.30), then DPD rates for descriptions ending H123, H063 or H077 (not CH077) over 15.2 kg (£14 up to 20 kg, £15 up to 25 kg, £17 up to 30 kg), then the Access postage, then weight bands of £1.90 / £2.45 / £8 / £9 / £10.50 / £15. A multi-pack is one parcel.',
+    'If Access postage equals an old band rate (£1.75 or £2.30, within 0.5p), we use the new rate instead (£1.90 or £2.45). The reason shows “Access postage £1.75 at the new rate £1.90”. Other Access amounts (for example £3.30, £8 or £14) stay as they are. You can change this mapping in Settings.',
     'A row is marked CHECK POSTAGE only if it is a multi-pack of 14,999 g or more, or a multi-pack with no weight. You must type the postage (0 is allowed) before it can go on the upload. Single items are not flagged this way.',
     'The lowest allowed price (the floor) is: China products 100% profit on cost; UK products that sold in the last 30 days 50%; UK products with no sales: 80% if cost is under £1, 70% if cost is under £5, 60% if cost is under £10, and 50% if cost is £10 or more.',
     'The 80% profit cap only blocks a raise above the cap. A cut from a price already over the cap is allowed if it stays at or above the floor and is not a loss.',
-    'To win the buy box we go 1p under the rival, but only if that price is still above our floor (and not over the 80% cap).',
+    'To win the buy box we go 1p under the rival, but only if that price is still above our floor. For UK products with sales, a cut to 1p under is allowed even if it is still above the 80% cap. A raise still cannot go over the cap. UK products with 0 sales still stop at the cap.',
     'If we are already cheaper than the buy box but still losing, and the product has sold on B&Q in the last 30 days, we may raise the price to 10–15p under the buy box, ending in 9. With no sales the price stays.',
-    'If we already win the buy box but have no B&Q sales, we raise the price only when profit is under 50%, and only up to the 50% price.',
+    'If we already win the buy box but have no B&Q sales, we raise the price only when profit is under 50%, and only up to the 50% price. If that 50% price would sit under the floor, we raise to the floor price instead (rounded up to the penny), never over the 80% cap, and never a loss. A UK suggestion is never shown under its own floor. You can turn this floor lift off in Settings (floorLift). The floors themselves stay the same.',
     'If we cannot win the buy box above the floor, there is an optional 5% cut (UK never below 65% profit on cost, and not if the price changed in the last 3 days; exactly 3 days is allowed). This does not win the buy box.',
     'The workbook never raises a China price onto the upload – you set those yourself. China cuts can still go on tab 7b. Tab 9 lists China products with no B&Q sales, for you to review the listing.',
     'When a price is raised, it is rounded to end in 9 if that still stays above the floor and under the cap. A cut stays on the exact penny.',
@@ -1825,7 +2118,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
     '6 Combined upload: the only tab to work in on a normal day. Filter Check to CHECK POSTAGE and type the postage. You can also type Your price or Include override here. Sorted with losses first.',
     '7a Final upload UK: the UK prices to copy into your B&Q CSV. Do not type on this tab.',
     '7b Final upload China: China cuts only, never raises. Copy into your B&Q CSV if there is a row. Do not type on this tab.',
-    '4 Can win buy box: we can go 1p under the winner and still stay above the floor.',
+    '4 Can win buy box: we go 1p under the winner if that stays above the floor. UK with sales: a cut may stay above the 80% cap. 0-sales UK still stops at the cap.',
     '3 Winning 0 sales: we hold the buy box but sold 0 on B&Q – there may be a small cut toward the floor to help it sell. UK only: if the price is already over the 80% cap, we drop to the cap price (never below the floor), even when that is below the floor + 5% buffer.',
     '2 Winning in range: we hold the buy box and profit is between the floor and the cap – nothing to do.',
     'Losing although cheaper: we are cheaper than the buy box but still losing. Review only. If it sold on B&Q, there may be a 10–15p raise ending in 9.',
@@ -1853,17 +2146,18 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
   function ruleNumberLines(S) {
     S = S || {};
     var P = (typeof BQP !== 'undefined') ? BQP : (typeof require === 'function' ? require('./bq_price.js') : null);
-    var D = (P && P.DEFAULT_RULES) || { fee: 0.15, ukMax: 0.8, safeMin: 0.5, chinaFloor: 1, ukSoldFloor: 0.5, ukBand1: 0.8, ukBand5: 0.7, ukBand10: 0.6, ukBandRest: 0.5, cost1: 1, cost5: 5, cost10: 10, t5cut: 0.05, t5ukFloor: 0.6, t5ukMin: 0.65, t5HoldDays: 3, step: 0.01, closeHi: 0.10, closeLo: 0.15, packGrams: 14999, zeroSalesRaise: 0.5, bands: [[2000, 1.75], [15200, 2.3], [20000, 8], [25000, 9], [30000, 10.5]], overBand: 15 };
+    var D = (P && P.DEFAULT_RULES) || { fee: 0.15, ukMax: 0.8, safeMin: 0.5, chinaFloor: 1, ukSoldFloor: 0.5, ukBand1: 0.8, ukBand5: 0.7, ukBand10: 0.6, ukBandRest: 0.5, cost1: 1, cost5: 5, cost10: 10, t5cut: 0.05, t5ukFloor: 0.6, t5ukMin: 0.65, t5HoldDays: 3, step: 0.01, closeHi: 0.10, closeLo: 0.15, packGrams: 14999, zeroSalesRaise: 0.5, floorLift: 1, bands: [[2000, 1.9], [15200, 2.45], [20000, 8], [25000, 9], [30000, 10.5]], overBand: 15, accessMap: [[1.75, 1.9], [2.3, 2.45]], accessMapTol: 0.005 };
     var R = P && P.rulesOf ? P.rulesOf(S) : Object.assign({}, D, S);
     var pct = function (x) { return Math.round((+x) * 100) + '%'; };
     var gbp = function (x) { return '£' + Number(x).toFixed(2).replace(/\.00$/, ''); };
     var bands = (R.bands || []).map(function (b) { return gbp(b[1]) + ' up to ' + b[0] + 'g'; }).join(', ');
     return [
       'Fee ' + pct(R.fee) + '. China floor ' + pct(R.chinaFloor) + '. UK with sales ' + pct(R.ukSoldFloor) + '. UK no sales: ' + pct(R.ukBand1) + ' under ' + gbp(R.cost1) + ', ' + pct(R.ukBand5) + ' under ' + gbp(R.cost5) + ', ' + pct(R.ukBand10) + ' under ' + gbp(R.cost10) + ', else ' + pct(R.ukBandRest) + '.',
-      'UK cap ' + pct(R.ukMax) + '. Safe minimum ' + pct(R.safeMin) + '. Zero-sales raise up to ' + pct(R.zeroSalesRaise) + '.',
+      'UK cap ' + pct(R.ukMax) + '. Safe minimum ' + pct(R.safeMin) + '. Zero-sales raise up to ' + pct(R.zeroSalesRaise) + '. Floor lift ' + ((R.floorLift === false || R.floorLift === 0 || R.floorLift === '0') ? 'off' : 'on') + ' (if a UK suggestion would sit under its floor, raise it to the floor price).',
       'Tab 5: ' + pct(R.t5cut) + ' cut, UK special floor ' + pct(R.t5ukFloor) + ', never below ' + pct(R.t5ukMin) + ', hold ' + R.t5HoldDays + ' days.',
       'Buy box step ' + gbp(R.step) + '. Losing-although-cheaper window ' + Math.round(R.closeLo * 100) + '–' + Math.round(R.closeHi * 100) + 'p under the buy box.',
-      'Weight bands: ' + bands + ', then ' + gbp(R.overBand) + '. Check postage for multi-packs at ' + R.packGrams + 'g or with no weight.'
+      'Weight bands: ' + bands + ', then ' + gbp(R.overBand) + '. Check postage for multi-packs at ' + R.packGrams + 'g or with no weight.',
+      'Access postage mapping (within ' + (Math.round((R.accessMapTol != null ? R.accessMapTol : 0.005) * 1000) / 10) + 'p): ' + ((R.accessMap || []).map(function (p) { return gbp(p[0]) + ' → ' + gbp(p[1]); }).join(', ') || 'none') + '.'
     ];
   }
   function rulesSheet(opt) {
@@ -1977,8 +2271,13 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
     var o = x.o, k = x.cat, s;
     if (o.dup) s = 'Duplicate SKU row – not priced';
     else if (x.label === 'No data') s = 'No buy box data';
-    else if (k === 'raise') s = /^Losing – already cheaper/.test(x.why) ? x.why : (o.china ? 'China raise – review only (never in Final upload)' : (!(o.sales >= 1) && o.pc != null && o.pc < P.SAFE_MIN - 1e-9 ? '0 B&Q sales: profit under 50% – raise only to 50% on cost' : (o.pc != null && o.floorPct != null && o.pc < o.floorPct - 1e-9 ? 'Raise to floor (profit under floor %)' : 'Raise: winning with room to the cap')));
-    else if (k === 't4') s = 'Win buy box: 1p under ' + (o.seller || 'rival');
+    else if (k === 'raise') s = /^Losing – already cheaper/.test(x.why) ? x.why : (o.china ? 'China raise – review only (never in Final upload)' : (!(o.sales >= 1) && o.pc != null && o.pc < P.SAFE_MIN - 1e-9 ? (x.sugg != null && o.floor != null && x.sugg + 1e-9 >= o.floor ? '0 B&Q sales: profit under 50% – raise to the floor' : '0 B&Q sales: profit under 50% – raise only to 50% on cost') : (o.pc != null && o.floorPct != null && o.pc < o.floorPct - 1e-9 ? 'Raise to floor (profit under floor %)' : 'Raise: winning with room to the cap')));
+    else if (k === 't4') {
+      var rival = o.seller || 'rival';
+      if (x.sugg != null && o.ceil != null && Math.abs(x.sugg - o.ceil) < 1e-9 && (o.bb == null || Math.abs(x.sugg - P.rnd(o.bb - 0.01, 2)) >= 1e-9))
+        s = 'Win buy box: under ' + rival + ' at our 80% cap £' + P.rnd(x.sugg, 2).toFixed(2);
+      else s = 'Win buy box: 1p under ' + rival;
+    }
     else if (k === 't5') {
       if (x.weeklyHold) s = 'Margin too low UK – weekly hold until ' + addDays(x.lastChange, WEEKLY_DAYS);
       else if (x.sugg != null) s = !o.china ? ('Optional UK: 5% off (60% floor, min 65%)') : ('Optional: ' + (x.sugg === P.rnd(o.floor, 2) ? 'down to the floor' : '5% off') + ' to attract sales');
@@ -2219,7 +2518,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
       [NAMES[0], 'Everything: your Access paste exactly as it came, plus postage, price now, profit now, floor and the action.', counts.all, 'Look up any SKU.'],
       [NAMES[1], 'We hold the buy box, it sells, profit is between the floor and the 80% cap.', counts.t2, 'Nothing – no change.'],
       [NAMES[2], 'We hold the buy box but sold 0 on B&Q in 30 days.', counts.t3, 'Optional price cut (goes to tab 6). ' + RULE3],
-      [NAMES[3], 'A rival holds the buy box; we can go 1p under and stay above the floor.', counts.t4, 'Suggested price = 1p under the buy box (or our 80% cap if lower), never under the floor (goes to tab 6).'],
+      [NAMES[3], 'A rival holds the buy box; we can go 1p under and stay above the floor.', counts.t4, 'Suggested price = 1p under the buy box, never under the floor (goes to tab 5). UK with sales: a cut may stay above the 80% cap. 0-sales UK still stops at the cap.'],
       [NAMES[4], 'We cannot win the buy box under the normal floor. UK optional cut uses 60% floor (min 65%), held only when the last change was under 3 days ago.', counts.t5, RULE5 + ' Exactly 3 days is allowed.'],
       [NAMES[5], 'Every suggested change in one list (except China raises). Type your own price in yellow "Your price" (blank = suggested); set Include Yes/No.', counts.t6, 'Rows with Include = Yes that pass the checks go to tab 7a (UK) or 7b (China). China under-floor raises are NOT here – see the review-only tab. Check-postage rows never go. Hidden helper columns do the maths – leave them.'],
       [REVIEW_CHINA, 'China (Ashian) products under the 100% floor – proposed raise to the floor. REVIEW ONLY.', counts.chinaRaiseReview, 'Never uploaded. Decide offline; do not use Include to push these into Final upload.'],
@@ -2262,8 +2561,8 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
         else { var w = String(q[0]).length * (q[2] === 'raw' ? 1 : 0.9) + 2; for (var i = 0; i < Math.min(sh.rows.length, 400); i++) { var cl = sh.rows[i][k]; if (!cl) continue; var L = cl.t === 'n' ? (cl.z === PC ? 6 : cl.z === EAN ? 14 : String(Math.round(cl.v * 100) / 100).length + 2) : String(cl.v).length; if (L > w) w = L; }
           o = { wch: Math.max(8, Math.min(Math.ceil(w) + 1, q[2] === 'raw' ? 40 : 46)) }; }
         if (q[3] === 'hide' || q[3] === 'group') o.hidden = true; return o; });
-      if (sh.filter && sh.rows.length) ws['!autofilter'] = { ref: X.utils.encode_range({ s: { r: hr, c: 0 }, e: { r: nr - 1, c: head.length - 1 } }) };
-      Object.keys(sh.notes || {}).forEach(function (k) { var j = /^\d+$/.test(k) ? +k : head.indexOf(k); if (j < 0) return; var a = enc(hr, j); ws[a].c = [{ a: 'Pricing tab', t: sh.notes[k] }]; ws[a].c.hidden = true; });
+      if (sh.filter && sh.rows.length) { var lastC = (sh.filterTo != null) ? sh.filterTo : head.length - 1; ws['!autofilter'] = { ref: X.utils.encode_range({ s: { r: hr, c: 0 }, e: { r: nr - 1, c: lastC } }) }; }
+      /* Notes become data-validation prompts in polish(); do not write comment shapes. */
       X.utils.book_append_sheet(wb, ws, sh.name);
     });
     wb.Props = { Title: 'B&Q pricing – 8 tabs', Author: 'B&Q dashboard' };
@@ -2318,6 +2617,24 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
       if (sh.cf) { var sets = Array.isArray(sh.cf) ? sh.cf : [sh.cf], pri = 1;
         var cfx = sets.map(function (cf) { return '<conditionalFormatting sqref="' + cf.sqref + '">' + cf.rules.map(function (r) { return '<cfRule type="expression" dxfId="' + STK.indexOf(r[0]) + '" priority="' + (pri++) + '" stopIfTrue="1"><formula>' + r[1].replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</formula></cfRule>'; }).join('') + '</conditionalFormatting>'; }).join('');
         var mm = /<(dataValidations|hyperlinks|printOptions|pageMargins|pageSetup|headerFooter|ignoredErrors|drawing|legacyDrawing|tableParts|extLst)[ >\/]/.exec(s); s = mm ? s.slice(0, mm.index) + cfx + s.slice(mm.index) : s.replace('</worksheet>', cfx + '</worksheet>'); }
+      if (sh.notes) {
+        var headN = sh.cols.map(function (q) { return q[0]; }), lastR = Math.max(3, (sh.top ? 2 : 1) + (sh.head2 ? 1 : 0) + Math.max(sh.rows.length, 1));
+        var startR = (sh.top ? 2 : 1) + (sh.head2 ? 1 : 0) + 1; /* first data row, 1-based */
+        var dvs = [];
+        Object.keys(sh.notes).forEach(function (k) {
+          var j = /^\d+$/.test(k) ? +k : headN.indexOf(k);
+          if (j < 0) return;
+          if (!sh.inputs || sh.inputs.indexOf(j) < 0) return; /* only yellow input columns get a prompt; skip 7a/7b header notes */
+          var col = X.utils.encode_col(j);
+          var esc = function (t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
+          dvs.push('<dataValidation type="none" allowBlank="1" showInputMessage="1" showErrorMessage="0" sqref="' + col + startR + ':' + col + lastR + '"><promptTitle>' + esc(k) + '</promptTitle><prompt>' + esc(sh.notes[k]) + '</prompt></dataValidation>');
+        });
+        if (dvs.length) {
+          var block = '<dataValidations count="' + dvs.length + '">' + dvs.join('') + '</dataValidations>';
+          var mm2 = /<(hyperlinks|printOptions|pageMargins|pageSetup|headerFooter|ignoredErrors|drawing|legacyDrawing|tableParts|extLst)[ >\/]/.exec(s);
+          s = mm2 ? s.slice(0, mm2.index) + block + s.slice(mm2.index) : s.replace('</worksheet>', block + '</worksheet>');
+        }
+      }
       Z.FileIndex[sx.k].content = bin(s);
     });
     /* Excel (Microsoft 365) removes a defined name and shows "We found a problem with some content"
@@ -2348,6 +2665,13 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
         if (!hit) return all;
         return '<definedName' + attrs + '>' + xmlEsc(quoteSheet(hit) + right) + '</definedName>';
       });
+      var extraNames = [];
+      list.forEach(function (sh) { (sh.defNames || []).forEach(function (d) { extraNames.push(d); }); });
+      if (extraNames.length) {
+        var nxml = extraNames.map(function (d) { return '<definedName name="' + xmlEsc(d.name) + '">' + xmlEsc(d.ref) + '</definedName>'; }).join('');
+        if (/<definedNames>/.test(wxml)) wxml = wxml.replace('</definedNames>', nxml + '</definedNames>');
+        else wxml = wxml.replace('</workbook>', '<definedNames>' + nxml + '</definedNames></workbook>');
+      }
       Z.FileIndex[wi].content = bin(wxml);
     }
     var sh33 = Z.FullPaths.findIndex(function (p) { return /Sh33tJ5$/.test(p); }); if (sh33 >= 0) X.CFB.utils.cfb_del(Z, Z.FullPaths[sh33]);
@@ -2456,7 +2780,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
       if (top && sh.key != null) KEY.forEach(function (k, i) { var a = enc(0, sh.key + i); ws[a] = { t: 's', v: k[1] }; sh._mk[a] = k[0]; });
       hrows.forEach(function (row, r) { row.forEach(function (v, k) { ws[enc(r + top, k)] = { t: 's', v: v == null ? '' : String(v), z: HDRF }; }); });
       head.forEach(function (h, k) { var t = htype(h); if (t) sh._hd[enc(hr, k)] = t; });
-      sh.rows.forEach(function (row, i) { row.forEach(function (cl, k) { if (!cl) return; var o = { t: cl.t || 's' }; if (cl.v != null && cl.v !== '') o.v = cl.v; else if (!cl.f) return; if (cl.z) o.z = cl.z; if (cl.f) o.f = cl.f; if (cl.l) o.l = cl.l; var a = enc(R0 + i, k); ws[a] = o; if (cl.st) sh._mk[a] = cl.st; }); });
+      sh.rows.forEach(function (row, i) { row.forEach(function (cl, k) { if (!cl) return; var o = { t: cl.t || (cl.f ? 'n' : 's') }; if (cl.f) { o.f = cl.f; if (cl.v !== undefined) o.v = cl.v; } else { if (cl.v == null || cl.v === '') return; o.v = cl.v; } if (cl.z) o.z = cl.z; if (cl.l) o.l = cl.l; var a = enc(R0 + i, k); ws[a] = o; if (cl.st) sh._mk[a] = cl.st; }); });
       var nr = R0 + sh.rows.length; ws['!ref'] = X.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: Math.max(nr - 1, R0 - 1), c: Math.max(head.length - 1, 0) } });
       ws['!cols'] = sh.cols.map(function (q, k) {
         var o;
@@ -2464,8 +2788,10 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
         else { var w = String(q[0] || '').length + 2; o = { wch: Math.max(8, Math.min(w, 46)) }; }
         if (q[3] === 'hide' || q[3] === 'group') o.hidden = true; return o;
       });
-      if (sh.filter && sh.rows.length) ws['!autofilter'] = { ref: X.utils.encode_range({ s: { r: hr, c: 0 }, e: { r: nr - 1, c: head.length - 1 } }) };
-      Object.keys(sh.notes || {}).forEach(function (k) { var j = /^\d+$/.test(k) ? +k : head.indexOf(k); if (j < 0) return; var a = enc(hr, j); if (!ws[a]) ws[a] = { t: 's', v: head[j] || '' }; ws[a].c = [{ a: 'Pricing', t: sh.notes[k] }]; ws[a].c.hidden = true; });
+      if (sh.filter && sh.rows.length) { var lastC = (sh.filterTo != null) ? sh.filterTo : head.length - 1; ws['!autofilter'] = { ref: X.utils.encode_range({ s: { r: hr, c: 0 }, e: { r: nr - 1, c: lastC } }) }; }
+      /* Notes are not written as Excel comments: SheetJS leaves the VML textbox empty, which
+         pops up as a blank white box on Your price / Postage review in desktop Excel.
+         polish() turns sh.notes into data-validation input messages instead. */
       X.utils.book_append_sheet(wb, ws, sh.name);
     });
     if (!wb.Workbook) wb.Workbook = {};
@@ -2830,6 +3156,7 @@ function setBox(){
   field("ukMax","UK cap %",pctv("ukMax"),"%")+
   field("safeMin","Safe minimum %",pctv("safeMin"),"%")+
   field("zeroSalesRaise","Zero-sales raise up to %",pctv("zeroSalesRaise"),"%")+
+  field("floorLift","Floor lift (1=on, 0=off)",numv("floorLift",D.floorLift==null?1:D.floorLift),"")+
   field("t5cut","Tab 5 cut %",pctv("t5cut"),"%")+
   field("t5ukFloor","Tab 5 UK special floor %",pctv("t5ukFloor"),"%")+
   field("t5ukMin","Tab 5 UK minimum %",pctv("t5ukMin"),"%")+
@@ -2842,12 +3169,15 @@ function setBox(){
   '</div>'+
   '<p class="note" style="margin-top:10px">Weight bands (grams, then postage £)</p>'+
   '<div class="grid" id="pzbands">'+bandFields()+'</div>'+
+  '<p class="note" style="margin-top:10px">If Access postage equals an old band rate (within 0.5p), use the new rate. Other Access amounts stay as they are.</p>'+
+  '<div class="grid">'+field("accessMap1old","Access map 1 old £",mapv(0,0),"£")+field("accessMap1new","Access map 1 new £",mapv(0,1),"£")+field("accessMap2old","Access map 2 old £",mapv(1,0),"£")+field("accessMap2new","Access map 2 new £",mapv(1,1),"£")+field("accessMapTol","Match within £",numv("accessMapTol",D.accessMapTol!=null?D.accessMapTol:0.005),"£")+'</div>'+
   '<div class="pz-acts"><button class="btn l" type="button" id="pzsetapply">Apply settings</button> <button class="btn l" type="button" id="pzsetreset">Reset to normal</button></div>'+
   '<div class="note" id="pzsetmsg"></div></div>';
 }
 function field(id,lab,val,suf){return '<label>'+esc(lab)+'<input id="pzr_'+id+'" type="number" step="any" value="'+esc(String(val))+'" data-suf="'+esc(suf||"")+'"></label>'}
 function pctv(k){var D=P.DEFAULT_RULES||{},r=st&&st.rules&&st.rules[k]!=null?st.rules[k]:D[k];return Math.round((+r)*10000)/100}
 function numv(k,d){return st&&st.rules&&st.rules[k]!=null?st.rules[k]:d}
+function mapv(i,j){var D=P.DEFAULT_RULES||{},M=(st&&st.rules&&st.rules.accessMap)||D.accessMap||[[1.75,1.9],[2.3,2.45]];return (M[i]||[])[j]}
 function bandFields(){
  var D=P.DEFAULT_RULES||{},B=(st&&st.rules&&st.rules.bands)||D.bands||[];
  var html="",i;for(i=0;i<5;i++){var b=B[i]||["",""];html+=field("bw"+i,"Band "+(i+1)+" up to (g)",b[0]||"", "g")+field("bp"+i,"Band "+(i+1)+" postage £",b[1]||"","£")}
@@ -2857,9 +3187,11 @@ function readRules(){
  var D=P.DEFAULT_RULES||{},o={},pct=function(k){var el=$("pzr_"+k);if(!el||el.value==="")return D[k];return Number(el.value)/100};
  var num=function(k,d){var el=$("pzr_"+k);if(!el||el.value==="")return d;return Number(el.value)};
  ["fee","chinaFloor","ukSoldFloor","ukBand1","ukBand5","ukBand10","ukBandRest","ukMax","safeMin","zeroSalesRaise","t5cut","t5ukFloor","t5ukMin"].forEach(function(k){o[k]=pct(k)});
- ["cost1","cost5","cost10","t5HoldDays","step","closeLo","closeHi","packGrams","overBand"].forEach(function(k){o[k]=num(k,D[k])});
+ ["cost1","cost5","cost10","t5HoldDays","step","closeLo","closeHi","packGrams","overBand","accessMapTol","floorLift"].forEach(function(k){o[k]=num(k,D[k])});
  var bands=[],i;for(i=0;i<5;i++){var w=$("pzr_bw"+i),p=$("pzr_bp"+i);if(w&&p&&w.value!==""&&p.value!=="")bands.push([Number(w.value),Number(p.value)])}
  if(bands.length)o.bands=bands;
+ var am=[],j;for(j=1;j<=2;j++){var ao=$("pzr_accessMap"+j+"old"),an=$("pzr_accessMap"+j+"new");if(ao&&an&&ao.value!==""&&an.value!=="")am.push([Number(ao.value),Number(an.value)])}
+ o.accessMap=am;
  return o;
 }
 function setWire(){if(!$("pzsetapply"))return;
@@ -2952,7 +3284,6 @@ function histDraw(){
 }
 window.BQPricing={state:function(){return st},bbRow:bbRow,BBHD:BBHD,bbSafe:function(){return bbSafe()},book7:function(X){return window.BQBook.build(X,P,b7input())},b7opt:b7opt,b7input:b7input,csvText:csvText,uploadPairs:uploadPairs,applyRuleForm:readRules,resetRules:resetRules};
 })();
-
 </script>
 <script>
 (function(){

@@ -5,12 +5,13 @@
      profit = price - total cost      profit % = profit / estimated cost
      postage (in this order): 1 your typed postage; 2 special fixed rules (Karimulla's seniors' list, 26 Oct + 2 Nov 2026 notes, see SPECIAL);
        3 description code H123/H063/H077 over 15.2kg: DPD 14 (<=20kg) / 15 (<=25kg) / 17 (<=30kg); 4 Access 'Postage Cost' if > 0;
-       5 weight band on the (total pack) weight: <=2000g 1.75, <=15200g 2.30, <=20000g 8, <=25000g 9, <=30000g 10.50, else 15. A multi-pack is ONE parcel. Check-postage only for multi-packs with weight >=14999g (or missing weight).
+       5 weight band on the (total pack) weight: <=2000g 1.90, <=15200g 2.45, <=20000g 8, <=25000g 9, <=30000g 10.50, else 15. A multi-pack is ONE parcel. Check-postage only for multi-packs with weight >=14999g (or missing weight).
+       If Access postage equals an old band rate (£1.75 or £2.30, within 0.5p), it is used at the new rate (£1.90 or £2.45). Other Access amounts stay as they are. The mapping is in Settings.
    No data and no keys in this file. */
 (function (root, f) { var m = f(); if (typeof module === 'object' && module.exports) module.exports = m; else root.BQP = m; })(this, function () {
   'use strict';
   var FEE = 0.15, ASHIAN = 2, OTHER = 1.5, UK_MAX = 0.8, CHINA_FLOOR = 1, SAFE_MIN = 0.5, RAISE_AT = 100, RAISE_STEP = 0.1, CHINA_CUT = 0.1;
-  var BANDS = [[2000, 1.75, '≤2 kg'], [15200, 2.3, '≤15.2 kg'], [20000, 8, '≤20 kg'], [25000, 9, '≤25 kg'], [30000, 10.5, '≤30 kg']], OVER = [15, 'over 30 kg'];
+  var BANDS = [[2000, 1.9, '≤2 kg'], [15200, 2.45, '≤15.2 kg'], [20000, 8, '≤20 kg'], [25000, 9, '≤25 kg'], [30000, 10.5, '≤30 kg']], OVER = [15, 'over 30 kg'];
   var _R = null;
   var DEFAULT_RULES = {
     fee: FEE, ukMax: UK_MAX, safeMin: SAFE_MIN, chinaFloor: CHINA_FLOOR, chinaCut: CHINA_CUT,
@@ -21,12 +22,16 @@
     closeHi: 0.10, closeLo: 0.15, packGrams: 14999,
     bands: BANDS.map(function (b) { return [b[0], b[1], b[2]]; }),
     overBand: OVER[0],
-    zeroSalesRaise: SAFE_MIN
+    accessMap: [[1.75, 1.9], [2.3, 2.45]],
+    accessMapTol: 0.005,
+    zeroSalesRaise: SAFE_MIN,
+    floorLift: 1
   };
   function rulesOf(s) {
     var d = DEFAULT_RULES, o = s || {}, r = {};
     Object.keys(d).forEach(function (k) {
       if (k === 'bands') r.bands = Array.isArray(o.bands) && o.bands.length ? o.bands : d.bands;
+      else if (k === 'accessMap') r.accessMap = accessMapFrom(o, d);
       else r[k] = o[k] != null && o[k] !== '' ? o[k] : d[k];
     });
     return r;
@@ -39,6 +44,9 @@
       if (k === 'bands') {
         var a = r.bands.map(function (b) { return [+b[0], +b[1]]; }), b = d.bands.map(function (x) { return [x[0], x[1]]; });
         if (JSON.stringify(a) !== JSON.stringify(b)) return true;
+      } else if (k === 'accessMap') {
+        var am = function (m) { return (m || []).map(function (p) { return [+p[0], +p[1]]; }); };
+        if (JSON.stringify(am(r.accessMap)) !== JSON.stringify(am(d.accessMap))) return true;
       } else if (+r[k] !== +d[k] && String(r[k]) !== String(d[k])) return true;
     }
     return false;
@@ -53,6 +61,14 @@
   function packGramsOf() { return _R ? _R.packGrams : 14999; }
   function closeHiOf(s) { return (s && s.closeHi != null) ? s.closeHi : (_R ? _R.closeHi : 0.10); }
   function closeLoOf(s) { return (s && s.closeLo != null) ? s.closeLo : (_R ? _R.closeLo : 0.15); }
+  /* When on (default), a UK suggestion that would sit under its own floor is lifted to that floor
+     (already rounded up to the penny). Cuts stay cuts, raises stay raises. Never over the 80% cap, never a loss.
+     Floors themselves are unchanged. China is not lifted. Turn off with Settings floorLift = 0. */
+  function floorLiftOf() {
+    var r = _R || DEFAULT_RULES;
+    if (r.floorLift === false || r.floorLift === 0 || r.floorLift === '0') return false;
+    return true;
+  }
   /* number from 8.7, '8.70', '£8.70', '1,234.50', ' 8.7 '; blank / text -> null */
   function num(v) {
     if (v == null) return null;
@@ -69,6 +85,33 @@
   function ceil2(x) { return Math.ceil(Number((r6(x) * 100).toFixed(6))) / 100; }
   function floor2(x) { return Math.floor(Number((r6(x) * 100).toFixed(6))) / 100; }
   function band(w) { w = num(w); if (!(w > 0)) return null; var B = _R ? _R.bands : BANDS, O = _R ? _R.overBand : OVER[0]; for (var i = 0; i < B.length; i++) if (w <= B[i][0]) return { p: B[i][1], lab: B[i][2] || ('≤' + (B[i][0] / 1000) + ' kg') }; return { p: O, lab: 'over ' + (B.length ? (B[B.length - 1][0] / 1000) + ' kg' : 'band') }; }
+  /* Settings mapping: Access postage that equals an old band rate (within accessMapTol, default 0.5p) is used at the new rate.
+     Raw Access 'Postage Cost' is left unchanged on the row (accessPc). Applied in postInfo, so fromAccess + decideAll
+     (dashboard Pricing tab and the nightly refresh_and_publish / build_pricing path) pick it up automatically. */
+  function accessMapFrom(o, d) {
+    o = o || {}; d = d || DEFAULT_RULES;
+    if (Array.isArray(o.accessMap)) return o.accessMap;
+    var pairs = [], i, a, b;
+    for (i = 1; i <= 5; i++) {
+      a = num(o['accessMap' + i + 'old']); b = num(o['accessMap' + i + 'new']);
+      if (a != null && b != null) pairs.push([a, b]);
+    }
+    return pairs.length ? pairs : (d.accessMap || []);
+  }
+  function accessMapOf() {
+    var r = _R || DEFAULT_RULES;
+    return { map: r.accessMap || DEFAULT_RULES.accessMap || [], tol: r.accessMapTol != null ? r.accessMapTol : (DEFAULT_RULES.accessMapTol != null ? DEFAULT_RULES.accessMapTol : 0.005) };
+  }
+  function mapAccessPostage(p) {
+    p = num(p);
+    if (p == null || !(p > 0)) return { p: p, mapped: false };
+    var M = accessMapOf(), tol = M.tol != null ? M.tol : 0.005, i, old, neu;
+    for (i = 0; i < M.map.length; i++) {
+      old = num(M.map[i][0]); neu = num(M.map[i][1]);
+      if (old != null && neu != null && Math.abs(p - old) <= tol + 1e-12) return { p: neu, mapped: true, from: old };
+    }
+    return { p: p, mapped: false };
+  }
   /* SPECIAL fixed postage (before Access / weight). Matched on the Variant description text (+ SKU / variant code prefix).
      Source: Karimulla's handwritten note 2 Nov 2026 (KEEP/special_postage_note_2026-11-02.jpg) and the seniors' list
      implemented 26 Oct 2026 (china_products_2026-10-26/work/pricing/build_v3.py). Fixed amounts are never multiplied by pack qty. */
@@ -113,7 +156,12 @@
     var k = specialRule(title, code); if (k) return { p: SPECIAL[k][1], src: 'Special: ' + SPECIAL[k][0], kind: 'special', rule: k };
     var h = heavyCode(title), wt = num(w);
     if (h && wt > HEAVY_FROM && wt <= HEAVY[HEAVY.length - 1][0]) for (var i = 0; i < HEAVY.length; i++) if (wt <= HEAVY[i][0]) return { p: HEAVY[i][1], src: 'DPD ' + h + ' ' + HEAVY[i][2], kind: 'heavy' };
-    var p = num(pc); if (p != null && p > 0) return { p: p, src: 'Access postage' + (h ? ' (' + h + ')' : ''), kind: 'access' };
+    var p = num(pc); if (p != null && p > 0) {
+      var m = mapAccessPostage(p), src = 'Access postage';
+      if (m.mapped) src += ' £' + rnd(p, 2).toFixed(2) + ' at the new rate £' + rnd(m.p, 2).toFixed(2);
+      if (h) src += ' (' + h + ')';
+      return { p: m.p, src: src, kind: 'access', accessMapped: !!m.mapped };
+    }
     var b = band(w); return b ? { p: b.p, src: (b.p >= 8 && b.p <= 10.5 ? 'DPD ' : 'Weight band ') + b.lab + (packN(title) ? ' (pack weight, one parcel)' : ''), kind: 'band' } : { p: null, src: 'No postage or weight', kind: 'none' };
   }
   /* postage: (pc, w) = Access / weight only (old callers); (pc, w, title, code[, typed]) = all rules incl. special */
@@ -228,7 +276,8 @@
     } else if (sales >= 1) {
       if (bb == null) { raw = 'No competitor – kept'; o.rule = '2 UK sold – no competitor, kept'; }
       else if (bb1 < o.floor) { raw = 'Margin too low'; o.rule = '2 UK sold – margin too low, kept'; }
-      else { raw = Math.min(o.ceil, bb1); o.rule = bb1 > o.ceil ? '2 UK sold – capped at 80%' : '2 UK sold – 1p under BB'; }
+      else if (bb1 > o.ceil && !(bb1 < cur - 1e-9)) { raw = o.ceil; o.rule = '2 UK sold – capped at 80%'; }
+      else { raw = bb1; o.rule = '2 UK sold – 1p under BB'; }
     } else {
       if (bb == null) { raw = o.ceil; o.rule = '3 UK 0 sales – no competitor, 80%'; }
       else if (bb1 < o.floor) { raw = 'Margin too low'; o.rule = '3 UK 0 sales – margin too low, kept'; }
@@ -350,7 +399,7 @@
      o = decide(row) output.  x = {fresh: today's buy box check worked for this EAN, rival: {p, s, d} newest OTHER seller seen holding the box,
      seasonal: Christmas product}.  s = settings (BB_DEFAULT).  Returns {act, sugg, profit, pc, gain, why, need}.
      act: 'Lower to win' | 'Raise' | "Can't win (floor)" | 'Keep' | 'No data'.  sugg is only set for Lower to win / Raise, and is never
-     under the floor, never over the UK 80% cap, never a loss (checked again at the end – if not, act becomes Keep). */
+     under the floor, never a loss. A raise is never over the UK 80% cap. A CUT to 1p under the competitor, on a UK product with sales, may stay above the cap. 0-sales UK cuts still stop at the cap (checked again at the end – if not, act becomes Keep). */
   var BB_DEFAULT = { step: 0.01, stepPct: 0, minGain: 0.10, raisePct: 0.05, raiseNoSales: false, noStockKeep: true, useStale: false, xmas: true, keepTrees: true };
   /* Christmas trees (XMAS TREE 5/6/7/8/10FT, SKU XMA-TRE-GRE-…): Karimulla 3 Nov 2026 – keep the tree prices as they are (no raise, no lower). Not tree bags / stands / spray. */
   function isXmasTree(title, sku) { return /\b(?:xmas|christmas)\s+tree\s+\d+\s*(?:ft|feet|foot)\b/i.test(String(title || '')) || /^XMA-TRE-GRE-/i.test(String(sku || '')); }
@@ -411,7 +460,10 @@
         return r;
       }
       var need = rnd(bb - bbStep(bb, s), 2), t = need, capped = false; r.need = need;
-      if (cap != null && t > cap) { t = cap; capped = true; }
+      /* 11 Nov 2026: UK with sales – a CUT to 1p under the competitor is not clamped to the 80% cap.
+         The cap still blocks raises. 0-sales UK still clamps to the cap. China has no cap. */
+      var soldCut = !o.china && o.sales >= 1 && t < cur - 1e-9;
+      if (cap != null && t > cap && !soldCut) { t = cap; capped = true; }
       if (t < fl) { r.act = "Can't win (floor)"; r.why = 'To win we need ' + g(need) + ' (under ' + seller + ' ' + g(bb) + '), but our floor is ' + g(fl) + ' (' + pc(o.floorPct) + ' on cost)'; return r; }
       set('Lower to win', t, capped ? 'Under ' + seller + ' ' + g(bb) + ' at our 80% cap ' + g(t) : (need === rnd(bb - 0.01, 2) ? '1p' : g(bb - need)) + ' under ' + seller + ' ' + g(bb) + '; floor ' + g(fl), bb);
     } else {
@@ -436,10 +488,28 @@
         set('Raise', t2, why, rv && rv.p > cur ? rv.p : null);
       }
     }
-    /* absolute safety: never under the floor, never over the cap, never a loss, never under 50% (China 100%) */
+    /* If a UK suggestion would sit under its own floor, lift it to the floor price (rounded up to the penny).
+       Only when that keeps a raise a raise (or a cut a cut), stays at/under the cap, and is not a loss. China unchanged. */
+    if (r.sugg != null && floorLiftOf() && !o.china && fl != null && r.sugg < fl - 1e-9) {
+      var lift = fl;
+      if (cap != null && lift > cap + 1e-9) lift = cap;
+      var CLift = calc(a, lift);
+      var stayRaise = (r.act === 'Raise' || r.sugg > cur + 1e-9) && lift > cur + 1e-9;
+      var stayCut = (r.act === 'Lower to win' || r.sugg < cur - 1e-9) && lift < cur - 1e-9;
+      if ((stayRaise || stayCut) && CLift.profit > 0 && CLift.pc >= safeOf() - 1e-9 && (cap == null || lift <= cap + 1e-9 || stayCut)) {
+        r.sugg = rnd(lift, 2);
+        r.profit = CLift.profit;
+        r.pc = CLift.pc;
+        r.gain = rnd(CLift.pr - C0.pr, 2);
+        if (stayRaise && !(o.sales >= 1)) r.why = '0 B&Q sales, profit under 50% on cost – raise to the floor (just at/above the floor %)';
+        else r.why = (r.why || '') + ' – lifted to the floor';
+      }
+    }
+    /* absolute safety: never under the floor (when floorLift is on), never over the cap, never a loss, never under 50% (China 100%) */
     if (r.sugg != null) {
-      var minPx = (r.act === 'Raise' && !o.china && !(o.sales >= 1)) ? priceFor(a, (_R && _R.zeroSalesRaise != null ? _R.zeroSalesRaise : SAFE_MIN)) : fl;
-      var bad = !(r.sugg > 0) || !(r.profit > 0) || r.sugg < minPx - 1e-9 || (cap != null && r.sugg > up9(cap) + 1e-9) || r.pc < safeOf() - 1e-9 || (o.china && r.pc < chinaFloorOf() - 1e-9);
+      var minPx = (!floorLiftOf() && r.act === 'Raise' && !o.china && !(o.sales >= 1)) ? priceFor(a, (_R && _R.zeroSalesRaise != null ? _R.zeroSalesRaise : SAFE_MIN)) : fl;
+      var overCapRaise = cap != null && r.sugg > up9(cap) + 1e-9 && !(r.sugg < cur - 1e-9);
+      var bad = !(r.sugg > 0) || !(r.profit > 0) || r.sugg < minPx - 1e-9 || overCapRaise || r.pc < safeOf() - 1e-9 || (o.china && r.pc < chinaFloorOf() - 1e-9);
       if (bad) { r.act = 'Keep'; r.why = 'Safety check stopped ' + g(r.sugg) + ' – kept'; r.sugg = null; r.profit = null; r.pc = null; r.gain = null; }
       else if (r.sugg === cur) { r.act = 'Keep'; r.why = 'Already at the suggested price'; r.sugg = null; r.profit = null; r.pc = null; r.gain = null; }
     }
@@ -464,6 +534,6 @@
     return rows.map(function (o) { var b = buyBox(o, { fresh: !!fresh[o.ean], rival: rivals[o.ean] || null, seasonal: isSeasonal(o.title, o.sku) }, s); b.o = o; return b; });
   }
   return { FEE: FEE, sales30: sales30, bbMap: bbMap, ukTime: ukTime, fromAccess: fromAccess, eanOf: eanOf, HDR: HDR, ASHIAN: ASHIAN, OTHER: OTHER, UK_MAX: UK_MAX, SAFE_MIN: SAFE_MIN, CHINA_FLOOR: CHINA_FLOOR, CHINA_CUT: CHINA_CUT, RAISE_AT: RAISE_AT, BANDS: BANDS, OVER: OVER,
-    num: num, rnd: rnd, ceil2: ceil2, band: band, postage: postage, postageSrc: postageSrc, postInfo: postInfo, specialRule: specialRule, heavyCode: heavyCode, SPECIAL: SPECIAL, HEAVY: HEAVY, isChina: isChina, multOf: multOf, fixedCost: fixedCost,
-    TRIM: TRIM, end9: end9, DEFAULT_RULES: DEFAULT_RULES, rulesOf: rulesOf, rulesDiffer: rulesDiffer, useRules: useRules, clearRules: clearRules, feeOf: feeOf, ukMaxOf: ukMaxOf, safeOf: safeOf, chinaFloorOf: chinaFloorOf, packGramsOf: packGramsOf, calc: calc, priceFor: priceFor, priceMax: priceMax, floorPrice: floorPrice, floor2: floor2, floorOf: floorOf, packN: packN, checkPost: checkPost, decide: decide, decideAll: decideAll, buyBox: buyBox, buyBoxAll: buyBoxAll, bbFromScrape: bbFromScrape, BB_DEFAULT: BB_DEFAULT, isSeasonal: isSeasonal, isXmasTree: isXmasTree, bbStep: bbStep, CHECK_G: 14999, VERSION: 'bq_price v5 2026-11-09 pack14999 checks' };
+    num: num, rnd: rnd, ceil2: ceil2, band: band, mapAccessPostage: mapAccessPostage, accessMapFrom: accessMapFrom, postage: postage, postageSrc: postageSrc, postInfo: postInfo, specialRule: specialRule, heavyCode: heavyCode, SPECIAL: SPECIAL, HEAVY: HEAVY, isChina: isChina, multOf: multOf, fixedCost: fixedCost,
+    TRIM: TRIM, end9: end9, DEFAULT_RULES: DEFAULT_RULES, rulesOf: rulesOf, rulesDiffer: rulesDiffer, useRules: useRules, clearRules: clearRules, feeOf: feeOf, ukMaxOf: ukMaxOf, safeOf: safeOf, chinaFloorOf: chinaFloorOf, packGramsOf: packGramsOf, floorLiftOf: floorLiftOf, calc: calc, priceFor: priceFor, priceMax: priceMax, floorPrice: floorPrice, floor2: floor2, floorOf: floorOf, packN: packN, checkPost: checkPost, decide: decide, decideAll: decideAll, buyBox: buyBox, buyBoxAll: buyBoxAll, bbFromScrape: bbFromScrape, BB_DEFAULT: BB_DEFAULT, isSeasonal: isSeasonal, isXmasTree: isXmasTree, bbStep: bbStep, CHECK_G: 14999, VERSION: 'bq_price v9 2026-11-11 floor lift to own floor' };
 });

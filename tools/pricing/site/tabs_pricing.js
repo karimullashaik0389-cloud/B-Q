@@ -259,6 +259,7 @@ function setBox(){
   field("ukMax","UK cap %",pctv("ukMax"),"%")+
   field("safeMin","Safe minimum %",pctv("safeMin"),"%")+
   field("zeroSalesRaise","Zero-sales raise up to %",pctv("zeroSalesRaise"),"%")+
+  field("floorLift","Floor lift (1=on, 0=off)",numv("floorLift",D.floorLift==null?1:D.floorLift),"")+
   field("t5cut","Tab 5 cut %",pctv("t5cut"),"%")+
   field("t5ukFloor","Tab 5 UK special floor %",pctv("t5ukFloor"),"%")+
   field("t5ukMin","Tab 5 UK minimum %",pctv("t5ukMin"),"%")+
@@ -271,12 +272,15 @@ function setBox(){
   '</div>'+
   '<p class="note" style="margin-top:10px">Weight bands (grams, then postage £)</p>'+
   '<div class="grid" id="pzbands">'+bandFields()+'</div>'+
+  '<p class="note" style="margin-top:10px">If Access postage equals an old band rate (within 0.5p), use the new rate. Other Access amounts stay as they are.</p>'+
+  '<div class="grid">'+field("accessMap1old","Access map 1 old £",mapv(0,0),"£")+field("accessMap1new","Access map 1 new £",mapv(0,1),"£")+field("accessMap2old","Access map 2 old £",mapv(1,0),"£")+field("accessMap2new","Access map 2 new £",mapv(1,1),"£")+field("accessMapTol","Match within £",numv("accessMapTol",D.accessMapTol!=null?D.accessMapTol:0.005),"£")+'</div>'+
   '<div class="pz-acts"><button class="btn l" type="button" id="pzsetapply">Apply settings</button> <button class="btn l" type="button" id="pzsetreset">Reset to normal</button></div>'+
   '<div class="note" id="pzsetmsg"></div></div>';
 }
 function field(id,lab,val,suf){return '<label>'+esc(lab)+'<input id="pzr_'+id+'" type="number" step="any" value="'+esc(String(val))+'" data-suf="'+esc(suf||"")+'"></label>'}
 function pctv(k){var D=P.DEFAULT_RULES||{},r=st&&st.rules&&st.rules[k]!=null?st.rules[k]:D[k];return Math.round((+r)*10000)/100}
 function numv(k,d){return st&&st.rules&&st.rules[k]!=null?st.rules[k]:d}
+function mapv(i,j){var D=P.DEFAULT_RULES||{},M=(st&&st.rules&&st.rules.accessMap)||D.accessMap||[[1.75,1.9],[2.3,2.45]];return (M[i]||[])[j]}
 function bandFields(){
  var D=P.DEFAULT_RULES||{},B=(st&&st.rules&&st.rules.bands)||D.bands||[];
  var html="",i;for(i=0;i<5;i++){var b=B[i]||["",""];html+=field("bw"+i,"Band "+(i+1)+" up to (g)",b[0]||"", "g")+field("bp"+i,"Band "+(i+1)+" postage £",b[1]||"","£")}
@@ -286,9 +290,11 @@ function readRules(){
  var D=P.DEFAULT_RULES||{},o={},pct=function(k){var el=$("pzr_"+k);if(!el||el.value==="")return D[k];return Number(el.value)/100};
  var num=function(k,d){var el=$("pzr_"+k);if(!el||el.value==="")return d;return Number(el.value)};
  ["fee","chinaFloor","ukSoldFloor","ukBand1","ukBand5","ukBand10","ukBandRest","ukMax","safeMin","zeroSalesRaise","t5cut","t5ukFloor","t5ukMin"].forEach(function(k){o[k]=pct(k)});
- ["cost1","cost5","cost10","t5HoldDays","step","closeLo","closeHi","packGrams","overBand"].forEach(function(k){o[k]=num(k,D[k])});
+ ["cost1","cost5","cost10","t5HoldDays","step","closeLo","closeHi","packGrams","overBand","accessMapTol","floorLift"].forEach(function(k){o[k]=num(k,D[k])});
  var bands=[],i;for(i=0;i<5;i++){var w=$("pzr_bw"+i),p=$("pzr_bp"+i);if(w&&p&&w.value!==""&&p.value!=="")bands.push([Number(w.value),Number(p.value)])}
  if(bands.length)o.bands=bands;
+ var am=[],j;for(j=1;j<=2;j++){var ao=$("pzr_accessMap"+j+"old"),an=$("pzr_accessMap"+j+"new");if(ao&&an&&ao.value!==""&&an.value!=="")am.push([Number(ao.value),Number(an.value)])}
+ o.accessMap=am;
  return o;
 }
 function setWire(){if(!$("pzsetapply"))return;

@@ -9,8 +9,8 @@ const Book = require(path.join(__dirname, '..', 'bq_book.js'));
 function row(o) {
   return Object.assign({
     sku: 'X', title: 'Test item', ean: '100', cost: 1.25, price: 5.59,
-    bb: 5.59, seller: 'Diva Packages', sup: 'UK Ltd', w: 500, pc: 1.75,
-    sales: 0, stock: 5, post: 1.75
+    bb: 5.59, seller: 'Diva Packages', sup: 'UK Ltd', w: 500, pc: 1.70,
+    sales: 0, stock: 5, post: 1.70
   }, o);
 }
 function go(extra, settings) {
@@ -23,7 +23,7 @@ function go(extra, settings) {
 }
 
 // AVR-like: cost £1.25, postage £1.75, sell £5.59, 0 sales, we win.
-const uk = go({ sku: 'AVR-SLT-GRE-01', title: 'Slate grey', cost: 1.25, price: 5.59, bb: 5.59, pc: 1.75, post: 1.75, sales: 0, stock: 8 });
+const uk = go({ sku: 'AVR-SLT-GRE-01', title: 'Slate grey', cost: 1.25, price: 5.59, bb: 5.59, pc: 1.70, post: 1.70, sales: 0, stock: 8 });
 assert.strictEqual(uk.d.china, false);
 assert.ok(uk.d.win, 'should be winning the buy box');
 assert.ok(!(uk.d.sales >= 1));
@@ -67,7 +67,7 @@ assert.ok(!underCap.x.ukCapDrop);
 // Quarter-gap cut still works when there is room above the buffer and we are not relying on the new rule
 // Use a clearly high price well above floor+5% and also above cap... wait, if above cap, s3 clips to cap.
 // So a quarter-gap (non-cap-drop) case must have current > buffer+10p AND cap >= the quarter/buffer suggestion.
-const high = go({ sku: 'HIGH', cost: 10, price: 30, bb: 30, post: 1.75, pc: 1.75, sales: 0 });
+const high = go({ sku: 'HIGH', cost: 10, price: 30, bb: 30, post: 1.70, pc: 1.70, sales: 0 });
 // cost 10, 0 sales, floor 50%, cap 80%. Plenty of room. Quarter-gap should fire, and if cap is above the buffer, reason is the old quarter-gap text (unless clipped below buffer).
 assert.strictEqual(high.x.cat, 't3');
 if (high.x.sugg != null && !high.x.ukCapDrop) {
@@ -76,7 +76,7 @@ if (high.x.sugg != null && !high.x.ukCapDrop) {
 }
 
 // China winning, 0 sales: outcome must follow the old China rule (no ukCapDrop, no cap)
-const cn = go({ sku: 'CN-01', title: 'China item', cost: 1.25, price: 8.5, bb: 8.5, sales: 0, sup: 'Ashian Homeware co.,Ltd', post: 1.75, pc: 1.75 });
+const cn = go({ sku: 'CN-01', title: 'China item', cost: 1.25, price: 8.5, bb: 8.5, sales: 0, sup: 'Ashian Homeware co.,Ltd', post: 1.70, pc: 1.70 });
 assert.strictEqual(cn.d.china, true);
 assert.strictEqual(cn.d.ceil, null);
 assert.ok(!cn.x.ukCapDrop, 'China must never use the UK cap-drop flag');
@@ -88,10 +88,10 @@ if (cn.x.sugg != null) {
 }
 
 // China already at/near 105%: still no cut, same reason family
-const cnNear = go({ sku: 'CN-NEAR', title: 'China near min', cost: 2, price: P.priceFor({ cost: 2, mult: 2, post: 1.75, collab: 0 }, 1.05), bb: 0, sales: 0, sup: 'Ashian Homeware', post: 1.75, pc: 1.75, seller: 'Diva Packages' });
+const cnNear = go({ sku: 'CN-NEAR', title: 'China near min', cost: 2, price: P.priceFor({ cost: 2, mult: 2, post: 1.70, collab: 0 }, 1.05), bb: 0, sales: 0, sup: 'Ashian Homeware', post: 1.70, pc: 1.70, seller: 'Diva Packages' });
 // set bb to the same price so we win
 const cnNearPrice = cnNear.d.price;
-const cnNear2 = go({ sku: 'CN-NEAR', title: 'China near min', cost: 2, price: cnNearPrice, bb: cnNearPrice, sales: 0, sup: 'Ashian Homeware', post: 1.75, pc: 1.75, seller: 'Diva Packages' });
+const cnNear2 = go({ sku: 'CN-NEAR', title: 'China near min', cost: 2, price: cnNearPrice, bb: cnNearPrice, sales: 0, sup: 'Ashian Homeware', post: 1.70, pc: 1.70, seller: 'Diva Packages' });
 assert.strictEqual(cnNear2.d.china, true);
 assert.ok(cnNear2.d.win);
 assert.ok(!cnNear2.x.ukCapDrop);
@@ -118,7 +118,7 @@ if (pack.x.ukCapDrop) {
 }
 
 // Cap is never below the floor for UK (floor is pulled down to the cap when both are 80%).
-const tight = go({ sku: 'TIGHT', cost: 0.14, price: 2.56, bb: 2.56, sales: 0, post: 1.75, pc: 1.75 });
+const tight = go({ sku: 'TIGHT', cost: 0.14, price: 2.56, bb: 2.56, sales: 0, post: 1.70, pc: 1.70 });
 assert.ok(tight.d.ceil + 1e-9 >= tight.d.floor, 'UK cap must not sit below the floor');
 assert.strictEqual(tight.d.floor, tight.d.ceil);
 

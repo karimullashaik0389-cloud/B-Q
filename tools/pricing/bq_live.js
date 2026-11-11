@@ -1,5 +1,7 @@
 /* Live pricing workbook. Yellow cells are the only inputs. Every profit, suggestion,
-   Combined row and Final upload price is a formula matched by SKU. No macros.
+   Combined row and Final upload price is a formula. Visible tabs use a direct cell
+   on the hidden _Calc row for that SKU (no INDEX/MATCH). Formula cells carry cached
+   values so Excel does not have to calculate on open. No macros.
    Blank input = no opinion. 0 postage is a real input. Two different numbers for one SKU = CONFLICT (neither is chosen). */
 (function (root, f) { var m = f(); if (typeof module === 'object' && module.exports) module.exports = m; else root.BQLive = m; })(this, function () {
   'use strict';
@@ -67,16 +69,25 @@
 
   function make(recs, input, P, saved, S) {
     input = input || {}; saved = saved || {}; S = Object.assign({}, P.BB_DEFAULT || {}, S || {});
+    var Book = (typeof BQBook !== 'undefined') ? BQBook : (typeof require === 'function' ? require('./bq_book.js') : null);
     var asOf = xDate(S.asOf || (input && input.asOf) || '');
     function sv(k, d) { return S[k] != null && S[k] !== '' ? S[k] : d; }
-    var setRows = [['fee', sv('fee', 0.15)], ['ukMax', sv('ukMax', 0.8)], ['safeMin', sv('safeMin', 0.5)], ['minChange', sv('minChange', 0.1)], ['t3buf', sv('t3buf', 0.05)], ['t5cut', sv('t5cut', 0.05)], ['t5ukFloor', sv('t5ukFloor', 0.6)], ['t5ukMin', sv('t5ukMin', 0.65)], ['t5HoldDays', sv('t5HoldDays', 3)], ['step', sv('step', 0.01)], ['stepPct', S.stepPct || 0], ['minGain', S.minGain == null ? 0.1 : S.minGain], ['raisePct', S.raisePct == null ? 0.05 : S.raisePct], ['xmas', S.xmas === false ? 0 : 1], ['raiseNoSales', S.raiseNoSales ? 1 : 0], ['noStockKeep', S.noStockKeep === false ? 0 : 1], ['keepTrees', S.keepTrees === false ? 0 : 1], ['useStale', S.useStale ? 1 : 0], ['checkPost', S.checkPost ? 1 : 0], ['asOf', asOf == null ? '' : asOf], ['packGrams', sv('packGrams', 14999)], ['chinaFloor', sv('chinaFloor', 1)], ['ukSoldFloor', sv('ukSoldFloor', 0.5)], ['ukBand1', sv('ukBand1', 0.8)], ['ukBand5', sv('ukBand5', 0.7)], ['ukBand10', sv('ukBand10', 0.6)], ['ukBandRest', sv('ukBandRest', 0.5)], ['cost1', sv('cost1', 1)], ['cost5', sv('cost5', 5)], ['cost10', sv('cost10', 10)], ['closeHi', sv('closeHi', 0.10)], ['closeLo', sv('closeLo', 0.15)], ['zeroSalesRaise', sv('zeroSalesRaise', 0.5)], ['band1w', 2000], ['band1p', 1.75], ['band2w', 15200], ['band2p', 2.3], ['band3w', 20000], ['band3p', 8], ['band4w', 25000], ['band4p', 9], ['band5w', 30000], ['band5p', 10.5], ['overBand', sv('overBand', 15)]];
+    var setRows = [['fee', sv('fee', 0.15)], ['ukMax', sv('ukMax', 0.8)], ['safeMin', sv('safeMin', 0.5)], ['minChange', sv('minChange', 0.1)], ['t3buf', sv('t3buf', 0.05)], ['t5cut', sv('t5cut', 0.05)], ['t5ukFloor', sv('t5ukFloor', 0.6)], ['t5ukMin', sv('t5ukMin', 0.65)], ['t5HoldDays', sv('t5HoldDays', 3)], ['step', sv('step', 0.01)], ['stepPct', S.stepPct || 0], ['minGain', S.minGain == null ? 0.1 : S.minGain], ['raisePct', S.raisePct == null ? 0.05 : S.raisePct], ['xmas', S.xmas === false ? 0 : 1], ['raiseNoSales', S.raiseNoSales ? 1 : 0], ['noStockKeep', S.noStockKeep === false ? 0 : 1], ['keepTrees', S.keepTrees === false ? 0 : 1], ['useStale', S.useStale ? 1 : 0], ['checkPost', S.checkPost ? 1 : 0], ['asOf', asOf == null ? '' : asOf], ['packGrams', sv('packGrams', 14999)], ['chinaFloor', sv('chinaFloor', 1)], ['ukSoldFloor', sv('ukSoldFloor', 0.5)], ['ukBand1', sv('ukBand1', 0.8)], ['ukBand5', sv('ukBand5', 0.7)], ['ukBand10', sv('ukBand10', 0.6)], ['ukBandRest', sv('ukBandRest', 0.5)], ['cost1', sv('cost1', 1)], ['cost5', sv('cost5', 5)], ['cost10', sv('cost10', 10)], ['closeHi', sv('closeHi', 0.10)], ['closeLo', sv('closeLo', 0.15)], ['zeroSalesRaise', sv('zeroSalesRaise', 0.5)], ['floorLift', sv('floorLift', 1)], ['band1w', 2000], ['band1p', 1.9], ['band2w', 15200], ['band2p', 2.45], ['band3w', 20000], ['band3p', 8], ['band4w', 25000], ['band4p', 9], ['band5w', 30000], ['band5p', 10.5], ['overBand', sv('overBand', 15)], ['accessMap1old', 1.75], ['accessMap1new', 1.9], ['accessMap2old', 2.3], ['accessMap2new', 2.45], ['accessMapTol', 0.005]];
     if (Array.isArray(S.bands) && S.bands.length) {
       var bi; for (bi = 0; bi < 5 && bi < S.bands.length; bi++) {
         var pair = S.bands[bi];
         setRows.forEach(function (r) { if (r[0] === 'band' + (bi + 1) + 'w') r[1] = pair[0]; if (r[0] === 'band' + (bi + 1) + 'p') r[1] = pair[1]; });
       }
     }
-    var SB = {}; setRows.forEach(function (r, i) { SB[r[0]] = "'" + SET + "'!$B$" + (i + 2); });
+    if (Array.isArray(S.accessMap) && S.accessMap.length) {
+      var mi; for (mi = 0; mi < 5 && mi < S.accessMap.length; mi++) {
+        var mp = S.accessMap[mi];
+        setRows.forEach(function (r) { if (r[0] === 'accessMap' + (mi + 1) + 'old') r[1] = mp[0]; if (r[0] === 'accessMap' + (mi + 1) + 'new') r[1] = mp[1]; });
+      }
+    }
+    if (S.accessMapTol != null && S.accessMapTol !== '') setRows.forEach(function (r) { if (r[0] === 'accessMapTol') r[1] = S.accessMapTol; });
+    var SB = {}; setRows.forEach(function (r) { SB[r[0]] = 'BQ_' + r[0]; });
+    var setNames = setRows.map(function (r, i) { return { name: 'BQ_' + r[0], ref: SET + '!$B$' + (i + 2) }; });
     var names = [];
     function add(name) { names.push(name); return names.length - 1; }
     ['sku','title','uk','cost','mult','collab','w','sales','stock','bb','win','seller','basePost','basePrice','china','tree','fresh','liveSeen','offer','packN','packCheck','lastChange','rival','seasonal','engSugg','engInc','engCheck','engReason','engProfit','engPc','engFloor','engCap','engNewProfit','noData','priceCheck','weeklyEng','t5Min','engAct','cat'].forEach(add);
@@ -111,10 +122,32 @@
       return pa - pb || (a.sku < b.sku ? -1 : a.sku > b.sku ? 1 : 0);
     });
     var nAll = (input.aoa && input.aoa.length > 1) ? input.aoa.length - 1 : recs.length, nTab = { 2: 0, 3: 0, 4: 0, 5: 0, china: 0 };
-    recs.forEach(function (rec) { if (nTab[rec.tab] != null) nTab[rec.tab]++; if (rec.cat === 'raise' && rec.china) nTab.china++; });
-    function bound(n) { return '$A$3:$A$' + Math.max(4, 2 + (n || 0)); }
-    var LOOK = [bound(nAll), bound(nTab[2]), bound(nTab[3]), bound(nTab[4]), bound(nTab[5]), bound(recs.length), bound(nTab.china)];
+    recs.forEach(function (rec, idx) {
+      rec._calcRow = idx + 2;
+      if (nTab[rec.tab] != null) nTab[rec.tab]++;
+      if (rec.cat === 'raise' && rec.china) nTab.china++;
+    });
+    var byTab = { 2: [], 3: [], 4: [], 5: [], china: [] };
+    recs.forEach(function (rec) { if (byTab[rec.tab]) byTab[rec.tab].push(rec); if (rec.cat === 'raise' && rec.china) byTab.china.push(rec); });
+    /* Excel row of this SKU on each review tab (data starts at row 3). Baked in so _Calc points at one cell instead of MATCH across a whole column. */
+    var srcRow = [{}, {}, {}, {}, {}, {}, {}];
+    recs.forEach(function (rec) { srcRow[5][rec.sku] = rec._calcRow + 1; });
+    function fillRows(k, list) { list.forEach(function (rec, i) { srcRow[k][rec.sku] = i + 3; }); }
+    fillRows(1, byTab[2]); fillRows(2, byTab[3]); fillRows(3, byTab[4]); fillRows(4, byTab[5]); fillRows(6, byTab.china);
+    var hdAll = (input.aoa && input.aoa[0]) ? input.aoa[0].map(function (h) { return h == null ? '' : String(h); }) : ['sku', 'Variant description', 'Estimated cost', 'Weight', 'B&Q 30d', 'Main supplier name'];
+    var skuAtAll = hdAll.indexOf('sku'); if (skuAtAll < 0) skuAtAll = 0;
+    var t1src = (input.aoa && input.aoa.length > 1) ? input.aoa.slice(1) : recs.map(function (r) { return [r.sku, r.title, r.cost, r.w, r.sales, r.sup]; });
+    t1src.forEach(function (raw, i) {
+      var sku = raw[skuAtAll] == null ? '' : String(raw[skuAtAll]).trim();
+      if (sku && srcRow[0][sku] == null) srcRow[0][sku] = i + 3;
+    });
     function onSheet(rec, k) { return k === 0 || k === 5 || (k === 1 && rec.tab === 2) || (k === 2 && rec.tab === 3) || (k === 3 && rec.tab === 4) || (k === 4 && rec.tab === 5) || (k === 6 && rec.cat === 'raise' && rec.china); }
+    var runUKv = 0, runCNv = 0;
+    function typCache(o, cached) {
+      if (cached == null || cached === '') { o.t = 'str'; o.v = ''; }
+      else if (typeof cached === 'number' && isFinite(cached)) { o.t = 'n'; o.v = cached; }
+      else { o.t = 'str'; o.v = String(cached); }
+    }
     var calcRows = recs.map(function (rec, idx) {
       var r = idx + 2, row = new Array(names.length);
       function setV(i, v, z) { if (v == null || v === '') return; row[i] = { t: typeof v === 'number' ? 'n' : 's', v: v, z: z }; }
@@ -131,15 +164,12 @@
       setV(33, rec.noData ? 1 : 0); setV(34, rec.priceCheck ? 1 : 0); setV(35, rec.weekly ? 1 : 0); setV(36, rec.t5Min, M); setV(37, rec.act || ''); setV(38, rec.cat || '');
       SRC.forEach(function (src, k) {
         if (!onSheet(rec, k)) return;
-        var m = C(mCols[k], r), rg = LOOK[k];
-        if (k === 5) {
-          var cr = r + 1;
-          function direct(col) { return 'IF(\'' + src[0] + '\'!A' + cr + '=A' + r + ',IF(LEN(TRIM(\'' + src[0] + '\'!' + col + cr + '&""))=0,"",\'' + src[0] + '\'!' + col + cr + '),' + pull('IFERROR(MATCH(A' + r + ',\'' + src[0] + '\'!' + rg + ',0),"")', src[0], col, rg) + ')'; }
-          setF(pCols[k], direct(src[1])); setF(rCols[k], direct(src[2])); setF(yCols[k], direct(src[3])); setF(iCols[k], normInc(direct(src[4])));
-        } else {
-          setF(mCols[k], 'IFERROR(MATCH(A' + r + ',\'' + src[0] + '\'!' + rg + ',0),"")');
-          setF(pCols[k], pull(m, src[0], src[1], rg)); setF(rCols[k], pull(m, src[0], src[2], rg)); setF(yCols[k], pull(m, src[0], src[3], rg)); setF(iCols[k], normInc(pull(m, src[0], src[4], rg)));
-        }
+        var sr = srcRow[k][rec.sku];
+        if (sr == null) return;
+        function directAt(col) { return 'IF(LEN(TRIM(\'' + src[0] + '\'!' + col + sr + '&""))=0,"",\'' + src[0] + '\'!' + col + sr + ')'; }
+        setF(pCols[k], directAt(src[1])); setF(rCols[k], directAt(src[2])); setF(yCols[k], directAt(src[3]));
+        setF(mCols[k], directAt(src[4])); /* raw Include text; normInc stays same-sheet so it can be a shared formula */
+        setF(iCols[k], normInc(C(mCols[k], r)));
       });
       setF(postN, countF(pCols, r)); setF(postBad, badNum(pCols, r, '>=0')); setF(postMin, minF(pCols, r)); setF(postMax, maxF(pCols, r));
       setF(postStat, statF(C(postBad, r), C(postN, r), C(postMax, r), C(postMin, r)));
@@ -169,7 +199,7 @@
       setF(chinaMin, 'IF(OR(' + C(chinaI, r) + '<>1,' + C(fixed, r) + '=""),"",' + priceFor(r, '1.05') + ')', M);
       setH(stepAmt, 'MAX(0.01,ROUND(MAX(' + SB.step + ',IF(OR(' + C(bbI, r) + '="",NOT(ISNUMBER(' + C(bbI, r) + '))),0,' + C(bbI, r) + ')*' + SB.stepPct + '/100),2))');
       setH(need, 'IF(OR(' + C(bbI, r) + '="",NOT(ISNUMBER(' + C(bbI, r) + '))),"",ROUND(' + C(bbI, r) + '-' + C(stepAmt, r) + ',2))', M);
-      setH(tLow, 'IF(' + C(need, r) + '="","",IF(' + C(capP, r) + '="",' + C(need, r) + ',IF(' + C(need, r) + '>' + C(capP, r) + ',' + C(capP, r) + ',' + C(need, r) + ')))', M);
+      setH(tLow, 'IF(' + C(need, r) + '="","",IF(OR(' + C(capP, r) + '=""' + ',AND(' + C(chinaI, r) + '<>1,' + C(salesI, r) + '>=1,' + C(need, r) + '<' + C(priceU, r) + '-0.000000001),' + C(need, r) + '<=' + C(capP, r) + '),' + C(need, r) + ',' + C(capP, r) + '))', M);
       setH(eC, '""'); setH(eR, '""'); setH(eQ, '""'); setH(eV, '""');
       setH(bbSugg, 'IF(' + C(tLow, r) + '="","",' + C(tLow, r) + ')', M);
       setH(raiseT, 'IF(AND(ISNUMBER(' + C(rivalI, r) + '),' + C(rivalI, r) + '>' + C(priceU, r) + '),ROUND(' + C(rivalI, r) + '-' + C(stepAmt, r) + ',2),IF(AND(ISNUMBER(' + C(rivalI, r) + '),' + C(rivalI, r) + '<=' + C(priceU, r) + '),"",IF(AND(' + SB.xmas + '=1,' + C(seaI, r) + '=1),"",ROUNDDOWN(' + C(priceU, r) + '*(1+' + SB.raisePct + '),2))))', M);
@@ -200,9 +230,10 @@
       setH(t3c, 'IF(' + C(t3m, r) + '="","",IF(' + C(capP, r) + '="",' + C(t3m, r) + ',IF(' + C(t3m, r) + '>' + C(capP, r) + ',' + C(capP, r) + ',' + C(t3m, r) + ')))', M);
       var t3ok = 'OR(' + okUK(C(t3c, r), C(t3fb, r)) + ',AND(' + C(chinaI, r) + '<>1,' + C(capP, r) + '<>"",' + C(priceU, r) + '>' + C(capP, r) + '+0.000000001,ABS(' + C(t3c, r) + '-' + C(capP, r) + ')<0.00001,' + okUK(C(t3c, r), C(floorP, r)) + '))';
       setH(t3s, 'IF(OR(' + C(priceU, r) + '="",' + C(t3c, r) + '=""),"",IF(AND(' + C(chinaI, r) + '<>1,' + C(t3c, r) + '>=' + C(priceU, r) + '),"",IF(ABS(' + C(priceU, r) + '-' + C(t3c, r) + ')<' + SB.minChange + ',"",IF(' + t3ok + ',' + C(t3c, r) + ',""))))', M);
-      var raisePx = 'IF(AND(' + C(chinaI, r) + '<>1,' + C(salesI, r) + '<1),' + priceFor(r, SB.zeroSalesRaise) + ',' + C(floorP, r) + ')';
+      var z50 = priceFor(r, SB.zeroSalesRaise);
+      var raisePx = 'IF(AND(' + C(chinaI, r) + '<>1,' + C(salesI, r) + '<1),IF(AND(' + SB.floorLift + '=1,' + C(floorP, r) + '<>"",' + z50 + '<' + C(floorP, r) + '-0.000000001),' + C(floorP, r) + ',' + z50 + '),' + C(floorP, r) + ')';
       var up9r = '(ROUND(' + raisePx + '*100,0)+MOD(9-MOD(ROUND(' + raisePx + '*100,0),10)+10,10))/100';
-      var raiseUp = 'IF(' + raisePx + '="","",IF(OR(' + up9r + '<=0,IF(' + C(capP, r) + '="",FALSE,' + up9r + '>' + C(capP, r) + ')),' + raisePx + ',' + up9r + '))';
+      var raiseUp = 'IF(' + raisePx + '="","",IF(AND(' + SB.floorLift + '=1,' + C(floorP, r) + '<>"",ABS(' + raisePx + '-' + C(floorP, r) + ')<0.000000001),' + raisePx + ',IF(OR(' + up9r + '<=0,IF(' + C(capP, r) + '="",FALSE,' + up9r + '>' + C(capP, r) + ')),' + raisePx + ',' + up9r + ')))';
       var raiseLine2 = 'IF(' + C(chinaI, r) + '=1,' + C(floorPct, r) + ',IF(' + C(salesI, r) + '>=1,' + C(floorPct, r) + ',' + SB.zeroSalesRaise + '))';
       setH(reSugg, 'IF(OR(' + C(act, r) + '="",' + C(act, r) + '="No data",' + C(act, r) + '="Price check"),"",IF(' + C(act, r) + '="Closer",' + C(closePx, r) + ',IF(' + C(act, r) + '="Lower",' + C(bbSugg, r) + ',IF(' + C(act, r) + '="Raise",IF(OR(' + C(pcNow, r) + '="",' + C(pcNow, r) + '<' + raiseLine2 + '),' + raiseUp + ',' + C(raiseC, r) + '),IF(' + C(act, r) + '="Can\'t win",' + C(t5s, r) + ',IF(AND(' + C(winI, r) + '=1,' + C(salesI, r) + '<1,' + C(treeI, r) + '<>1,OR(NOT(ISNUMBER(' + C(stockI, r) + ')),' + C(stockI, r) + '>0,' + SB.noStockKeep + '=0)),' + C(t3s, r) + ',""))))))', M);
       setF(showPost, 'IF(' + C(postU, r) + '="","",' + C(postU, r) + ')', M);
@@ -232,6 +263,64 @@
       setF(runCN, (idx === 0 ? 'IF(' + qualCN + ',1,0)' : C(runCN, r - 1) + '+IF(' + qualCN + ',1,0)'));
       setF(upUK, 'IF(' + qualUK + ',' + C(runUK, r) + ',"")', IN);
       setF(upCN, 'IF(' + qualCN + ',' + C(runCN, r) + ',"")', IN);
+      /* Cached results so Excel can open without a full calculate. When no review
+         is typed, visible columns equal the engine snapshot already stored in eng* cells. */
+      var sav = saved[rec.sku] || null;
+      var hasPost = !!(sav && sav.post != null);
+      var hasPrice = !!(sav && sav.priceNow != null);
+      var hasYour = !!(sav && sav.your != null);
+      var hasInc = !!(sav && (sav.inc === 'Yes' || sav.inc === 'No'));
+      var oc = null;
+      if (hasPost || hasPrice || hasYour || hasInc) {
+        var edit = {};
+        if (hasPost) edit.post = sav.post;
+        if (hasPrice) edit.priceNow = sav.priceNow;
+        if (hasYour) edit.your = sav.your;
+        if (hasInc) edit.inc = sav.inc;
+        oc = outcome(P, rec, edit, S, Book && Book.classify);
+      }
+      var showCheckV = oc ? oc.check : rec.engCheck;
+      var showIncV = oc ? oc.inc : rec.engInc;
+      var showSuggV = oc && oc.sugg != null ? oc.sugg : rec.engSugg;
+      var showFinalV = oc && oc.final != null ? oc.final : rec.engSugg;
+      var showNewPV = oc && oc.newProfit != null ? oc.newProfit : rec.engNewProfit;
+      var showWhyV = oc && oc.reason ? oc.reason : rec.engReason;
+      var showPostV = oc && oc.post != null ? oc.post : rec.basePost;
+      var showPriceV = oc && oc.price != null ? oc.price : rec.basePrice;
+      var showProfitV = oc && oc.profitNow != null ? oc.profitNow : rec.engProfit;
+      var showFloorV = oc && oc.floor != null ? oc.floor : rec.engFloor;
+      var showPcV = rec.engPc;
+      if (oc && oc.profitNow != null && rec.cost > 0 && (hasPost || hasPrice)) showPcV = oc.profitNow / rec.cost;
+      var qUK = showIncV === 'Yes' && showCheckV === 'OK' && rec.uk === 'UK';
+      var qCN = showIncV === 'Yes' && showCheckV === 'OK' && rec.uk === 'China';
+      runUKv += qUK ? 1 : 0;
+      runCNv += qCN ? 1 : 0;
+      var idleRow = !hasPost && !hasPrice;
+      var ckv = {
+        postN: hasPost ? 1 : 0, postBad: 0, postMin: hasPost ? sav.post : 1e99, postMax: hasPost ? sav.post : -1,
+        postStat: hasPost ? 'OK' : 'BASE', postU: hasPost ? sav.post : rec.basePost,
+        priceN: hasPrice ? 1 : 0, priceBad: 0, priceMin: hasPrice ? sav.priceNow : 1e99, priceMax: hasPrice ? sav.priceNow : -1,
+        priceStat: hasPrice ? 'OK' : 'BASE', priceU: hasPrice ? sav.priceNow : rec.basePrice,
+        yourN: hasYour ? 1 : 0, yourBad: 0, yourMin: hasYour ? sav.your : 1e99, yourMax: hasYour ? sav.your : -1,
+        yourStat: hasYour ? 'OK' : 'BASE', yourU: hasYour ? sav.your : '',
+        incN: hasInc ? 1 : 0, incBad: 0, incFirst: hasInc ? sav.inc : '', incStat: hasInc ? 'OK' : 'BASE', incVal: hasInc ? sav.inc : '',
+        fixed: (function () { var post = hasPost ? sav.post : rec.basePost; if (post == null || !(rec.cost > 0)) return ''; return rec.cost * rec.mult + post + (rec.collab || 0); })(),
+        profitNow: showProfitV, pcNow: showPcV, floorPct: rec.floorPct, floorP: showFloorV, capP: rec.engCap, t5MinP: rec.t5Min,
+        showPost: showPostV, showPrice: showPriceV, showProfit: showProfitV, showPc: showPcV, showFloor: showFloorV,
+        showSugg: showSuggV, showFinal: showFinalV, showNewP: showNewPV, showCheck: showCheckV, showInc: showIncV,
+        showWhy: showWhyV, showCap: rec.engCap, showNewPc: (showNewPV != null && rec.cost > 0) ? showNewPV / rec.cost : '',
+        runUK: runUKv, runCN: runCNv, upUK: qUK ? runUKv : '', upCN: qCN ? runCNv : ''
+      };
+      if (idleRow) {
+        ['stepAmt','need','tLow','eC','eR','eQ','eV','bbSugg','raiseT','raiseC','gain','closePx','act','weekly','t5ukR','t5ukC','t5cnR','t5s','t3q','t3fb','t3m','t3c','t3s','reSugg'].forEach(function (nm) { ckv[nm] = ''; });
+      }
+      var ci;
+      for (ci = 0; ci < names.length; ci++) {
+        if (!row[ci] || !row[ci].f) continue;
+        if (!idleRow && ckv[names[ci]] === undefined) continue; /* leave heavy engine cells uncached when a postage/price review is baked in */
+        typCache(row[ci], ckv[names[ci]] === undefined ? '' : ckv[names[ci]]);
+      }
+      rec._cache = { showCheck: showCheckV, showInc: showIncV, showSugg: showSuggV, showFinal: showFinalV, showNewP: showNewPV, showWhy: showWhyV, showPost: showPostV, showPrice: showPriceV, showProfit: showProfitV, showFloor: showFloorV, showPc: showPcV, showCap: rec.engCap, showNewPc: ckv.showNewPc, upUK: ckv.upUK, upCN: ckv.upCN };
       return row;
     });
     var calcHead = names.map(function (n) { return [n, null, 14, 'hide']; });
@@ -239,11 +328,13 @@
 
     function v(val, z) { if (val == null || val === '') return null; return { t: typeof val === 'number' ? 'n' : 's', v: val, z: z }; }
     var calcLast = Math.max(4, recs.length + 1);
-    function fml(col, rr, z, aligned) {
-      if (!aligned) return { t: 'n', f: 'IFERROR(INDEX(\'' + CALC + '\'!$' + ref(col) + '$2:$' + ref(col) + '$' + calcLast + ',MATCH(A' + rr + ',\'' + CALC + '\'!$A$2:$A$' + calcLast + ',0)),"")', z: z };
-      var cr = rr - 1;
-      return { t: 'n', f: 'IF(\'' + CALC + '\'!A' + cr + '=A' + rr + ',\'' + CALC + '\'!' + ref(col) + cr + ',IFERROR(INDEX(\'' + CALC + '\'!$' + ref(col) + '$2:$' + ref(col) + '$' + calcLast + ',MATCH(A' + rr + ',\'' + CALC + '\'!$A$2:$A$' + calcLast + ',0)),""))', z: z };
+    function fml(col, rr, z, calcRow, cached) {
+      var cr = calcRow || (rr - 1);
+      var o = { f: 'IF(\'' + CALC + '\'!A' + cr + '=A' + rr + ',\'' + CALC + '\'!' + ref(col) + cr + ',"")', z: z };
+      typCache(o, cached);
+      return o;
     }
+    function cv(rec, key) { return rec._cache ? rec._cache[key] : undefined; }
     function inputCell(rec, field, z) {
       var c = saved[rec.sku]; if (!c) return null;
       if (field === 'post' && c.post != null) return { t: 'n', v: c.post, z: z || M };
@@ -251,6 +342,118 @@
       if (field === 'your' && c.your != null) return { t: 'n', v: c.your, z: M };
       if (field === 'inc' && (c.inc === 'Yes' || c.inc === 'No')) return { t: 's', v: c.inc, z: YESF };
       return null;
+    }
+    function firstFilledF(refs, empty) {
+      var f = empty || '""';
+      for (var i = refs.length - 1; i >= 0; i--) f = 'IF(' + refs[i] + '<>"",' + refs[i] + ',' + f + ')';
+      return f;
+    }
+    function numConflictF(refs) {
+      if (refs.length < 2) return 'FALSE';
+      var n = '(' + refs.map(function (c) { return 'IF(' + c + '="","",1)'; }).join('+') + ')';
+      var mn = 'MIN(' + refs.map(function (c) { return 'IF(OR(' + c + '="",NOT(ISNUMBER(' + c + '))),1E99,' + c + ')'; }).join(',') + ')';
+      var mx = 'MAX(' + refs.map(function (c) { return 'IF(OR(' + c + '="",NOT(ISNUMBER(' + c + '))),-1E99,' + c + ')'; }).join(',') + ')';
+      return 'AND(' + n + '>=2,ABS(' + mx + '-' + mn + ')>=0.001)';
+    }
+    function incNormF(cell) {
+      return 'IF(' + cell + '="","",IF(OR(UPPER(TRIM(' + cell + '&""))="YES",UPPER(TRIM(' + cell + '&""))="Y"),"Yes",IF(OR(UPPER(TRIM(' + cell + '&""))="NO",UPPER(TRIM(' + cell + '&""))="N"),"No","BAD")))';
+    }
+    function incMergeF(refs) {
+      if (!refs.length) return '""';
+      var norms = refs.map(incNormF);
+      var first = firstFilledF(norms, '""');
+      if (refs.length < 2) return first;
+      var n = '(' + norms.map(function (c) { return 'IF(' + c + '="","",1)'; }).join('+') + ')';
+      var bad = '(' + norms.map(function (c) { return 'IF(' + c + '="BAD",1,0)'; }).join('+') + ')';
+      var differ = '(' + norms.map(function (c) { return 'IF(OR(' + c + '="",' + c + '=' + first + '),0,1)'; }).join('+') + ')';
+      return 'IF(OR(' + bad + '>0,AND(' + n + '>=2,' + differ + '>0)),"CONFLICT",' + first + ')';
+    }
+    function numMergeF(refs) {
+      if (!refs.length) return '""';
+      var first = firstFilledF(refs, '""');
+      if (refs.length < 2) return first;
+      return 'IF(' + numConflictF(refs) + ',"CONFLICT",' + first + ')';
+    }
+    function reviewRefs(rec, name, rr) {
+      var post = [], price = [], your = [], inc = [];
+      for (var k = 0; k < 7; k++) {
+        if (!onSheet(rec, k)) continue;
+        var row = srcRow[k][rec.sku];
+        if (row == null) continue;
+        var sh = SRC[k][0];
+        function cell(col) { return (sh === name && row === rr) ? (col + rr) : ("'" + sh + "'!" + col + row); }
+        post.push(cell(SRC[k][1]));
+        price.push(cell(SRC[k][2]));
+        your.push(cell(SRC[k][3]));
+        inc.push(cell(SRC[k][4]));
+      }
+      return { post: post, price: price, your: your, inc: inc };
+    }
+    function calcDirect(col, rec, rr, z, cached) {
+      return fml(col, rr, z, rec._calcRow, cached);
+    }
+    function toneOf(pc, used, floor, cap) {
+      if (pc != null && typeof pc === 'number' && isFinite(pc) && pc < 0) return 'neg';
+      if (used != null && floor != null && used < floor - 1e-5) return 'under';
+      if (used != null && cap != null && used > cap + 1e-5) return 'blue';
+      return null;
+    }
+    function liteIf(idleF, bakedRef, heavyRef, cached, z) {
+      var o = { f: 'IF(' + idleF + ',' + bakedRef + ',' + heavyRef + ')', z: z };
+      typCache(o, cached);
+      return o;
+    }
+    function liteRow(name, rec, rr, opts) {
+      opts = opts || {};
+      var refs = reviewRefs(rec, name, rr);
+      var c = rec._cache || {};
+      var mp = { f: firstFilledF(refs.post, '""') }; typCache(mp, '');
+      var mq = { f: firstFilledF(refs.price, '""') }; typCache(mq, '');
+      var my = { f: firstFilledF(refs.your, '""') }; typCache(my, '');
+      var mi = { f: firstFilledF(refs.inc, '""') }; typCache(mi, '');
+      var AB = 'AB' + rr, AC = 'AC' + rr, AD = 'AD' + rr, AE = 'AE' + rr;
+      var AF = 'AF' + rr, AG = 'AG' + rr, AH = 'AH' + rr, AI = 'AI' + rr, AJ = 'AJ' + rr, AK = 'AK' + rr, AL = 'AL' + rr, AM = 'AM' + rr, AN = 'AN' + rr, AO = 'AO' + rr, AP = 'AP' + rr, AQ = 'AQ' + rr;
+      var AX = 'AX' + rr, AY = 'AY' + rr, AZ = 'AZ' + rr, BA = 'BA' + rr, BB = 'BB' + rr, BC = 'BC' + rr, BD = 'BD' + rr, BE = 'BE' + rr, BF = 'BF' + rr, BG = 'BG' + rr, BH = 'BH' + rr, BI = 'BI' + rr;
+      var idleAll = 'AND(' + AB + '="",' + AC + '="",' + AD + '="",' + AE + '="")';
+      var idlePP = 'AND(' + AB + '="",' + AC + '="")';
+      function sh(f, baked, z) { var o = { f: f, z: z }; typCache(o, baked); return o; }
+      var checkC = sh('IF(' + idleAll + ',' + AF + ',' + AX + ')', c.showCheck, null);
+      var sellC = sh('IF(' + AC + '="",' + AI + ',' + BA + ')', c.showPrice, M);
+      var floorC = sh('IF(' + idlePP + ',' + AJ + ',' + BB + ')', c.showFloor, M);
+      var suggC = sh('IF(' + idlePP + ',' + AL + ',' + BC + ')', c.showSugg, M);
+      var pcC = sh('IF(' + idlePP + ',' + AM + ',' + BD + ')', c.showPc, PC);
+      var newPcC = sh('IF(OR(V' + rr + '="",D' + rr + '="",D' + rr + '<=0),"",V' + rr + '/D' + rr + ')', c.showNewPc, PC);
+      var postC = sh('IF(' + AB + '="",' + AH + ',' + AZ + ')', c.showPost, M);
+      var finalC = sh('IF(' + idleAll + ',' + AG + ',' + AY + ')', c.showFinal, M);
+      var whyC = sh('IF(' + idleAll + ',' + AP + ',' + BG + ')', c.showWhy, null);
+      var profC = sh('IF(' + idlePP + ',' + AN + ',' + BE + ')', c.showProfit, M);
+      var newPC = sh('IF(' + idleAll + ',' + AO + ',' + BF + ')', c.showNewP, M);
+      var incC = sh('IF(' + idleAll + ',' + AQ + ',' + BH + ')', c.showInc, null);
+      var capC = sh('IF(' + idlePP + ',' + AK + ',' + BI + ')', c.showCap, M);
+      var tI = toneOf(c.showPc, c.showPrice, c.showFloor, rec.engCap);
+      var tK = toneOf(c.showNewPc, c.showFinal, c.showFloor, rec.engCap);
+      if (tI) pcC.st = tI;
+      if (tK) newPcC.st = tK;
+      function val(x, z) { if (x == null || x === '') return { t: 'str', v: '' }; if (typeof x === 'number' && isFinite(x)) return { t: 'n', v: x, z: z }; return { t: 'str', v: String(x), z: z }; }
+      var floorRef = (rec.cat === 't5' && !rec.china && rec.t5Min != null) ? rec.t5Min : (c.showFloor != null ? c.showFloor : rec.engFloor);
+      var helpers = [
+        mp, mq, my, mi,
+        val(c.showCheck), val(c.showFinal, M), val(c.showPost, M), val(c.showPrice, M), val(c.showFloor, M), val(c.showCap, M), val(c.showSugg, M), val(c.showPc, PC), val(c.showProfit, M), val(c.showNewP, M), val(c.showWhy), val(c.showInc), val(c.showNewPc, PC),
+        val(rec.weekly ? 1 : 0), val(rec.packCheck ? 1 : 0), val(floorRef, M), val(rec.mult), val(rec.collab || 0, M),
+        calcDirect(showCheck, rec, rr, null, c.showCheck), calcDirect(showFinal, rec, rr, M, c.showFinal), calcDirect(showPost, rec, rr, M, c.showPost), calcDirect(showPrice, rec, rr, M, c.showPrice), calcDirect(showFloor, rec, rr, M, c.showFloor), calcDirect(showSugg, rec, rr, M, c.showSugg), calcDirect(showPc, rec, rr, PC, c.showPc), calcDirect(showProfit, rec, rr, M, c.showProfit), calcDirect(showNewP, rec, rr, M, c.showNewP), calcDirect(showWhy, rec, rr, null, c.showWhy), calcDirect(showInc, rec, rr, null, c.showInc), calcDirect(showCap, rec, rr, M, c.showCap), calcDirect(showNewPc, rec, rr, PC, c.showNewPc)
+      ];
+      return [
+        v(rec.sku), v(rec.title), checkC, v(rec.cost, M), v(rec.uk),
+        sellC, floorC, suggC, pcC,
+        opts.readonly ? null : inputCell(rec, 'your', M),
+        newPcC, v(rec.seller), v(rec.bb, M), postC,
+        opts.readonly ? null : inputCell(rec, 'post', M),
+        opts.readonly ? null : inputCell(rec, 'inc'),
+        finalC, whyC, v(rec.sales, IN),
+        opts.readonly ? null : inputCell(rec, 'priceNow', M),
+        profC, newPC, incC,
+        v(c.upUK, IN), v(c.upCN, IN), v(rec.stock, IN), capC
+      ].concat(helpers);
     }
     var VIS = [
       ['B&Q SKU', null, 18], ['Product', null, 36], ['Check', null, 16], ['Estimated cost', M, 14], ['UK/China', null, 12],
@@ -279,37 +482,23 @@
     }
     function revSheet(name, list, top, opts) {
       opts = opts || {};
-      var aligned = name === T6;
       var rows = list.map(function (rec, i) {
-        var rr = i + 3;
-        return [
-          v(rec.sku), v(rec.title), fml(showCheck, rr, null, aligned), v(rec.cost, M), v(rec.uk),
-          fml(showPrice, rr, M, aligned), fml(showFloor, rr, M, aligned), fml(showSugg, rr, M, aligned), fml(showPc, rr, PC, aligned),
-          opts.readonly ? null : inputCell(rec, 'your', M),
-          fml(showNewPc, rr, PC, aligned), v(rec.seller), v(rec.bb, M), fml(showPost, rr, M, aligned),
-          opts.readonly ? null : inputCell(rec, 'post', M),
-          opts.readonly ? null : inputCell(rec, 'inc'),
-          fml(showFinal, rr, M, aligned), fml(showWhy, rr, null, aligned), v(rec.sales, IN),
-          opts.readonly ? null : inputCell(rec, 'priceNow', M),
-          fml(showProfit, rr, M, aligned), fml(showNewP, rr, M, aligned), fml(showInc, rr, null, aligned),
-          fml(upUK, rr, IN, aligned), fml(upCN, rr, IN, aligned), v(rec.stock, IN), fml(showCap, rr, M, aligned)
-        ];
+        return liteRow(name, rec, i + 3, opts);
       });
       var cols = VIS.map(function (c) { return c.slice(); }).concat(GRP.map(function (c) { return [c[0], c[1], c[2], 'group']; }));
+      var HIDE = ['mPost','mPrice','mYour','mInc','bCheck','bFinal','bPost','bPrice','bFloor','bCap','bSugg','bPc','bProfit','bNewP','bWhy','bInc','bNewPc','weekly','pack','floorRef','mult','collab','cCheck','cFinal','cPost','cPrice','cFloor','cSugg','cPc','cProfit','cNewP','cWhy','cInc','cCap','cNewPc'];
+      HIDE.forEach(function (h) { cols.push([h, null, 8, 'hide']); });
       var last = Math.max(3, 2 + rows.length);
-      var out = { name: name, top: (top || REVNOTE) + '  ' + CF_KEY, cols: cols, rows: rows, freeze: { x: 1, y: 2 }, filter: true, cf: profitCf(last), notes: { 'Postage review': 'Type a postage, or 0. Leave blank to keep Postage used.', 'Selling price review': 'Corrects the current selling price. The suggestion is recalculated. This is not Your price.', 'Your price': 'Optional final price. Safety rules still apply. Leave blank to use the suggestion.', 'Include override': 'Yes or No. Blank keeps the automatic decision. Yes cannot bypass a floor, a raise over the cap, a China raise, a weekly hold or postage that is still unchecked.' } };
+      var out = { name: name, top: (top || REVNOTE) + '  ' + CF_KEY, cols: cols, rows: rows, freeze: { x: 1, y: 2 }, filter: true, filterTo: 26, cf: profitCf(last), notes: { 'Postage review': 'Type a postage, or 0. Leave blank to keep Postage used.', 'Selling price review': 'Corrects the current selling price. The suggestion is recalculated. This is not Your price.', 'Your price': 'Optional final price. Safety rules still apply. Leave blank to use the suggestion.', 'Include override': 'Yes or No. Blank keeps the automatic decision. Yes cannot bypass a floor, a raise over the cap, a China raise, a weekly hold or postage that is still unchecked.' } };
       if (!opts.readonly) out.inputs = [14, 19, 9, 15];
       return out;
     }
-    var byTab = { 2: [], 3: [], 4: [], 5: [], china: [] };
-    recs.forEach(function (rec) { if (byTab[rec.tab]) byTab[rec.tab].push(rec); if (rec.cat === 'raise' && rec.china) byTab.china.push(rec); });
     var loseCheap = recs.filter(function (r) { return !r.win && r.bb > 0 && r.basePrice != null && r.basePrice < r.bb - 1e-9 && !r.noData; });
     var cantWin = recs.filter(function (r) { return r.act === "Can't win (floor)"; });
-    var Book = (typeof BQBook !== 'undefined') ? BQBook : require('./bq_book.js');
     var inactivePack = Book.inactiveFix ? Book.inactiveFix(P, input.aoa || [], input.offers || (input.settings && input.settings.offers) || {}, S) : { rows: [] };
     var list = [];
     /* Calculation sheets first so a full pass resolves each SKU once, then the visible tabs read those results. Hidden, so the workbook still opens on Rules. */
-    list.push({ name: SET, hide: true, cols: [['Setting', null, 20], ['Value', null, 16]], rows: setRows.map(function (r) { return [v(r[0]), r[1] === '' || r[1] == null ? null : { t: 'n', v: r[1] }]; }), freeze: { x: 0, y: 1 }, filter: false });
+    list.push({ name: SET, hide: true, cols: [['Setting', null, 20], ['Value', null, 16]], rows: setRows.map(function (r) { return [v(r[0]), r[1] === '' || r[1] == null ? null : { t: 'n', v: r[1] }]; }), freeze: { x: 0, y: 1 }, filter: false, defNames: setNames });
     list.push({ name: CALC, hide: true, cols: calcHead, rows: calcRows, freeze: { x: 1, y: 1 }, filter: false });
     list.push(Book.rulesSheet({ settings: S, recs: recs, asOf: S.asOf || input.asOf || '' }));
     list.push(revSheet(T6, recs, 'Every product, sorted by projected profit % (losses first). Filter Check to OK to see upload rows. A suggestion that appears after you type a review shows up here and on Final without retyping. Yellow cells are inputs; other columns are in the collapsed group on the right (click +).'));
@@ -386,6 +575,7 @@
       var t1In = 40;
       while (cols.length < t1In) cols.push([' ', null, 3, 'hide']);
       cols[t1In] = ['Postage review', M, 16]; cols[t1In + 1] = ['Selling price review', M, 18]; cols[t1In + 2] = ['Your price', M, 12]; cols[t1In + 3] = ['Include override', null, 16];
+      ['mPost','mPrice','mYour','mInc','bPost','bPrice','bProfit','bPc','bFloor','bSugg','bCheck','bWhy','cPost','cPrice','cProfit','cPc','cFloor','cSugg','cCheck','cWhy'].forEach(function (h) { cols.push([h, null, 8, 'hide']); });
       SRC[0][1] = L(t1In); SRC[0][2] = L(t1In + 1); SRC[0][3] = L(t1In + 2); SRC[0][4] = L(t1In + 3);
       var body = [];
       var source = (aoa && aoa.length > 1) ? aoa.slice(1) : recs.map(function (r) { return [r.sku, r.title, r.cost, r.w, r.sales, r.sup]; });
@@ -399,23 +589,53 @@
         var line = hd.map(function (_, j) { return v(raw[j]); });
         while (line.length < cols.length) line.push(null);
         if (rec && !dup) {
-          line[hd.length] = fml(showPost, rr, M); line[hd.length + 1] = fml(showPrice, rr, M); line[hd.length + 2] = fml(showProfit, rr, M); line[hd.length + 3] = fml(showPc, rr, PC); line[hd.length + 4] = fml(showFloor, rr, M); line[hd.length + 5] = fml(showSugg, rr, M); line[hd.length + 6] = fml(showCheck, rr); line[hd.length + 7] = fml(showWhy, rr);
+          var c1 = rec._cache || {};
+          var refs1 = reviewRefs(rec, T1, rr);
+          var t1Idle = 'AND(AS' + rr + '="",AT' + rr + '="",AU' + rr + '="",AV' + rr + '="")';
+          function t1v(x, z) { if (x == null || x === '') return { t: 'str', v: '' }; if (typeof x === 'number' && isFinite(x)) return { t: 'n', v: x, z: z }; return { t: 'str', v: String(x), z: z }; }
+          var m1p = { f: firstFilledF(refs1.post, '""') }; typCache(m1p, '');
+          var m1q = { f: firstFilledF(refs1.price, '""') }; typCache(m1q, '');
+          var m1y = { f: firstFilledF(refs1.your, '""') }; typCache(m1y, '');
+          var m1i = { f: firstFilledF(refs1.inc, '""') }; typCache(m1i, '');
+          line[hd.length] = liteIf(t1Idle, 'AW' + rr, 'BE' + rr, c1.showPost, M);
+          line[hd.length + 1] = liteIf(t1Idle, 'AX' + rr, 'BF' + rr, c1.showPrice, M);
+          line[hd.length + 2] = liteIf(t1Idle, 'AY' + rr, 'BG' + rr, c1.showProfit, M);
+          line[hd.length + 3] = liteIf(t1Idle, 'AZ' + rr, 'BH' + rr, c1.showPc, PC);
+          line[hd.length + 4] = liteIf(t1Idle, 'BA' + rr, 'BI' + rr, c1.showFloor, M);
+          line[hd.length + 5] = liteIf(t1Idle, 'BB' + rr, 'BJ' + rr, c1.showSugg, M);
+          line[hd.length + 6] = liteIf(t1Idle, 'BC' + rr, 'BK' + rr, c1.showCheck, null);
+          line[hd.length + 7] = liteIf(t1Idle, 'BD' + rr, 'BL' + rr, c1.showWhy, null);
           line[t1In] = inputCell(rec, 'post', M); line[t1In + 1] = inputCell(rec, 'priceNow', M); line[t1In + 2] = inputCell(rec, 'your', M); line[t1In + 3] = inputCell(rec, 'inc');
+          line[t1In + 4] = m1p; line[t1In + 5] = m1q; line[t1In + 6] = m1y; line[t1In + 7] = m1i;
+          line[t1In + 8] = t1v(c1.showPost, M); line[t1In + 9] = t1v(c1.showPrice, M); line[t1In + 10] = t1v(c1.showProfit, M); line[t1In + 11] = t1v(c1.showPc, PC);
+          line[t1In + 12] = t1v(c1.showFloor, M); line[t1In + 13] = t1v(c1.showSugg, M); line[t1In + 14] = t1v(c1.showCheck); line[t1In + 15] = t1v(c1.showWhy);
+          line[t1In + 16] = calcDirect(showPost, rec, rr, M, c1.showPost); line[t1In + 17] = calcDirect(showPrice, rec, rr, M, c1.showPrice);
+          line[t1In + 18] = calcDirect(showProfit, rec, rr, M, c1.showProfit); line[t1In + 19] = calcDirect(showPc, rec, rr, PC, c1.showPc);
+          line[t1In + 20] = calcDirect(showFloor, rec, rr, M, c1.showFloor); line[t1In + 21] = calcDirect(showSugg, rec, rr, M, c1.showSugg);
+          line[t1In + 22] = calcDirect(showCheck, rec, rr, null, c1.showCheck); line[t1In + 23] = calcDirect(showWhy, rec, rr, null, c1.showWhy);
         } else if (dup) line[hd.length + 7] = v('Duplicate SKU — type on the first row of this SKU');
         body.push(line);
       });
       /* formulas on _Calc were built with AO before we might have moved t1In. If t1In isn't 40, rebuild is too late.
          Caller must keep access width under 40. We force inputs at 40 and hide gap columns. If hd is long, MATCH still uses column A only if sku is column A.
          Rebuild gather letters: if t1In!==40 the _Calc formulas already say AO. So we MUST place inputs at column 40 (AO). */
-      return { name: T1, top: 'All products. Yellow Postage review, Selling price review, Your price and Include override are at columns AO–AR. Other columns are the Access paste or formulas. Duplicate SKUs: edit the first row only.', cols: cols, rows: body, freeze: { x: 1, y: 2 }, filter: true, inputs: [40, 41, 42, 43] };
+      return { name: T1, top: 'All products. Yellow Postage review, Selling price review, Your price and Include override are at columns AO–AR. Other columns are the Access paste or formulas. Duplicate SKUs: edit the first row only.', cols: cols, rows: body, freeze: { x: 1, y: 2 }, filter: true, filterTo: 43, inputs: [40, 41, 42, 43] };
     }
     function finalSheet(name, upCol, finCol, n, note) {
       var rows = [], N = Math.max(n, 1);
       var skuRg = "'" + CALC + "'!$A$2:$A$" + calcLast;
       var upRg = "'" + CALC + "'!$" + ref(upCol) + "$2:$" + ref(upCol) + "$" + calcLast;
       var finRg = "'" + CALC + "'!$" + ref(finCol) + "$2:$" + ref(finCol) + "$" + calcLast;
+      var listed = recs.filter(function (r) {
+        var inc = r._cache ? r._cache.showInc : r.engInc, chk = r._cache ? r._cache.showCheck : r.engCheck;
+        return inc === 'Yes' && chk === 'OK' && (name === T7A ? r.uk === 'UK' : r.uk === 'China');
+      });
       for (var i = 0; i < N; i++) {
-        rows.push([{ t: 's', f: 'IFERROR(INDEX(' + skuRg + ',MATCH(ROW()-2,' + upRg + ',0)),"")' }, { t: 'n', f: 'IFERROR(INDEX(' + finRg + ',MATCH(ROW()-2,' + upRg + ',0)),"")', z: '0.00' }]);
+        var recU = listed[i], fsku = 'IFERROR(INDEX(' + skuRg + ',MATCH(ROW()-2,' + upRg + ',0)),"")', fprc = 'IFERROR(INDEX(' + finRg + ',MATCH(ROW()-2,' + upRg + ',0)),"")';
+        var skuCell = { f: fsku }, prcCell = { f: fprc, z: '0.00' };
+        typCache(skuCell, recU ? recU.sku : '');
+        typCache(prcCell, recU && recU._cache && recU._cache.showFinal != null ? recU._cache.showFinal : (recU && recU.engSugg != null ? recU.engSugg : ''));
+        rows.push([skuCell, prcCell]);
       }
       var T = (input.template && input.template.Data) || [['Offer SKU', 'Offer price', 'Discount price', 'Discount start date', 'Discount end date'], ['offer-sku', 'price', 'discount-price', 'discount-start-date', 'discount-end-date']];
       return { name: name, cols: [[T[0][0], null, 24], [T[0][1], null, 14], [T[0][2], null, 16], [T[0][3], null, 22], [T[0][4], null, 22]], head2: T[1], rows: rows, freeze: { x: 0, y: 2 }, filter: false, notes: { 0: note } };
@@ -457,9 +677,11 @@
     var i = Z.FullPaths.findIndex(function (q) { return q.slice(-'xl/workbook.xml'.length) === 'xl/workbook.xml'; });
     if (i < 0) return bytes;
     var s = txt(Z.FileIndex[i].content);
-    if (/<calcPr[\s>]/.test(s)) s = s.replace(/<calcPr\b[^>]*\/?>/, '<calcPr calcMode="auto" fullCalcOnLoad="1" forceFullCalc="1"/>');
-    else s = s.replace('</workbook>', '<calcPr calcMode="auto" fullCalcOnLoad="1" forceFullCalc="1"/></workbook>');
-    /* Hidden sheets still calculate in Excel. Gnumeric's test recalc also calculates them. */
+    var calcTag = '<calcPr calcMode="auto" calcCompleted="1" fullCalcOnLoad="0" forceFullCalc="0" iterate="0" iterateCount="0"/>';
+    if (/<calcPr[\s>]/.test(s)) s = s.replace(/<calcPr\b[^>]*\/?>/, calcTag);
+    else s = s.replace('</workbook>', calcTag + '</workbook>');
+    /* Cached values are written for every formula. Excel should open on those values and only recalc dirty cells after an edit.
+       Hidden sheets still calculate when a dependent cell changes. Gnumeric/LibreOffice test recalc still recalculates them. */
     Z.FileIndex[i].content = bin(s);
     return new Uint8Array(X.CFB.write(Z, { fileType: 'zip', type: 'array', compression: true }));
   }

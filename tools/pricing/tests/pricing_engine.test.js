@@ -4,7 +4,7 @@ const assert = require('assert'), path = require('path');
 const P0 = process.env.BQP_PATH || 'bq_price.js', B = require(path.isAbsolute(P0) ? P0 : path.join(__dirname, '..', P0));
 let n = 0; const t = (name, f) => { f(); n++; };
 const near = (a, b, e = 1e-9) => assert.ok(Math.abs(a - b) <= e, a + ' != ' + b);
-const base = { sku: 'T-1', title: 'Test item', cost: 2, price: 9.99, bb: null, seller: '', sup: 'Some UK Ltd', pc: null, w: 500, sales: 0 };
+const base = { sku: 'T-1', title: 'Test item', cost: 2, price: 9.99, bb: null, seller: '', sup: 'Some UK Ltd', pc: 1.70, w: 500, sales: 0 };
 const D = (o, opt) => B.decide(Object.assign({}, base, o), opt);
 t('num parses money text', () => { assert.strictEqual(B.num('£8.70'), 8.7); assert.strictEqual(B.num('1,234.50'), 1234.5); assert.strictEqual(B.num(' 8.7 '), 8.7);
   assert.strictEqual(B.num(''), null); assert.strictEqual(B.num('abc'), null); assert.strictEqual(B.num(null), null); assert.strictEqual(B.num(0), 0); });
@@ -12,8 +12,8 @@ t('master-file row (Ashian, 0.38 cost, 3.32 price)', () => { const c = B.calc({ 
 t('UK company cost is half the cost', () => { const c = B.calc({ cost: 10, mult: 1.5, post: 2.3, collab: '' }, 30); near(c.company, 5); near(c.total, 10 + 5 + 4.5 + 2.3); });
 t('collab fee counts, blank = 0', () => { near(B.calc({ cost: 1, mult: 1.5, post: 1, collab: '0.5' }, 5).total, 1 + .5 + .75 + 1 + .5); });
 t('postage bands and override', () => {
-  [[2000, 1.75], [2001, 2.3], [15200, 2.3], [15201, 8], [20000, 8], [25000, 9], [30000, 10.5], [30001, 15]].forEach(([w, p]) => assert.strictEqual(B.postage(null, w), p));
-  assert.strictEqual(B.postage('£3.10', 99999), 3.1); assert.strictEqual(B.postage(0, 500), 1.75); assert.strictEqual(B.postage(null, null), null); });
+  [[2000, 1.9], [2001, 2.45], [15200, 2.45], [15201, 8], [20000, 8], [25000, 9], [30000, 10.5], [30001, 15]].forEach(([w, p]) => assert.strictEqual(B.postage(null, w), p));
+  assert.strictEqual(B.postage('£3.10', 99999), 3.1); assert.strictEqual(B.postage(0, 500), 1.9); assert.strictEqual(B.postage(null, null), null); });
 t('floors', () => { assert.strictEqual(B.floorOf(true, 0, 3).f, 1); assert.strictEqual(B.floorOf(false, 1, .5).f, .5);
   [[.99, .8], [1, .7], [4.99, .7], [5, .6], [9.99, .6], [10, .5]].forEach(([c, f]) => assert.strictEqual(B.floorOf(false, 0, c).f, f)); });
 t('priceFor gives at least the % (rounded up)', () => { for (let c = .1; c < 40; c += .37) { const a = { cost: c, mult: 1.5, post: 2.3, collab: 0 }; [.5, .6, .7, .8, 1].forEach(f => {
@@ -27,7 +27,7 @@ t('UK sold, 1p under is above 80% -> capped at 80%', () => { const o = D({ sales
 t('UK buy box below floor -> Margin too low, price kept', () => { const o = D({ sales: 3, bb: 3, seller: 'Rival', price: 9.99 }); assert.strictEqual(o.status, 'Margin too low'); assert.strictEqual(o.finalp, 9.99); assert.ok(!o.upload); });
 t('UK sold, no competitor -> kept', () => { const o = D({ sales: 3, bb: '', seller: '' }); assert.strictEqual(o.status, 'No competitor – kept'); assert.ok(!o.upload); });
 t('UK 0 sales floor uses cost band', () => { const o = D({ cost: 4, sales: 0 }); assert.strictEqual(o.floorPct, .7); });
-t('zero-sales raise stops at 50% and does not use the higher band floor', () => {
+t('zero-sales raise under 50% is lifted to the floor; already at 50% is not raised', () => {
   function atProfit(frac, sales) {
     const probe = D({ cost: 4, sales: sales, price: 20, bb: 20, seller: 'Diva Packages', w: 500, sup: 'UK Ltd' });
     const price = frac < 0.5 ? Math.round(B.priceFor(probe.a, frac) * 100) / 100 : B.priceFor(probe.a, frac);
@@ -39,7 +39,7 @@ t('zero-sales raise stops at 50% and does not use the higher band floor', () => 
   assert.strictEqual(under.bb.act, 'Raise');
   const stop = B.priceFor(under.o.a, 0.5);
   assert.ok(under.bb.sugg + 0.001 >= stop);
-  assert.ok(under.bb.sugg < under.o.floor - 0.05);
+  assert.ok(under.bb.sugg + 1e-9 >= under.o.floor, 'floorLift raises to the band floor, not only to 50%');
   const at = atProfit(0.5, 0), above = atProfit(0.6, 0);
   assert.ok(at.o.pc + 1e-9 >= 0.5);
   assert.notStrictEqual(at.bb.act, 'Raise');
@@ -54,7 +54,7 @@ t('zero-sales raise stops at 50% and does not use the higher band floor', () => 
 t('winning -> kept', () => { const o = D({ seller: 'Diva Packages', bb: 9.99, sales: 5 }); assert.strictEqual(o.status, 'Already winning'); assert.ok(!o.upload); });
 t('winning with 100+ sales -> +10% step held; with toggle uploaded; max 80%', () => {
   const r = { seller: 'Diva Packages', bb: 7, price: 7, sales: 150, cost: 2 }; const o = D(r); assert.strictEqual(o.status, 'Raise 10% – held for review'); assert.ok(!o.upload);
-  const a = { cost: 2, mult: 1.5, post: 1.75, collab: 0 }; const pc = B.calc(a, 7).pc; const u = D(r, { raise100: true });
+  const a = { cost: 2, mult: 1.5, post: 1.70, collab: 0 }; const pc = B.calc(a, 7).pc; const u = D(r, { raise100: true });
   assert.strictEqual(u.newp, B.priceFor(a, Math.min(.8, pc + .1))); assert.ok(u.upload); assert.ok(u.fpc <= .8 + .01);
   const top = D({ seller: 'Diva Packages', bb: 9, price: B.priceFor(a, .8), sales: 150, cost: 2 }, { raise100: true }); assert.ok(!top.upload); });
 t('China: floor 100%, 1p under buy box', () => { const o = D({ sup: 'Ashian Homeware', sales: 2, bb: 12, seller: 'Rival', price: 13 }); assert.strictEqual(o.floorPct, 1); assert.strictEqual(o.newp, 11.99); assert.ok(o.fpc >= 1); });
@@ -95,7 +95,7 @@ t('multi-pack check postage starts at 14999g; a light pack and a single over 30k
   const zero = D({ title: '4 x Spray', sales: 3, bb: 8.5, seller: 'Rival', price: 9.5, w: 14999, postYour: 0 }); assert.ok(zero.postChecked); assert.strictEqual(zero.post, 0); assert.ok(zero.upload); });
 t('your price: loss / under 50% blocked, good one uploaded', () => {
   assert.strictEqual(D({ your: 1 }).status, 'Loss – blocked'); assert.ok(!D({ your: 1 }).upload);
-  const a = { cost: 2, mult: 1.5, post: 1.75 }; const p49 = B.priceFor(a, .49); assert.strictEqual(D({ your: p49 }).status, 'Under 50% – blocked');
+  const a = { cost: 2, mult: 1.5, post: 1.70 }; const p49 = B.priceFor(a, .49); assert.strictEqual(D({ your: p49 }).status, 'Under 50% – blocked');
   const ok = D({ your: '£9.00' }); assert.strictEqual(ok.status, 'Your price'); assert.ok(ok.upload); assert.strictEqual(ok.finalp, 9); });
 t('duplicate SKUs: first kept, later flagged and never uploaded', () => { const r = B.decideAll([Object.assign({}, base, { sales: 3, bb: 8.5, seller: 'R', price: 9.5 }), Object.assign({}, base, { sales: 3, bb: 8.5, seller: 'R', price: 9.5 }), Object.assign({}, base, { sku: ' ' })]);
   assert.strictEqual(r.dups, 1); assert.strictEqual(r.nosku, 1); assert.ok(r.rows[0].upload); assert.ok(!r.rows[1].upload); assert.strictEqual(r.rows[1].why, 'Duplicate SKU'); });
@@ -115,7 +115,7 @@ t('FUZZ 50,000 random rows: nothing uploaded at a loss, under 50%, China under 1
       assert.ok(c.profit > 0, o.sku); assert.ok(c.pc >= .5 - 1e-9, o.sku); assert.ok(!o.dup); if (!opt.checkPost) assert.ok(!o.check);
       if (o.china && o.your == null) assert.ok(c.pc >= 1 - 1e-9, 'china ' + o.sku + ' ' + c.pc);
       if (!o.china && o.your == null) assert.ok(c.pc <= .8 + 1e-9 || o.finalp <= o.price, 'uk over 80% ' + o.sku + ' ' + c.pc);
-      if (typeof o.raw === 'number' && !o.china) assert.ok(B.calc(o.a || { cost: o.cost, mult: o.mult, post: o.post, collab: o.collab }, o.raw).pc <= .8 + 1e-9, 'raw over 80% ' + o.sku);
+      if (typeof o.raw === 'number' && !o.china) { const rawPc = B.calc(o.a || { cost: o.cost, mult: o.mult, post: o.post, collab: o.collab }, o.raw).pc; const soldCut = o.sales >= 1 && o.price != null && o.raw < o.price - 1e-9; assert.ok(rawPc <= .8 + 1e-9 || soldCut, 'raw over 80% ' + o.sku); }
       assert.ok(o.finalp !== o.price); });
     assert.ok(up > 100, 'fuzz uploads ' + up); assert.strictEqual(new Set(out.rows.filter(o => o.upload).map(o => o.sku)).size, up); });
 });
@@ -125,20 +125,20 @@ t('cap price rounds DOWN: never over 80%, and 1p more would be over', () => { le
     const p = B.priceMax(a, .8); assert.ok(B.calc(a, p).pc <= .8 + 1e-9, 'cap ' + c + ' ' + p); assert.ok(B.calc(a, Math.round(p * 100 + 1) / 100).pc > .8 - 1e-9); k++; }));
   assert.ok(k > 3000); });
 t('floor price rounds UP: never under the floor (China and UK floors 50/60/70%)', () => {
-  for (let c = .05; c < 60; c += .0731) [.5, .6, .7, 1].forEach(f => { const a = { cost: c, mult: f === 1 ? 2 : 1.5, post: 1.75, collab: 0 };
+  for (let c = .05; c < 60; c += .0731) [.5, .6, .7, 1].forEach(f => { const a = { cost: c, mult: f === 1 ? 2 : 1.5, post: 1.70, collab: 0 };
     const p = B.floorPrice(a, f, f === 1); assert.ok(B.calc(a, p).pc >= f - 1e-9, 'floor ' + c + ' ' + f); }); });
 t('UK floor 80% = cap 80%: floor never above cap (cap wins, within 1p)', () => {
-  for (let c = .05; c < 1; c += .0137) { const a = { cost: c, mult: 1.5, post: 1.75, collab: 0 }, fp = B.floorPrice(a, .8, false), cp = B.priceMax(a, .8);
+  for (let c = .05; c < 1; c += .0137) { const a = { cost: c, mult: 1.5, post: 1.70, collab: 0 }, fp = B.floorPrice(a, .8, false), cp = B.priceMax(a, .8);
     assert.ok(fp <= cp + 1e-9); assert.ok(B.calc(a, fp).pc <= .8 + 1e-9); assert.ok(B.calc(a, fp + .01).pc > .8 - 1e-9); } });
 t('decide: no-competitor UK and 100+ step never over 80% after rounding', () => {
   for (let c = .3; c < 40; c += .113) {
-    const o = D({ cost: c, price: 999, bb: null, sales: 0 }); assert.ok(o.ceil == null || B.calc({ cost: c, mult: 1.5, post: 1.75, collab: 0 }, o.ceil).pc <= .8 + 1e-9);
-    const a = { cost: c, mult: 1.5, post: 1.75, collab: 0 }, p0 = B.priceFor(a, .75), s = D({ cost: c, price: p0, bb: p0, seller: 'Diva Packages', sales: 150 }, { raise100: true });
+    const o = D({ cost: c, price: 999, bb: null, sales: 0 }); assert.ok(o.ceil == null || B.calc({ cost: c, mult: 1.5, post: 1.70, collab: 0 }, o.ceil).pc <= .8 + 1e-9);
+    const a = { cost: c, mult: 1.5, post: 1.70, collab: 0 }, p0 = B.priceFor(a, .75), s = D({ cost: c, price: p0, bb: p0, seller: 'Diva Packages', sales: 150 }, { raise100: true });
     if (typeof s.raw === 'number') assert.ok(B.calc(a, s.raw).pc <= .8 + 1e-9, 'step ' + c + ' ' + s.raw);
     const fl = D({ cost: c, price: 999, bb: 1, sales: 0 }); if (typeof fl.floor === 'number') assert.ok(B.calc(a, fl.floor).pc >= B.floorOf(false, 0, c).f - 1e-9 || B.floorOf(false, 0, c).f === .8); } });
 
 t('optional penny trims: cap-only, <=5p and <=5% -> kept (no upload) unless switched on', () => {
-  const a = { cost: 2, mult: 1.5, post: 1.75, collab: 0 }, cap = B.priceMax(a, .8), r2 = x => Math.round(x * 100) / 100;
+  const a = { cost: 2, mult: 1.5, post: 1.70, collab: 0 }, cap = B.priceMax(a, .8), r2 = x => Math.round(x * 100) / 100;
   [null, r2(cap + 1)].forEach(bb => [.01, .03, .05].forEach(d => {
     const o = D({ cost: 2, price: r2(cap + d), bb: bb, seller: bb ? 'Rival' : '', sales: 0 });
     assert.strictEqual(o.status, B.TRIM); assert.ok(o.trim && !o.upload && o.finalp === r2(cap + d));
@@ -183,7 +183,8 @@ t('losing but already cheaper raises 10–15p under the buy box only when it has
   const over = go({ bb: 20, price: 10.15 });
   assert.strictEqual(over.bb.sugg, null);
   assert.strictEqual(over.bb.why, 'Losing – already cheaper, cap');
-  const floor = go({ bb: 9.2, price: 9 });
+  const flPx = go({ bb: 20, price: 12 }).d.floor;
+  const floor = go({ bb: Math.round((flPx + 0.01) * 100) / 100, price: Math.round((flPx - 0.60) * 100) / 100 });
   assert.strictEqual(floor.bb.sugg, null);
   assert.strictEqual(floor.bb.why, 'Losing – already cheaper, at floor');
   const cn = go({ sup: 'Ashian Homeware', bb: 20, price: 13, sales: 3 });

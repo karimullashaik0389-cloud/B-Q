@@ -37,8 +37,8 @@ If it says the buy box run is **not complete**, some SKUs use the Access buy box
   1. What you type in **Postage (type here)**.
   2. Special fixed postage: Xmas tree 8ft £3.30, 10ft £4.30; pet bed XL/XXL £3.30; high back stool 2x £3.30, 3x+ £8; fabric folding chair 2x £4.30, 3x+ £8; standard folding chair 2x £3.30, 3x+ £8; suitcase 20in £3.30, 24in/28in £8, suitcase sets £8; tarpaulin 10x15m £3.30, 12x15m £3.30, 15x20m £8; 240L wheelie bins £27; baby high chair £3.30; guitar £3.30; BBQ table £3.30; 3-tier airer £3.30; 9L air fryer £4.30.
   3. Description ending in code H123, H063 or H077 (not CH077 etc.) and over 15.2kg: DPD £14 (to 20kg), £15 (to 25kg), £17 (to 30kg).
-  4. The Access "Postage Cost".
-  5. The weight: up to 2000g £1.75, up to 15200g £2.30, up to 20000g £8, up to 25000g £9, up to 30000g £10.50, above that £15. A multi-pack is one parcel (pack weight).
+  4. The Access "Postage Cost". If that figure equals an old band rate (£1.75 or £2.30, within 0.5p), we use the new rate instead (£1.90 or £2.45). Other Access amounts stay as they are. This mapping is in Settings.
+  5. The weight: up to 2000g £1.90, up to 15200g £2.45, up to 20000g £8, up to 25000g £9, up to 30000g £10.50, above that £15. A multi-pack is one parcel (pack weight).
 - We use **our** postage rules only. The £1.85 / £2.35 / £5.16 bands in the old master file are deliberately **not** used, so postage can differ from that file on purpose.
 
 ## 5. Your own price
@@ -69,10 +69,11 @@ Tap **Back to the published data** to return.
 ## 10. Rules in one look
 - UK: profit stays between 50% and 80% on cost.
 - Rounding: a price set by the 80% cap is rounded **down** to the penny, so it is never over 80%. A floor price is rounded **up**, so it is never under the floor. (Cost under £1 with no sales has floor and cap both 80%: if no penny gives exactly 80%, the cap wins – just under 80%.)
-- Postage: our rules only (typed, special list, H-code DPD tiers, Access figure, else weight bands above). The old file's £1.85 / £2.35 / £5.16 bands are not used.
+- Postage: our rules only (typed, special list, H-code DPD tiers, Access figure with the old-to-new band mapping above, else weight bands above). The old file's £1.85 / £2.35 / £5.16 bands are not used.
 - UK, winning with good sales: keep the price.
 - UK, not winning: 1p under the buy box, but never below the floor.
 - UK floor with no sales: cost under £1 80%, under £5 70%, under £10 60%, else 50%. With sales: 50%.
+- If a UK suggested price would sit under that floor (for example a 0-sales raise that only went up to 50% profit, when the floor is 80/70/60%), we lift the suggestion to the floor price, rounded up to the penny, so profit is just at or above the floor %. Never over the 80% cap, and never a loss. Rows already at or above the floor are not changed. China is not lifted (China raises still never go on the upload). You can turn this off in Settings (`floorLift` = 0). The floors themselves do not change.
 - "Sales" means units sold in the last 30 days. We count them from the B&Q orders file. This is the same number the Sales tab uses.
 - If the Access file is newer than the orders file, we use the Access "B n Q 30Days" column instead. The grey box at the top tells you which one was used.
 - A row with price £0 or blank goes to **NEED YOUR REVIEW**. We do not upload it. Please check the listing.
