@@ -537,6 +537,36 @@
         var mm = /<(dataValidations|hyperlinks|printOptions|pageMargins|pageSetup|headerFooter|ignoredErrors|drawing|legacyDrawing|tableParts|extLst)[ >\/]/.exec(s); s = mm ? s.slice(0, mm.index) + cfx + s.slice(mm.index) : s.replace('</worksheet>', cfx + '</worksheet>'); }
       Z.FileIndex[sx.k].content = bin(s);
     });
+    /* Excel (Microsoft 365) removes a defined name and shows "We found a problem with some content"
+       / "Removed Records: Named range from /xl/workbook.xml" when a sheet name containing an apostrophe
+       (e.g. Losing – can't win above floor) is quoted in a defined name without doubling the apostrophe.
+       SheetJS writes _xlnm._FilterDatabase that way for Autofilter. Rewrite those names correctly (11 Nov 2026). */
+    var wi = get('xl/workbook.xml');
+    if (wi != null) {
+      var wxml = txt(Z.FileIndex[wi].content);
+      var xmlUnesc = function (t) { return String(t).replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'"); };
+      var xmlEsc = function (t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+      var sheetNames = [];
+      wxml.replace(/<sheet [^>]*name="([^"]*)"/g, function (_, n) { sheetNames.push(xmlUnesc(n)); });
+      sheetNames.sort(function (a, b) { return b.length - a.length; });
+      var quoteSheet = function (n) {
+        if (/^[A-Za-z_][A-Za-z0-9_.]*$/.test(n) && !/^[rc](?:\d|$)/i.test(n)) return n;
+        return "'" + String(n).replace(/'/g, "''") + "'";
+      };
+      wxml = wxml.replace(/<definedName\b([^>]*)>([\s\S]*?)<\/definedName>/g, function (all, attrs, body) {
+        var v = xmlUnesc(body);
+        var bang = v.lastIndexOf('!');
+        if (bang < 0) return all;
+        var left = v.slice(0, bang), right = v.slice(bang);
+        var inner = left;
+        if (inner.charAt(0) === "'" && inner.charAt(inner.length - 1) === "'") inner = inner.slice(1, -1).replace(/''/g, "'");
+        var hit = null;
+        for (var i = 0; i < sheetNames.length; i++) { if (sheetNames[i] === inner) { hit = sheetNames[i]; break; } }
+        if (!hit) return all;
+        return '<definedName' + attrs + '>' + xmlEsc(quoteSheet(hit) + right) + '</definedName>';
+      });
+      Z.FileIndex[wi].content = bin(wxml);
+    }
     var sh33 = Z.FullPaths.findIndex(function (p) { return /Sh33tJ5$/.test(p); }); if (sh33 >= 0) X.CFB.utils.cfb_del(Z, Z.FullPaths[sh33]);
     return new Uint8Array(X.CFB.write(Z, { fileType: 'zip', type: 'array', compression: true }));
   }
