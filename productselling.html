@@ -84,7 +84,8 @@ table.bt{border-collapse:collapse;width:100%;font-size:14px}.bt th,.bt td{paddin
  <button class="big" data-v="pricing"><b>Pricing</b><span>New B&amp;Q prices · profit check · buy box · upload file</span></button>
  <button class="big" data-v="lookup"><b>Individual sales</b><span>Orders · units · sales £ by period · upload an Excel SKU list</span></button>
  <button class="big" data-v="calc"><b>Calculator</b><span>Cost · postage · fees · total cost · profit · safe prices</span></button>
- <button class="ghost" id="lock">🔒 Lock</button>
+ <div id="hclean"></div>
+ <button class="ghost" id="lock">🔒 Lock</button> <button class="ghost" id="forget2" type="button">Forget this device</button>
 </div>
 <div id="viewer" class="hide"><iframe id="frame" title="Dashboard" allow="clipboard-write"></iframe></div>
 <div id="tabv" class="hide"><div class="tbar"><button id="tback" type="button" aria-label="Home – all dashboards"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Home</button><b id="ttitle"></b></div><div id="tbody"></div></div>
@@ -100,6 +101,39 @@ var $=function(i){return document.getElementById(i)};
 function auxSalt(){var u=new Uint8Array(16);for(var i=0;i<16;i++)u[i]=parseInt(AUX_HEX.substr(i*2,2),16);return u}
 var keys={},bufs={},curUrl=null,te=new TextDecoder(),te2=new TextEncoder(),mode="main";
 var OPEN=(document.body.getAttribute("data-open")||"").trim(); if(OPEN!=="sales"&&OPEN!=="orders"&&OPEN!=="selling") OPEN="";
+/* BQ-REMEMBER-1: remember the unlock on this device (same origin, IndexedDB, non-extractable keys). */
+var BQ_REMEMBER_DAYS=30;   /* the ONE setting: days an unlock is remembered on this device (Lock ends it sooner) */
+var RDB="bq_unlock",RST="keys",RID="device",BC=null;
+function rOpen(){return new Promise(function(res,rej){if(!window.indexedDB)return rej(new Error("noidb"));
+ var q;try{q=indexedDB.open(RDB,1)}catch(e){return rej(e)}
+ q.onupgradeneeded=function(){q.result.createObjectStore(RST)};q.onsuccess=function(){res(q.result)};q.onerror=function(){rej(q.error||new Error("idb"))}})}
+function rTx(mode,fn){return rOpen().then(function(db){return new Promise(function(res,rej){var t=db.transaction(RST,mode),r=fn(t.objectStore(RST)),out;
+ r.onsuccess=function(){out=r.result};t.oncomplete=function(){db.close();res(out)};t.onerror=t.onabort=function(){db.close();rej(t.error||new Error("idb"))}})})}
+function rClear(){return rTx("readwrite",function(s){return s.delete(RID)}).catch(function(){})}
+function rSave(nk){if(!window.indexedDB||!window.crypto||!crypto.subtle)return Promise.resolve();var out={};
+ return Promise.all(Object.keys(nk).map(function(d){var k=nk[d];if(!k||!k.key)return null;var use=d==="aux"?["encrypt","decrypt"]:["decrypt"];
+  var p=k.key.extractable?crypto.subtle.exportKey("raw",k.key).then(function(raw){var u=new Uint8Array(raw);
+     return crypto.subtle.importKey("raw",u,{name:"AES-GCM"},false,use).then(function(x){u.fill(0);return x})}):Promise.resolve(k.key);
+  return p.then(function(x){out[d]={key:x,salt:new Uint8Array(k.salt)}})}))
+ .then(function(){var now=Date.now();return rTx("readwrite",function(s){return s.put({v:1,saved:now,exp:now+BQ_REMEMBER_DAYS*864e5,keys:out},RID)})})
+ .then(function(){return out},function(){return rClear().then(function(){return null})})}
+/* true = unlocked from this device; "expired" / "stale" = ask again with a reason; false = nothing saved */
+function restoreDevice(){if(!window.indexedDB||!window.crypto||!crypto.subtle)return Promise.resolve(false);
+ return rTx("readonly",function(s){return s.get(RID)}).then(function(o){
+  if(!o||o.v!==1||!o.keys||!o.keys.aux||!o.keys.sales||!o.keys.orders)return false;
+  if(!(o.exp>Date.now()))return rClear().then(function(){return "expired"});
+  var nk={};Object.keys(o.keys).forEach(function(d){nk[d]={key:o.keys[d].key,salt:new Uint8Array(o.keys[d].salt)}});
+  return fresh(nk).then(function(ok){if(!ok)return "stale";
+   return getBuf("sales").then(function(b){return decrypt(nk.sales.key,parts(b))}).then(function(){keys=nk;return true},function(e){if(e&&e.message==="net")throw e;return "stale"})})
+ }).catch(function(){return false})}
+try{BC=new BroadcastChannel("bq-unlock");BC.onmessage=function(e){if(e&&e.data==="lock"&&(keys.aux||keys.sales))lock("Locked on another page. This device no longer remembers you.",true)}}catch(e){BC=null}
+/* BQ-REMEMBER-2: on the remembered path only non-extractable keys, no old key stores */
+var DEVICE=false;   /* true while this page runs on the remembered keys */
+function dropOldStores(){forget();try{sessionStorage.removeItem("bqDashSession.v1")}catch(e){}}
+function finishStore(pw,nk,remember){if(!remember){forget();return rClear().then(function(){return nk})}
+ return rSave(nk).then(function(nx){if(nx){DEVICE=true;dropOldStores();return nx}   /* nx: re-imported non-extractable keys; the extractable ones are dropped */
+  return wrapStore(pw,nk).then(function(){return nk})})}                            /* no IndexedDB: the old "Remember me" store */
+function forgetDevice(){lock("This device has forgotten the saved login.")}
 function b64(u8){var s="";for(var i=0;i<u8.length;i+=8192)s+=String.fromCharCode.apply(null,u8.subarray(i,i+8192));return btoa(s)}
 function unb64(s){var b=atob(s),u=new Uint8Array(b.length);for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u}
 function show(id){["login","menu"].forEach(function(x){$(x).classList.toggle("hide",x!==id)})}
@@ -172,14 +206,13 @@ $("lf").addEventListener("submit",function(ev){ev.preventDefault();
  $("msg").textContent="";$("go").disabled=true;$("go").textContent="Checking…";
  var p, rem=$("rem")?$("rem").checked:true;
  if(mode==="device"){
-  p=unwrap(pw).then(function(nk){return fresh(nk).then(function(ok){if(!ok)throw new Error("stale");if(nk.listings)return nk;
-    return addListingsKey(pw,nk).then(function(nk2){if(!nk2.listings)return nk2;return wrapStore(pw,nk2).then(function(){return nk2})})})})
+  p=unwrap(pw).then(function(nk){return fresh(nk).then(function(ok){if(!ok)throw new Error("stale");return addListingsKey(pw,nk).then(function(nk2){return finishStore(pw,nk2,true)})})})
    .catch(function(e){if(e&&e.message==="net")throw e;var stale=e&&e.message==="stale";
-    return tryMain(pw).then(function(nk){return wrapStore(pw,nk).then(function(){return nk})},function(e2){
+    return tryMain(pw).then(function(nk){return finishStore(pw,nk,true)},function(e2){
      if(e2&&(e2.message==="net"||e2.name==="TypeError"))throw e2;
      if(stale){forget();setMode("main");throw new Error("stale2")}throw e2})});
  }else{
-  p=tryMain(pw).then(function(nk){return(rem?wrapStore(pw,nk):Promise.resolve(forget())).then(function(){return nk})});
+  p=tryMain(pw).then(function(nk){return finishStore(pw,nk,rem)});
  }
  p.then(afterUnlock)
  .catch(function(e){fail(e,e&&e.message==="stale2"?"The dashboards were updated, so this device’s saved login has expired. Please type the main password.":"That password isn’t right — please try again.")})
@@ -204,11 +237,11 @@ function back(){if(OPEN){location.href="index.html";return}
  $("viewer").classList.add("hide");setFrame("about:blank");
  if(curUrl){URL.revokeObjectURL(curUrl);curUrl=null}document.title="B&Q Dashboards"}
 function clearSession(){try{sessionStorage.removeItem("bqDashSession.v1");sessionStorage.removeItem("bqDashReturn");sessionStorage.removeItem("bqDashGo");localStorage.removeItem("bqListKey.v1")}catch(e){}}
-function lock(msg){clearSession();forget();keys={};bufs={};back();if(window.BQTabs)BQTabs.close();setMode("main",msg||"")}
-function stashSession(){if(!keys||!keys.aux)return Promise.resolve();
+function lock(msg,fromOther){DEVICE=false;clearSession();forget();rClear();if(!fromOther&&BC)try{BC.postMessage("lock")}catch(e){}keys={};bufs={};back();if(window.BQTabs)BQTabs.close();setMode("main",msg||"")}
+function stashSession(){if(DEVICE){try{sessionStorage.removeItem("bqDashSession.v1")}catch(e){}return Promise.resolve()}if(!keys||!keys.aux)return Promise.resolve();
  var ds=Object.keys(FILES).filter(function(d){return keys[d]}).concat(["aux"]).concat(keys.listings?["listings"]:[]),inner={};
  return Promise.all(ds.map(function(d){return crypto.subtle.exportKey("raw",keys[d].key).then(function(raw){inner[d]={salt:b64(keys[d].salt),key:b64(new Uint8Array(raw))}})}))
-  .then(function(){try{sessionStorage.setItem("bqDashSession.v1",JSON.stringify({v:1,inner:inner}))}catch(e){}})}
+  .then(function(){try{sessionStorage.setItem("bqDashSession.v1",JSON.stringify({v:1,inner:inner}))}catch(e){}},function(){})}
 /* Restore unlocked keys for this tab (sales.html / orders.html / return from Listings). */
 function restoreSession(){
  var o=null;try{o=JSON.parse(sessionStorage.getItem("bqDashSession.v1")||"null")}catch(e){}
@@ -220,12 +253,12 @@ function restoreSession(){
   .then(function(){return fresh(nk)}).then(function(ok){if(!ok)return false;
    return getBuf("sales").then(function(b){return decrypt(nk.sales.key,parts(b)).then(function(){keys=nk;return true})})})
   .catch(function(){return false})}
-window.BQ={aux:function(){return keys.aux?keys.aux.key:null},lock:lock,busy:busy,back:back,stashSession:stashSession,forced:OPEN||null,openDash:open};
+window.BQ={aux:function(){return keys.aux?keys.aux.key:null},liveKeys:function(){var o={};Object.keys(keys).forEach(function(d){if(keys[d]&&keys[d].key)o[d]=keys[d].key});return o},remembered:function(){return DEVICE},lock:lock,busy:busy,back:back,stashSession:stashSession,forced:OPEN||null,openDash:open};
 window.addEventListener("message",function(e){var f=$("frame");
  if(!f||e.source!==f.contentWindow||!e.data||typeof e.data.bq!=="string")return;
  if(location.origin!=="null"&&e.origin!==location.origin)return;
  var m=e.data,reply=function(o){o.re=m.id;try{e.source.postMessage(o,location.origin!=="null"?location.origin:"*")}catch(x){}};
- if(m.bq==="hello"){reply({ok:true,remembered:!!stored()});return}
+ if(m.bq==="hello"){reply({ok:true,remembered:!!stored()||DEVICE});return}
  if(m.bq==="lock"){reply({ok:true});lock("Locked. This device no longer remembers you.");return}
  if(m.bq==="nav"){var nv=String(m.v||"");reply({ok:true});
   stashSession().then(function(){if(nv==="sales"||nv==="orders"||nv==="selling")location.href=nv+".html";else if(nv==="home")location.href="index.html"});return}
@@ -235,18 +268,23 @@ window.addEventListener("message",function(e){var f=$("frame");
   if(window.BQTabs&&BQTabs.tabs[v]){back();BQTabs.open(v)}return}
  if(m.bq==="rewrap"){var o=String(m.old||""),n=String(m.nw||"");
   if(n.length<8){reply({ok:false,err:"New password needs at least 8 characters"});return}
+  if(DEVICE){reply({ok:false,err:"remembered"});return}   /* no separate device password on the remembered path */
   var chk=stored()?unwrap(o).catch(function(){return tryMain(o)}):tryMain(o);
   chk.then(function(nk){return wrapStore(n,nk)},function(){throw new Error("wrong")})
   .then(function(){reply({ok:true})},function(err){reply({ok:false,err:err&&err.message==="wrong"?"wrong":"error"})});
  }});
 document.querySelectorAll("[data-d]").forEach(function(b){b.addEventListener("click",function(){open(b.getAttribute("data-d"))})});
 $("lock").addEventListener("click",function(){lock("Locked. This device no longer remembers you.")});
-if($("forget"))$("forget").addEventListener("click",function(){clearSession();forget();setMode("main","This device has forgotten the saved login.")});
+if($("forget"))$("forget").addEventListener("click",function(){forgetDevice()});
+if($("forget2"))$("forget2").addEventListener("click",function(){forgetDevice()});
 if(!window.crypto||!crypto.subtle){$("msg").textContent="This browser can’t unlock the dashboards (needs HTTPS and a modern browser).";$("go").disabled=true}
 else{var had1=false;try{had1=!!localStorage.getItem(LS1);localStorage.removeItem(LS1)}catch(e){}
  if(OPEN){document.title=OPEN==="sales"?"B&Q Sales":OPEN==="orders"?"B&Q Orders":"B&Q Products selling"}
- restoreSession().then(function(ok){if(ok){afterUnlock(keys);return}
-  if(stored())setMode("device");else setMode("main","")});}
+ show("none");busy(true,"Unlocking…");
+ if($("lsub"))$("lsub").textContent="Enter the password once. This device then stays unlocked on every page and tab for up to "+BQ_REMEMBER_DAYS+" days, until you tap Lock.";
+ restoreDevice().then(function(r){if(r===true){DEVICE=true;dropOldStores();return true}return restoreSession().then(function(ok){return ok?true:r})}).then(function(r){busy(false);if(r===true){afterUnlock(keys);return}
+  var why=r==="expired"?"This device’s unlock has ended (after "+BQ_REMEMBER_DAYS+" days). Please type the password.":r==="stale"?"The dashboards were updated, so please type the password once more.":"";
+  if(stored())setMode("device",why);else setMode("main",why)});}
 })();
 </script>
 <script>
@@ -3707,4 +3745,5 @@ window.BQNav={tabs:T,current:function(){return cur},go:go};
 </script>
 <script src="entry_pages.js"></script>
 <script src="bqnav.js"></script>
+<script src="js/bq_clean_export.js"></script>
 </body></html>
