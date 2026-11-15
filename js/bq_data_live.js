@@ -17,7 +17,7 @@ var SLOTS=[
   {id:"price_template", title:"Price import template", help:"The official B&Q / Mirakl price import template. Not a daily export.", accept:".xlsx,.xls,.xlsm", kinds:"excel"}
 ];
 /* live build: only the files a tab can read in the browser */
-var FEEDS={access:"Sales, Orders, Pricing, Individual sales and Calculator",orders:"Sales, Orders, Individual sales and Calculator",buybox:"Pricing"};
+var FEEDS={access:"Sales, Orders, Products selling, Pricing, Individual sales and Calculator",orders:"Sales, Orders, Products selling, Individual sales and Calculator",buybox:"Pricing"};
 SLOTS=SLOTS.filter(function(s){return FEEDS[s.id]});
 function $(id){return document.getElementById(id)}
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])})}
@@ -187,7 +187,7 @@ function styles(){if($("hd-css"))return;var s=document.createElement("style");s.
   ".bq-stale{background:#FEF3C7;border:1px solid #F59E0B;border-radius:10px;padding:8px 10px;margin:0 0 12px;font-size:14px;color:#78350F;font-weight:600}";
   document.head.appendChild(s)}
 function render(){var host=$("hdata");if(!host)return;styles();
-  var html='<h2>Data upload</h2><p class="note hd-intro">Upload today’s files once here and the tabs on this device use them: Sales, Orders, Pricing, Individual sales and Calculator. A file more than 1 day old (red badge) is not used. Files stay in this browser only; nothing is sent to B&amp;Q, Mirakl or GitHub. Duplicates and Products selling show the published lists.</p><div class="box">';
+  var html='<h2>Data upload</h2><p class="note hd-intro">Upload today’s files once here and the tabs on this device use them: Sales, Orders, Products selling, Pricing, Individual sales and Calculator. A file more than 1 day old (red badge) is not used. Files stay in this browser only; nothing is sent to B&amp;Q, Mirakl or GitHub. Duplicates shows the published list.</p><div class="box">';
   SLOTS.forEach(function(s){html+='<div class="hd-slot" data-slot="'+s.id+'">'+
     '<div class="hd-main"><b class="hd-title">'+esc(s.title)+'</b><div class="hd-meta" id="hd-meta-'+s.id+'">Checking…</div><p class="mut" style="margin:4px 0 0;font-size:13px">'+esc(s.help)+'</p><div class="hd-msg" id="hd-msg-'+s.id+'"></div></div>'+
     '<span class="hd-badge hd-grey" id="hd-badge-'+s.id+'">…</span>'+
