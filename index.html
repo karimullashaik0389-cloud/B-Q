@@ -84,6 +84,7 @@ table.bt{border-collapse:collapse;width:100%;font-size:14px}.bt th,.bt td{paddin
  <button class="big" data-v="pricing"><b>Pricing</b><span>New B&amp;Q prices · profit check · buy box · upload file</span></button>
  <button class="big" data-v="lookup"><b>Individual sales</b><span>Orders · units · sales £ by period · upload an Excel SKU list</span></button>
  <button class="big" data-v="calc"><b>Calculator</b><span>Cost · postage · fees · total cost · profit · safe prices</span></button>
+ <div id="hdata"></div>
  <div id="hclean"></div>
  <button class="ghost" id="lock">🔒 Lock</button> <button class="ghost" id="forget2" type="button">Forget this device</button>
 </div>
@@ -3745,5 +3746,7 @@ window.BQNav={tabs:T,current:function(){return cur},go:go};
 </script>
 <script src="entry_pages.js"></script>
 <script src="bqnav.js"></script>
+<script src="js/bq_data_live.js"></script>
+<script src="js/bq_feed_live.js"></script>
 <script src="js/bq_clean_export.js"></script>
 </body></html>
