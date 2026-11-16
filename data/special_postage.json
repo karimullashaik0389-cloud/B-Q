@@ -1,0 +1,215 @@
+{
+ "version": 1,
+ "rules": [
+  {
+   "id": "petXL",
+   "name": "Pet bed XL/XXL",
+   "words": "pet bed / dog bed + XL, XXL or XLG",
+   "prefixes": "",
+   "pack": "",
+   "postage": 3.3,
+   "builtin": "petXL"
+  },
+  {
+   "id": "hbs2",
+   "name": "High back stool X2",
+   "words": "high back stool",
+   "prefixes": "HOM074",
+   "pack": "2",
+   "postage": 3.3,
+   "builtin": "hbs2"
+  },
+  {
+   "id": "hbs3",
+   "name": "High back stool X3+",
+   "words": "high back stool",
+   "prefixes": "HOM074",
+   "pack": "3+",
+   "postage": 8,
+   "builtin": "hbs3"
+  },
+  {
+   "id": "fab2",
+   "name": "Fabric folding chair X2",
+   "words": "fabric folding chair",
+   "prefixes": "FAB-FOL, HOM041",
+   "pack": "2",
+   "postage": 4.3,
+   "builtin": "fab2"
+  },
+  {
+   "id": "fab3",
+   "name": "Fabric folding chair X3+",
+   "words": "fabric folding chair",
+   "prefixes": "FAB-FOL, HOM041",
+   "pack": "3+",
+   "postage": 8,
+   "builtin": "fab3"
+  },
+  {
+   "id": "std2",
+   "name": "Standard folding chair X2",
+   "words": "standard folding chair",
+   "prefixes": "HOM042, HOM043",
+   "pack": "2",
+   "postage": 3.3,
+   "builtin": "std2"
+  },
+  {
+   "id": "std3",
+   "name": "Standard folding chair X3+",
+   "words": "standard folding chair",
+   "prefixes": "HOM042, HOM043",
+   "pack": "3+",
+   "postage": 8,
+   "builtin": "std3"
+  },
+  {
+   "id": "suit20",
+   "name": "Suitcase small 20in",
+   "words": "suitcase / luggage, every size 20in (code -20I-)",
+   "prefixes": "",
+   "pack": "",
+   "postage": 3.3,
+   "builtin": "suit20"
+  },
+  {
+   "id": "suitL",
+   "name": "Suitcase 24in/28in",
+   "words": "suitcase / luggage, 24in or 28in (code -24I- / -28I-)",
+   "prefixes": "",
+   "pack": "",
+   "postage": 8,
+   "builtin": "suitL"
+  },
+  {
+   "id": "suitSet",
+   "name": "Suitcase set (large rate)",
+   "words": "suitcase / luggage + set, Npc or 2+1",
+   "prefixes": "",
+   "pack": "",
+   "postage": 8,
+   "builtin": "suitSet"
+  },
+  {
+   "id": "tree8",
+   "name": "Xmas tree 8ft",
+   "words": "xmas / christmas tree 8ft",
+   "prefixes": "XMA-TRE-…-8FT",
+   "pack": "",
+   "postage": 3.3,
+   "builtin": "tree8"
+  },
+  {
+   "id": "tree10",
+   "name": "Xmas tree 10ft",
+   "words": "xmas / christmas tree 10ft",
+   "prefixes": "XMA-TRE-…-10FT",
+   "pack": "",
+   "postage": 4.3,
+   "builtin": "tree10"
+  },
+  {
+   "id": "tar1015",
+   "name": "Tarpaulin 10x15m",
+   "words": "tarpaulin / tarp 10x15m",
+   "prefixes": "",
+   "pack": "",
+   "postage": 3.3,
+   "builtin": "tar1015"
+  },
+  {
+   "id": "tar1215",
+   "name": "Tarpaulin 12x15m",
+   "words": "tarpaulin / tarp 12x15m",
+   "prefixes": "",
+   "pack": "",
+   "postage": 3.3,
+   "builtin": "tar1215"
+  },
+  {
+   "id": "tar1520",
+   "name": "Tarpaulin 15x20m",
+   "words": "tarpaulin / tarp 15x20m",
+   "prefixes": "",
+   "pack": "",
+   "postage": 8,
+   "builtin": "tar1520"
+  },
+  {
+   "id": "baby",
+   "name": "Baby high chair",
+   "words": "baby high chair",
+   "prefixes": "BAB-HIG",
+   "pack": "",
+   "postage": 3.3,
+   "builtin": "baby"
+  },
+  {
+   "id": "guitar",
+   "name": "Guitar",
+   "words": "",
+   "prefixes": "GUI-TAR",
+   "pack": "",
+   "postage": 3.3,
+   "builtin": "guitar"
+  },
+  {
+   "id": "bbq",
+   "name": "BBQ table",
+   "words": "",
+   "prefixes": "SIL-BBQ-TAB",
+   "pack": "",
+   "postage": 3.3,
+   "builtin": "bbq"
+  },
+  {
+   "id": "airer",
+   "name": "3-tier clothes airer",
+   "words": "airer + 3 tier",
+   "prefixes": "",
+   "pack": "",
+   "postage": 3.3,
+   "builtin": "airer"
+  },
+  {
+   "id": "fryer",
+   "name": "9L air fryer",
+   "words": "",
+   "prefixes": "DUL-9L-AFY",
+   "pack": "",
+   "postage": 4.3,
+   "builtin": "fryer"
+  },
+  {
+   "id": "bin",
+   "name": "Wheelie bin 240L",
+   "words": "240L (wheelie) bin at the start",
+   "prefixes": "240-BLK-BIN, 240-BRW-BIN, 240-GRE-BIN",
+   "pack": "",
+   "postage": 27,
+   "builtin": "bin"
+  }
+ ],
+ "heavy": {
+  "codes": "H123, H063, H077",
+  "from": 15200,
+  "rates": [
+   {
+    "upTo": 20000,
+    "postage": 14,
+    "label": "15-20kg"
+   },
+   {
+    "upTo": 25000,
+    "postage": 15,
+    "label": "20-25kg"
+   },
+   {
+    "upTo": 30000,
+    "postage": 17,
+    "label": "25-30kg"
+   }
+  ]
+ }
+}

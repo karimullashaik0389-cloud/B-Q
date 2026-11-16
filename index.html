@@ -680,6 +680,70 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
     tree8: ['Xmas tree 8ft', 3.3], tree10: ['Xmas tree 10ft', 4.3], tar1015: ['Tarpaulin 10x15m', 3.3], tar1215: ['Tarpaulin 12x15m', 3.3], tar1520: ['Tarpaulin 15x20m', 8],
     baby: ['Baby high chair', 3.3], guitar: ['Guitar', 3.3], bbq: ['BBQ table', 3.3], airer: ['3-tier clothes airer', 3.3], fryer: ['9L air fryer', 4.3], bin: ['Wheelie bin 240L', 27] };
   var HEAVY = [[20000, 14, '15-20kg'], [25000, 15, '20-25kg'], [30000, 17, '25-30kg']], HEAVY_FROM = 15200;
+  /* 16 Nov 2026: the special postage list is DATA (repo data/special_postage.json, editable on the Pricing tab).
+     Built-in rows (builtin = key above) keep their exact coded match; you can change their name / postage or delete them.
+     Your own rows match on words in the Access Variant description (all words of one alternative; '|' between alternatives)
+     and/or a SKU / variant code prefix (comma list), optionally only for a pack size ('1', '2', '3+'). First matching row wins, top to bottom. */
+  var SP_HELP = { petXL: ['pet bed / dog bed + XL, XXL or XLG', '', ''], hbs2: ['high back stool', 'HOM074', '2'], hbs3: ['high back stool', 'HOM074', '3+'],
+    fab2: ['fabric folding chair', 'FAB-FOL, HOM041', '2'], fab3: ['fabric folding chair', 'FAB-FOL, HOM041', '3+'], std2: ['standard folding chair', 'HOM042, HOM043', '2'], std3: ['standard folding chair', 'HOM042, HOM043', '3+'],
+    suit20: ['suitcase / luggage, every size 20in (code -20I-)', '', ''], suitL: ['suitcase / luggage, 24in or 28in (code -24I- / -28I-)', '', ''], suitSet: ['suitcase / luggage + set, Npc or 2+1', '', ''],
+    tree8: ['xmas / christmas tree 8ft', 'XMA-TRE-…-8FT', ''], tree10: ['xmas / christmas tree 10ft', 'XMA-TRE-…-10FT', ''], tar1015: ['tarpaulin / tarp 10x15m', '', ''], tar1215: ['tarpaulin / tarp 12x15m', '', ''], tar1520: ['tarpaulin / tarp 15x20m', '', ''],
+    baby: ['baby high chair', 'BAB-HIG', ''], guitar: ['', 'GUI-TAR', ''], bbq: ['', 'SIL-BBQ-TAB', ''], airer: ['airer + 3 tier', '', ''], fryer: ['', 'DUL-9L-AFY', ''], bin: ['240L (wheelie) bin at the start', '240-BLK-BIN, 240-BRW-BIN, 240-GRE-BIN', ''] };
+  var DEFAULT_SPECIAL = { version: 1, rules: Object.keys(SPECIAL).map(function (k) { return { id: k, name: SPECIAL[k][0], words: SP_HELP[k][0], prefixes: SP_HELP[k][1], pack: SP_HELP[k][2], postage: SPECIAL[k][1], builtin: k }; }),
+    heavy: { codes: 'H123, H063, H077', from: HEAVY_FROM, rates: HEAVY.map(function (h) { return { upTo: h[0], postage: h[1], label: h[2] }; }) } };
+  DEFAULT_SPECIAL = JSON.parse(JSON.stringify(DEFAULT_SPECIAL));
+  var BUILTIN_SPECIAL = JSON.parse(JSON.stringify(SPECIAL)), _SP = null, _SPCODES = null;
+  function cleanSpecial(cfg) {
+    var c = cfg && typeof cfg === 'object' ? cfg : {}, out = { version: 1, rules: [], heavy: null }, seen = {};
+    (Array.isArray(c.rules) ? c.rules : DEFAULT_SPECIAL.rules).forEach(function (r, i) {
+      if (!r) return; var p = num(r.postage); if (p == null || p < 0) return;
+      var b = r.builtin && BUILTIN_SPECIAL[r.builtin] ? String(r.builtin) : '';
+      var w = String(r.words == null ? '' : r.words).trim(), px = String(r.prefixes == null ? '' : r.prefixes).trim();
+      if (!b && !w && !px) return;
+      var id = String(r.id || b || ('own' + (i + 1))); while (seen[id]) id += '_'; seen[id] = 1;
+      out.rules.push({ id: id, name: String(r.name || b || w || px).trim(), words: w, prefixes: px, pack: ['1', '2', '3+'].indexOf(String(r.pack || '')) >= 0 ? String(r.pack) : '', postage: rnd(p, 2), builtin: b });
+    });
+    var h = c.heavy && typeof c.heavy === 'object' ? c.heavy : DEFAULT_SPECIAL.heavy, rates = [];
+    (Array.isArray(h.rates) ? h.rates : []).forEach(function (x) { var u = num(x && x.upTo), p = num(x && x.postage); if (u > 0 && p != null && p >= 0) rates.push({ upTo: u, postage: rnd(p, 2), label: String(x.label || '') }); });
+    rates.sort(function (a, b) { return a.upTo - b.upTo; });
+    var from = num(h.from); out.heavy = { codes: String(h.codes == null ? '' : h.codes), from: from == null ? HEAVY_FROM : from, rates: rates };
+    return out;
+  }
+  /* use a special postage list (null = defaults). Updates SPECIAL (name, £) in place so every screen sees the same list. */
+  function useSpecial(cfg) {
+    _SP = cfg ? cleanSpecial(cfg) : null; var S = _SP || DEFAULT_SPECIAL;
+    Object.keys(SPECIAL).forEach(function (k) { delete SPECIAL[k]; });
+    S.rules.forEach(function (r) { SPECIAL[r.id] = [r.name, r.postage]; });
+    var cs = String(S.heavy.codes || '').split(/[\s,;]+/).filter(Boolean).map(function (x) { return x.toUpperCase().replace(/[^A-Z0-9]/g, ''); }).filter(Boolean);
+    _SPCODES = cs.length ? new RegExp('(?:^|-)\\s*(' + cs.join('|') + ')\\s*$', 'i') : null;
+    return S;
+  }
+  function specialConfig() { return JSON.parse(JSON.stringify(_SP || DEFAULT_SPECIAL)); }
+  function specialDiffers(cfg) { return JSON.stringify(cleanSpecial(cfg)) !== JSON.stringify(cleanSpecial(DEFAULT_SPECIAL)); }
+  function ownMatch(r, t, cs) {
+    var l = t.toLowerCase(), ok = false;
+    if (r.words) ok = r.words.split('|').some(function (alt) { var ws = alt.toLowerCase().split(/\s+/).filter(Boolean); return ws.length > 0 && ws.every(function (w) { return new RegExp('(^|[^a-z0-9])' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|[^a-z0-9])').test(l); }); });
+    if (!ok && r.prefixes) ok = r.prefixes.split(',').map(function (x) { return x.trim().toUpperCase(); }).filter(Boolean).some(function (px) { return cs.some(function (c) { return c.indexOf(px) === 0; }); });
+    if (ok && r.pack) { var n = packN(t) || 1; ok = r.pack === '3+' ? n >= 3 : n === +r.pack; }
+    return ok;
+  }
+  /* the special row for a product (first match, top to bottom) or null */
+  function matchSpecial(title, code) {
+    var S = _SP || DEFAULT_SPECIAL, t = title == null ? '' : String(title), cs = codes(code), bk, done = false;
+    for (var i = 0; i < S.rules.length; i++) {
+      var r = S.rules[i];
+      if (r.builtin) { if (!done) { bk = specialRule(t, code); done = true; } if (bk === r.builtin) return r; }
+      else if (ownMatch(r, t, cs)) return r;
+    }
+    return null;
+  }
+  /* products matched per row in an Access sheet (first match wins, same as pricing) */
+  function countSpecial(aoa) {
+    var h = (aoa && aoa[0] || []).map(function (x) { return x == null ? '' : String(x).trim(); }), it = h.indexOf('Variant description'), is = h.indexOf('sku'), iv = h.indexOf('Variant code'), out = {}, seen = {};
+    for (var j = 1; j < (aoa || []).length; j++) { var x = aoa[j] || [], sku = is >= 0 && x[is] != null ? String(x[is]).trim() : ''; if (!sku || seen[sku]) continue; seen[sku] = 1;
+      var r = matchSpecial(it >= 0 ? x[it] : '', [sku, iv >= 0 ? x[iv] : '']); if (r) out[r.id] = (out[r.id] || 0) + 1; }
+    return out;
+  }
   function codes(c) { return (Array.isArray(c) ? c : [c]).filter(function (x) { return x != null && x !== ''; }).map(function (x) { return String(x).trim().toUpperCase(); }); }
   function pre(cs, re) { for (var i = 0; i < cs.length; i++) if (re.test(cs[i])) return true; return false; }
   function specialRule(title, code) {
@@ -709,13 +773,13 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
     return null;
   }
   /* H123 / H063 / H077 = the code after the last '-' of the description (e.g. '... - 888436 - H077'; CH077 does NOT match) */
-  function heavyCode(title) { var m = String(title == null ? '' : title).match(/(?:^|-)\s*(H123|H063|H077)\s*$/i); return m ? m[1].toUpperCase() : null; }
+  function heavyCode(title) { var re = _SP ? _SPCODES : /(?:^|-)\s*(H123|H063|H077)\s*$/i; if (!re) return null; var m = String(title == null ? '' : title).match(re); return m ? m[1].toUpperCase() : null; }
   /* full postage decision: {p, src, kind} ; ov = typed postage (wins over everything) */
   function postInfo(pc, w, title, code, ov) {
     var o = num(ov); if (o != null && o >= 0 && ov !== '') return { p: o, src: 'Your postage', kind: 'your' };
-    var k = specialRule(title, code); if (k) return { p: SPECIAL[k][1], src: 'Special: ' + SPECIAL[k][0], kind: 'special', rule: k };
-    var h = heavyCode(title), wt = num(w);
-    if (h && wt > HEAVY_FROM && wt <= HEAVY[HEAVY.length - 1][0]) for (var i = 0; i < HEAVY.length; i++) if (wt <= HEAVY[i][0]) return { p: HEAVY[i][1], src: 'DPD ' + h + ' ' + HEAVY[i][2], kind: 'heavy' };
+    var sr = matchSpecial(title, code); if (sr) return { p: sr.postage, src: 'Special: ' + sr.name, kind: 'special', rule: sr.id };
+    var h = heavyCode(title), wt = num(w), HV = (_SP || DEFAULT_SPECIAL).heavy, HR = HV.rates;
+    if (h && HR.length && wt > HV.from && wt <= HR[HR.length - 1].upTo) for (var i = 0; i < HR.length; i++) if (wt <= HR[i].upTo) return { p: HR[i].postage, src: 'DPD ' + h + ' ' + HR[i].label, kind: 'heavy' };
     var p = num(pc); if (p != null && p > 0) {
       var m = mapAccessPostage(p), src = 'Access postage';
       if (m.mapped) src += ' £' + rnd(p, 2).toFixed(2) + ' at the new rate £' + rnd(m.p, 2).toFixed(2);
@@ -1125,7 +1189,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
     return rows.map(function (o) { var b = buyBox(o, { fresh: !!fresh[o.ean], rival: rivals[o.ean] || null, seasonal: isSeasonal(o.title, o.sku) }, s); b.o = o; return b; });
   }
   return { FEE: FEE, sales30: sales30, bbMap: bbMap, ukTime: ukTime, fromAccess: fromAccess, eanOf: eanOf, HDR: HDR, ASHIAN: ASHIAN, OTHER: OTHER, UK_MAX: UK_MAX, SAFE_MIN: SAFE_MIN, CHINA_FLOOR: CHINA_FLOOR, CHINA_CUT: CHINA_CUT, RAISE_AT: RAISE_AT, BANDS: BANDS, OVER: OVER,
-    num: num, rnd: rnd, ceil2: ceil2, band: band, mapAccessPostage: mapAccessPostage, accessMapFrom: accessMapFrom, postage: postage, postageSrc: postageSrc, postInfo: postInfo, specialRule: specialRule, heavyCode: heavyCode, SPECIAL: SPECIAL, HEAVY: HEAVY, isChina: isChina, multOf: multOf, fixedCost: fixedCost,
+    num: num, rnd: rnd, ceil2: ceil2, band: band, mapAccessPostage: mapAccessPostage, accessMapFrom: accessMapFrom, postage: postage, postageSrc: postageSrc, postInfo: postInfo, DEFAULT_SPECIAL: DEFAULT_SPECIAL, useSpecial: useSpecial, specialConfig: specialConfig, specialDiffers: specialDiffers, matchSpecial: matchSpecial, countSpecial: countSpecial, cleanSpecial: cleanSpecial, specialRule: specialRule, heavyCode: heavyCode, SPECIAL: SPECIAL, HEAVY: HEAVY, isChina: isChina, multOf: multOf, fixedCost: fixedCost,
     TRIM: TRIM, end9: end9, DEFAULT_RULES: DEFAULT_RULES, rulesOf: rulesOf, rulesDiffer: rulesDiffer, useRules: useRules, clearRules: clearRules, feeOf: feeOf, ukMaxOf: ukMaxOf, safeOf: safeOf, chinaFloorOf: chinaFloorOf, packGramsOf: packGramsOf, floorLiftOf: floorLiftOf, t3UploadOn: t3UploadOn, newFloorUploadOn: newFloorUploadOn, OLD_NOSALES_COST: OLD_NOSALES_COST, withRules: withRules, calc: calc, priceFor: priceFor, priceMax: priceMax, floorPrice: floorPrice, floor2: floor2, floorOf: floorOf, isRival: isRival, packN: packN, checkPost: checkPost, decide: decide, decideAll: decideAll, buyBox: buyBox, buyBoxAll: buyBoxAll, bbFromScrape: bbFromScrape, accessScrape: accessScrape, BB_DEFAULT: BB_DEFAULT, isSeasonal: isSeasonal, isXmasTree: isXmasTree, bbStep: bbStep, CHECK_G: 14999, VERSION: 'bq_price v12 2026-11-16 Access-only, price now = INV, 100% under £1, competitor 60%' };
 });
 </script>
@@ -3133,6 +3197,50 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
 if(!window.BQTabs||!window.BQP)return;
 var K=BQTabs.kit,$=K.$,esc=K.esc,money=K.money,P=window.BQP,Q=window.BQC;
 var LSY="bqPriceYour1",LSO="bqPriceOpt1",LSV="bqPriceView1",LSB="bqBBOpt1",LSC="bqChecked1",LSR="bqPriceRules1",LSH="bqUploadHist1";
+/* 16 Nov 2026 – Special postage list (Karimulla). Order stays: typed postage > special > Access > weight bands.
+   Repo defaults: data/special_postage.json (the 2am run reads the same file). Edits here are saved in this browser
+   at once; "Export special postage" downloads the file to send to the assistant. No token, nothing is written to GitHub. */
+var LSSP="bqSpecialPost1";
+function spSaved(){var v=ls(LSSP,null);return v&&Array.isArray(v.rules)?v:null}
+function spApply(){var s=spSaved();P.useSpecial(s||window.__bqSpRepo||null)}
+try{spApply()}catch(e){}
+var spRepoP=(window.fetch?fetch("data/special_postage.json",{cache:"no-store"}).then(function(r){return r.ok?r.json():null}).catch(function(){return null}):Promise.resolve(null)).then(function(j){if(j&&Array.isArray(j.rules))window.__bqSpRepo=j;try{spApply()}catch(e){}return j});
+function spBox(){return '<div class="box pz-set" id="pzsp"><h3>Special postage</h3><div id="pzspin"></div></div>'}
+function spCfg(){return P.specialConfig()}
+function spDraw(){var el=$("pzspin");if(!el)return;var C=spCfg(),cnt=st&&st.aoa?P.countSpecial(st.aoa):null,saved=!!spSaved();
+ var e=function(v){return esc(v==null?"":String(v))},packSel=function(i,v,dis){return '<select data-sp="pack" data-i="'+i+'"'+(dis?' disabled':'')+'>'+[["","any"],["1","single"],["2","pack of 2"],["3+","pack of 3+"]].map(function(o){return '<option value="'+o[0]+'"'+(o[0]===(v||"")?' selected':'')+'>'+o[1]+'</option>'}).join("")+'</select>'};
+ var h='<p class="note">Used before the Access postage and the weight bands (postage you type for a product still wins). First matching row wins, top to bottom; new rows go at the top. Match words are checked in the Access Variant description (all words; use | between alternatives); SKU / code prefix is a comma list. Built-in rows keep their exact match – you can change their name and £ or delete them.</p>'+
+  '<div class="pz-sptw"><table class="pz-spt"><thead><tr><th>Name</th><th>Match words (Variant description)</th><th>SKU / code prefix</th><th>Pack</th><th>Postage £</th><th>Products'+(cnt?'':' <span class="mut">(upload Access)</span>')+'</th><th></th></tr></thead><tbody>'+
+  C.rules.map(function(r,i){var b=!!r.builtin;return '<tr><td><input data-sp="name" data-i="'+i+'" value="'+e(r.name)+'"></td>'+
+   (b?'<td class="mut">'+e(r.words||"–")+' <i>(built-in match)</i></td><td class="mut">'+e(r.prefixes||"–")+'</td><td>'+packSel(i,r.pack,true)+'</td>'
+     :'<td><input data-sp="words" data-i="'+i+'" value="'+e(r.words)+'"></td><td><input data-sp="prefixes" data-i="'+i+'" value="'+e(r.prefixes)+'"></td><td>'+packSel(i,r.pack,false)+'</td>')+
+   '<td><input data-sp="postage" data-i="'+i+'" type="number" step="0.01" min="0" value="'+e(r.postage)+'"></td><td>'+(cnt?(cnt[r.id]||0):"")+'</td><td><button class="btn l" type="button" data-spdel="'+i+'">Delete</button></td></tr>'}).join("")+
+  '</tbody></table></div><div class="pz-acts"><button class="btn l" type="button" id="pzspadd">Add row</button></div>'+
+  '<p class="note" style="margin-top:10px"><b>Heavy items (DPD)</b> – description ends in one of these codes and weight is over the start weight.</p>'+
+  '<div class="grid"><label>Codes (comma list)<input data-sph="codes" value="'+e(C.heavy.codes)+'"></label><label>Start weight over (g)<input data-sph="from" type="number" step="1" value="'+e(C.heavy.from)+'"></label></div>'+
+  '<table class="pz-spt"><thead><tr><th>Up to (g)</th><th>Postage £</th><th>Label</th><th></th></tr></thead><tbody>'+
+  C.heavy.rates.map(function(x,i){return '<tr><td><input data-spr="upTo" data-i="'+i+'" type="number" step="1" value="'+e(x.upTo)+'"></td><td><input data-spr="postage" data-i="'+i+'" type="number" step="0.01" value="'+e(x.postage)+'"></td><td><input data-spr="label" data-i="'+i+'" value="'+e(x.label)+'"></td><td><button class="btn l" type="button" data-sprdel="'+i+'">Delete</button></td></tr>'}).join("")+
+  '</tbody></table><div class="pz-acts"><button class="btn l" type="button" id="pzspradd">Add heavy rate</button></div>'+
+  '<div class="pz-acts"><button class="btn o" type="button" id="pzspexp">Export special postage</button> <button class="btn l" type="button" id="pzspreset">Back to the saved list</button></div>'+
+  '<p class="note">Changes are used here at once and kept in this browser. To make the 2am run use them, click Export special postage and send that file (special_postage.json) to your assistant.</p>'+
+  '<div class="note" id="pzspmsg">'+(saved?(P.specialDiffers(C)||(window.__bqSpRepo&&JSON.stringify(P.cleanSpecial(C))!==JSON.stringify(P.cleanSpecial(window.__bqSpRepo)))?'<b>Using your browser copy</b> – not yet in the 2am run.':'Using your browser copy (same as the saved list).'):'Using the saved list (same as the 2am run).')+'</div>';
+ el.innerHTML=h;spWire()}
+function spRead(){var C=spCfg();
+ Array.prototype.forEach.call(document.querySelectorAll("#pzspin [data-sp]"),function(inp){var r=C.rules[+inp.getAttribute("data-i")],f=inp.getAttribute("data-sp");if(!r)return;
+  if(f==="postage")r.postage=inp.value===""?null:Number(inp.value);else if(!r.builtin||f==="name")r[f]=inp.value});
+ Array.prototype.forEach.call(document.querySelectorAll("#pzspin [data-sph]"),function(inp){var f=inp.getAttribute("data-sph");C.heavy[f]=f==="from"?Number(inp.value):inp.value});
+ Array.prototype.forEach.call(document.querySelectorAll("#pzspin [data-spr]"),function(inp){var x=C.heavy.rates[+inp.getAttribute("data-i")],f=inp.getAttribute("data-spr");if(x)x[f]=f==="label"?inp.value:(inp.value===""?null:Number(inp.value))});
+ return C}
+function spSet(C){lss(LSSP,P.cleanSpecial(C));spApply();if(st&&st.aoa){compute();draw()}spDraw()}
+function spWire(){var el=$("pzspin");if(!el)return;
+ Array.prototype.forEach.call(el.querySelectorAll("input,select"),function(inp){inp.onchange=function(){spSet(spRead())}});
+ Array.prototype.forEach.call(el.querySelectorAll("[data-spdel]"),function(b){b.onclick=function(){var C=spRead(),i=+b.getAttribute("data-spdel"),r=C.rules[i];if(r&&confirm("Delete special postage row “"+r.name+"”?")){C.rules.splice(i,1);spSet(C)}}});
+ Array.prototype.forEach.call(el.querySelectorAll("[data-sprdel]"),function(b){b.onclick=function(){var C=spRead();C.heavy.rates.splice(+b.getAttribute("data-sprdel"),1);spSet(C)}});
+ $("pzspadd").onclick=function(){var C=spRead(),w=prompt("Match words in the Access description (e.g. garden bench). Leave blank to use a SKU prefix instead.","");if(w==null)return;var px=w?"":prompt("SKU / code prefix (e.g. GAR-BEN)","");if(px==null)return;var p=prompt("Postage £","");if(p==null||p===""||!(Number(p)>=0))return;
+  C.rules.unshift({id:"own"+Date.now(),name:(w||px).trim(),words:w.trim(),prefixes:(px||"").trim(),pack:"",postage:Number(p),builtin:""});spSet(C)};
+ $("pzspradd").onclick=function(){var C=spRead();C.heavy.rates.push({upTo:"",postage:"",label:""});lss(LSSP,C);P.useSpecial(C);spDraw()};
+ $("pzspexp").onclick=function(){saveText(JSON.stringify(P.cleanSpecial(spCfg()),null,1)+"\n","special_postage.json","application/json")};
+ $("pzspreset").onclick=function(){if(!confirm("Forget your browser copy and use the saved list (the one the 2am run uses)?"))return;try{localStorage.removeItem(LSSP)}catch(e){}spApply();if(st&&st.aoa){compute();draw()}spDraw()}}
 var TPL={Data:[["Offer SKU","Offer price","Discount price","Discount start date","Discount end date"],["offer-sku","price","discount-price","discount-start-date","discount-end-date"]]};
 function ls(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}}
 function lss(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
@@ -3160,7 +3268,8 @@ var CSS='.pz-b7g{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 10px}.pz-b7t{d
  '.pz-need .tone-under{background:#FFC107;color:#111;font-weight:700}.pz-need .tone-blue{background:#90CAF9;font-weight:700}.pz-need .tone-ok{background:#C8E6C9;font-weight:700}'+
  '.pz-need .big{outline:3px solid #DC2626}.pz-set{margin-top:16px}.pz-set h3{margin:0 0 8px;font-size:18px}'+
  '.pz-set .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px 14px}.pz-set label{font-size:13px;color:#334155;display:flex;flex-direction:column;gap:3px}'+
- '.pz-set input{font-size:15px;padding:5px 7px;border:1px solid #CBD5E1;border-radius:6px}.pz-hist{margin-top:12px}';
+ '.pz-set input{font-size:15px;padding:5px 7px;border:1px solid #CBD5E1;border-radius:6px}.pz-hist{margin-top:12px}'+
+ '.pz-sptw{overflow-x:auto}.pz-spt{border-collapse:collapse;width:100%;font-size:13px;margin-top:6px}.pz-spt th,.pz-spt td{border-bottom:1px solid #E2E8F0;padding:4px 6px;text-align:left;vertical-align:middle}.pz-spt input{width:100%;min-width:70px;box-sizing:border-box}';
 var st=null;
 var HOW='<div class="pz-how" id="pzhow"><h2>How to make today\'s prices</h2>'+
  '<p class="lead">Do these steps every day, in this order. If today\'s Access file is already shown under the buttons, you can go straight to step 4.</p>'+
@@ -3213,7 +3322,7 @@ function render(body){
   '<div class="pz-need box" id="pzneed"></div>'+
   '<div class="pz-hist note" id="pzhist"></div>'+
   '</div>'+
-  setBox()+
+  setBox()+spBox()+
   CHKHTML;
  $("pzfilebtn").onclick=function(){$("pzfile").click()};
  $("pzbbbtn").onclick=function(){$("pzbbfile").click()};
@@ -3221,9 +3330,9 @@ function render(body){
  $("pzbbfile").onchange=function(){if(this.files[0])pickBB(this.files[0]);this.value=""};
  $("pzpub").onclick=function(){if(!st.doc)return;st.src="pub";st.aoa=st.doc.aoa;st.accessDate=st.doc.meta.access_date;st.file=st.doc.meta.access;st.userScrape=null;this.classList.add("hide");$("pzfmsg").textContent="";$("pzbbmsg").textContent="";compute();draw()};
  $("pzb7dl").onclick=book7;if($("pzcsv"))$("pzcsv").onclick=csv7;$("pzb7in").onchange=function(){var f=this.files&&this.files[0];this.value="";if(f)fromEdited(f)};
- chkWire();setWire();histDraw();ruleBanner();
+ chkWire();setWire();histDraw();ruleBanner();spDraw();
  var bb=K.getJSON("buybox.enc").then(function(d){return d},function(){return null});
- return K.getJSON("pricing.enc").then(function(d){return d},function(e){if(e&&e.message==="notyet")return null;throw e}).then(function(doc){
+ return spRepoP.then(function(){return K.getJSON("pricing.enc")}).then(function(d){return d},function(e){if(e&&e.message==="notyet")return null;throw e}).then(function(doc){
   return bb.then(function(b){st.bbDoc=b;st.doc=doc;
    if(!doc){$("pzsrc").innerHTML='<b>The published Pricing file is not on this site yet.</b> Use step 2 to choose an Access file.';return}
    st.aoa=doc.aoa;st.accessDate=doc.meta.access_date;st.file=doc.meta.access;compute();draw()})})}
@@ -3250,7 +3359,7 @@ function checkRes(){var items=st.res.rows.filter(function(o){return o.changed}).
  return Q.build(items,{checkPost:!!st.opt.checkPost},{title:"Dashboard Pricing tab",made:K.uk(new Date().toISOString()),input:(st.src==="pub"?"Published Access file: ":"Your Access file: ")+st.file,
   changeRule:"New price (your typed price or the rule price) different from the price now.",
   bb:st.M&&st.M.n?st.M.label+" where the EAN was checked; otherwise the Access buy box.":"Access buy box (no newer buy box file).",sales:st.prep.counts.soldSkus!=null&&st.doc&&st.doc.sales30?"B&Q orders (same as the Sales tab) when not older than the Access file, else Access B n Q 30Days":"Access B n Q 30Days"})}
-function draw(){if(!st)return;showPub();ruleBanner();if(!st.res)return;b7draw();chkDraw()}
+function draw(){if(!st)return;showPub();ruleBanner();spDraw();if(!st.res)return;b7draw();chkDraw()}
 function pick(file){var msg=$("pzfmsg");msg.textContent="Reading "+file.name+"…";
  K.xlsx().then(function(X){return file.arrayBuffer().then(function(buf){var wb;try{wb=X.read(new Uint8Array(buf),{type:"array"})}catch(e){throw new Error("This is not an Excel file. Please pick the Access file you saved (it ends in .xlsx).")}
   var name=wb.SheetNames.indexOf("B&QBB3")>=0?"B&QBB3":wb.SheetNames.filter(function(n){var a=X.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null});return a[0]&&a[0].indexOf("Estimated cost")>=0})[0];
