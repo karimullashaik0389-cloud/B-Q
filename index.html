@@ -1393,6 +1393,42 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
     out.check = chk; return out;
   }
 
+  /* 16 Nov 2026: visible EAN (Access product-id, stored as text) and Free stock (Access Free stock quantity) columns straight after
+     B&Q SKU on 6 Combined upload. Display only. Built after the sheet, then every reference to that sheet's columns B+ (on the sheet
+     itself and from every other sheet) moves two columns right, so all other values stay the same. */
+  function colN(s) { var n = 0; for (var i = 0; i < s.length; i++) n = n * 26 + (s.charCodeAt(i) - 64); return n - 1; }
+  function shiftRefs(f, here, target, at, by) {
+    by = by || 1;
+    if (typeof f !== 'string' || f.indexOf('"') < 0 && !/[A-Z]\$?\d/.test(f)) return f;
+    var parts = f.split(/("(?:[^"]|"")*")/);
+    for (var i = 0; i < parts.length; i += 2) {
+      var seg = parts[i], out = '', last = 0, prevEnd = -1, prevSheet = null, re = /('([^']+)'!)?(\$?)([A-Z]{1,3})(\$?)(\d+)(?![0-9A-Za-z_(])/g, m;
+      while ((m = re.exec(seg))) {
+        var st0 = m.index, pre = st0 > 0 ? seg.charAt(st0 - 1) : '';
+        if (!m[1] && /[A-Za-z0-9_.$!']/.test(pre)) continue;
+        var sheet = m[1] ? m[2] : (pre === ':' && prevEnd === st0 - 1 ? prevSheet : here);
+        prevEnd = st0 + m[0].length; prevSheet = sheet;
+        var c = colN(m[4]);
+        if (sheet === target && c >= at) { out += seg.slice(last, st0) + (m[1] || '') + m[3] + L(c + by) + m[5] + m[6]; last = prevEnd; }
+      }
+      parts[i] = out + seg.slice(last);
+    }
+    return parts.join('');
+  }
+  function eanInsert(list, target, recs) {
+    var sh = null; list.forEach(function (x) { if (x.name === target) sh = x; }); if (!sh) return;
+    list.forEach(function (x) {
+      (x.rows || []).forEach(function (row) { (row || []).forEach(function (cl) { if (cl && cl.f) cl.f = shiftRefs(cl.f, x.name, target, 1, 2); }); });
+    });
+    sh.cols.splice(1, 0, ['EAN', null, 16], ['Free stock', IN, 11]);
+    sh.rows.forEach(function (row, i) { var r = recs[i] || {}, e = r.ean != null ? String(r.ean) : '', fs = typeof r.stock === 'number' && isFinite(r.stock) ? { t: 'n', v: r.stock, z: IN } : null; row.splice(1, 0, e ? { t: 's', v: e, z: '@' } : null, fs); });
+    if (sh.inputs) sh.inputs = sh.inputs.map(function (j) { return j >= 1 ? j + 2 : j; });
+    if (sh.filterTo != null && sh.filterTo >= 1) sh.filterTo += 2;
+    (Array.isArray(sh.cf) ? sh.cf : sh.cf ? [sh.cf] : []).forEach(function (set) {
+      set.sqref = shiftRefs(set.sqref, target, target, 1, 2);
+      (set.rules || []).forEach(function (r) { if (Array.isArray(r)) r[1] = shiftRefs(r[1], target, target, 1, 2); else if (r && r.f) r.f = shiftRefs(r.f, target, target, 1, 2); });
+    });
+  }
   function make(recs, input, P, saved, S) {
     input = input || {}; saved = saved || {}; S = Object.assign({}, P.BB_DEFAULT || {}, S || {});
     var Book = (typeof BQBook !== 'undefined') ? BQBook : (typeof require === 'function' ? require('./bq_book.js') : null);
@@ -1846,6 +1882,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
       if (rec.engCheck === 'CHECK POSTAGE') counts.checkPost++;
     });
     counts.t7 = counts.t7uk + counts.t7cn;
+    eanInsert(list, T6, recs);
     return { list: list, counts: counts, cols: { showPost: showPost, showPrice: showPrice, showProfit: showProfit, showSugg: showSugg, showFinal: showFinal, showCheck: showCheck, showInc: showInc, upUK: upUK, upCN: upCN } };
 
 

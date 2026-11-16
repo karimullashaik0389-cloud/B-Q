@@ -67,12 +67,48 @@
     out.check = chk; return out;
   }
 
+  /* 16 Nov 2026: visible EAN (Access product-id, stored as text) and Free stock (Access Free stock quantity) columns straight after
+     B&Q SKU on 6 Combined upload. Display only. Built after the sheet, then every reference to that sheet's columns B+ (on the sheet
+     itself and from every other sheet) moves two columns right, so all other values stay the same. */
+  function colN(s) { var n = 0; for (var i = 0; i < s.length; i++) n = n * 26 + (s.charCodeAt(i) - 64); return n - 1; }
+  function shiftRefs(f, here, target, at, by) {
+    by = by || 1;
+    if (typeof f !== 'string' || f.indexOf('"') < 0 && !/[A-Z]\$?\d/.test(f)) return f;
+    var parts = f.split(/("(?:[^"]|"")*")/);
+    for (var i = 0; i < parts.length; i += 2) {
+      var seg = parts[i], out = '', last = 0, prevEnd = -1, prevSheet = null, re = /('([^']+)'!)?(\$?)([A-Z]{1,3})(\$?)(\d+)(?![0-9A-Za-z_(])/g, m;
+      while ((m = re.exec(seg))) {
+        var st0 = m.index, pre = st0 > 0 ? seg.charAt(st0 - 1) : '';
+        if (!m[1] && /[A-Za-z0-9_.$!']/.test(pre)) continue;
+        var sheet = m[1] ? m[2] : (pre === ':' && prevEnd === st0 - 1 ? prevSheet : here);
+        prevEnd = st0 + m[0].length; prevSheet = sheet;
+        var c = colN(m[4]);
+        if (sheet === target && c >= at) { out += seg.slice(last, st0) + (m[1] || '') + m[3] + L(c + by) + m[5] + m[6]; last = prevEnd; }
+      }
+      parts[i] = out + seg.slice(last);
+    }
+    return parts.join('');
+  }
+  function eanInsert(list, target, recs) {
+    var sh = null; list.forEach(function (x) { if (x.name === target) sh = x; }); if (!sh) return;
+    list.forEach(function (x) {
+      (x.rows || []).forEach(function (row) { (row || []).forEach(function (cl) { if (cl && cl.f) cl.f = shiftRefs(cl.f, x.name, target, 1, 2); }); });
+    });
+    sh.cols.splice(1, 0, ['EAN', null, 16], ['Free stock', IN, 11]);
+    sh.rows.forEach(function (row, i) { var r = recs[i] || {}, e = r.ean != null ? String(r.ean) : '', fs = typeof r.stock === 'number' && isFinite(r.stock) ? { t: 'n', v: r.stock, z: IN } : null; row.splice(1, 0, e ? { t: 's', v: e, z: '@' } : null, fs); });
+    if (sh.inputs) sh.inputs = sh.inputs.map(function (j) { return j >= 1 ? j + 2 : j; });
+    if (sh.filterTo != null && sh.filterTo >= 1) sh.filterTo += 2;
+    (Array.isArray(sh.cf) ? sh.cf : sh.cf ? [sh.cf] : []).forEach(function (set) {
+      set.sqref = shiftRefs(set.sqref, target, target, 1, 2);
+      (set.rules || []).forEach(function (r) { if (Array.isArray(r)) r[1] = shiftRefs(r[1], target, target, 1, 2); else if (r && r.f) r.f = shiftRefs(r.f, target, target, 1, 2); });
+    });
+  }
   function make(recs, input, P, saved, S) {
     input = input || {}; saved = saved || {}; S = Object.assign({}, P.BB_DEFAULT || {}, S || {});
     var Book = (typeof BQBook !== 'undefined') ? BQBook : (typeof require === 'function' ? require('./bq_book.js') : null);
     var asOf = xDate(S.asOf || (input && input.asOf) || '');
     function sv(k, d) { return S[k] != null && S[k] !== '' ? S[k] : d; }
-    var setRows = [['fee', sv('fee', 0.15)], ['ukMax', sv('ukMax', 0.8)], ['safeMin', sv('safeMin', 0.5)], ['minChange', sv('minChange', 0.1)], ['t3buf', sv('t3buf', 0.05)], ['t5cut', sv('t5cut', 0.05)], ['t5ukFloor', sv('t5ukFloor', 0.6)], ['t5ukMin', sv('t5ukMin', 0.65)], ['t5HoldDays', sv('t5HoldDays', 3)], ['step', sv('step', 0.01)], ['stepPct', S.stepPct || 0], ['minGain', S.minGain == null ? 0.1 : S.minGain], ['raisePct', S.raisePct == null ? 0.05 : S.raisePct], ['xmas', S.xmas === false ? 0 : 1], ['raiseNoSales', S.raiseNoSales ? 1 : 0], ['noStockKeep', S.noStockKeep === false ? 0 : 1], ['keepTrees', S.keepTrees === false ? 0 : 1], ['useStale', S.useStale ? 1 : 0], ['checkPost', S.checkPost ? 1 : 0], ['asOf', asOf == null ? '' : asOf], ['packGrams', sv('packGrams', 14999)], ['chinaFloor', sv('chinaFloor', 1)], ['ukSoldFloor', sv('ukSoldFloor', 0.5)], ['ukBand1', sv('ukBand1', 0.8)], ['ukBand5', sv('ukBand5', 0.7)], ['ukBand10', sv('ukBand10', 0.6)], ['ukBandRest', sv('ukBandRest', 0.5)], ['cost1', sv('cost1', 1)], ['cost5', sv('cost5', 5)], ['cost10', sv('cost10', 10)], ['closeHi', sv('closeHi', 0.10)], ['closeLo', sv('closeLo', 0.15)], ['zeroSalesRaise', sv('zeroSalesRaise', 0.5)], ['floorLift', sv('floorLift', 1)], ['band1w', 2000], ['band1p', 1.9], ['band2w', 15200], ['band2p', 2.45], ['band3w', 20000], ['band3p', 8], ['band4w', 25000], ['band4p', 9], ['band5w', 30000], ['band5p', 10.5], ['overBand', sv('overBand', 15)], ['accessMap1old', 1.75], ['accessMap1new', 1.9], ['accessMap2old', 2.3], ['accessMap2new', 2.45], ['accessMapTol', 0.005]];
+    var setRows = [['fee', sv('fee', 0.15)], ['ukMax', sv('ukMax', 0.8)], ['safeMin', sv('safeMin', 0.5)], ['minChange', sv('minChange', 0.1)], ['t3buf', sv('t3buf', 0.05)], ['t5cut', sv('t5cut', 0.05)], ['t5ukFloor', sv('t5ukFloor', 0.6)], ['t5ukMin', sv('t5ukMin', 0.65)], ['t5HoldDays', sv('t5HoldDays', 3)], ['step', sv('step', 0.01)], ['stepPct', S.stepPct || 0], ['minGain', S.minGain == null ? 0.1 : S.minGain], ['raisePct', S.raisePct == null ? 0.05 : S.raisePct], ['xmas', S.xmas === false ? 0 : 1], ['raiseNoSales', S.raiseNoSales ? 1 : 0], ['noStockKeep', S.noStockKeep === false ? 0 : 1], ['keepTrees', S.keepTrees === false ? 0 : 1], ['useStale', S.useStale ? 1 : 0], ['checkPost', S.checkPost ? 1 : 0], ['asOf', asOf == null ? '' : asOf], ['packGrams', sv('packGrams', 14999)], ['chinaFloor', sv('chinaFloor', 1)], ['ukSoldFloor', sv('ukSoldFloor', 0.5)], ['ukBand1', sv('ukBand1', 1)], ['ukBand5', sv('ukBand5', 0.7)], ['ukBand10', sv('ukBand10', 0.6)], ['ukBandRest', sv('ukBandRest', 0.5)], ['cost1', sv('cost1', 1)], ['cost5', sv('cost5', 2)], ['cost10', sv('cost10', 5)], ['closeHi', sv('closeHi', 0.10)], ['closeLo', sv('closeLo', 0.15)], ['zeroSalesRaise', sv('zeroSalesRaise', 0.5)], ['floorLift', sv('floorLift', 1)], ['t3Upload', sv('t3Upload', 1)], ['newFloorUpload', sv('newFloorUpload', 1)], ['ukRivalFloor', sv('ukRivalFloor', 0.6)], ['band1w', 2000], ['band1p', 1.9], ['band2w', 15200], ['band2p', 2.45], ['band3w', 20000], ['band3p', 8], ['band4w', 25000], ['band4p', 9], ['band5w', 30000], ['band5p', 10.5], ['overBand', sv('overBand', 15)], ['accessMap1old', 1.75], ['accessMap1new', 1.9], ['accessMap2old', 2.3], ['accessMap2new', 2.45], ['accessMapTol', 0.005]];
     if (Array.isArray(S.bands) && S.bands.length) {
       var bi; for (bi = 0; bi < 5 && bi < S.bands.length; bi++) {
         var pair = S.bands[bi];
@@ -193,7 +229,7 @@
       setF(profitNow, 'IF(OR(' + C(postU, r) + '="",' + C(priceU, r) + '=""),"",ROUND(ROUND(' + C(priceU, r) + '*(1-' + SB.fee + ')-' + C(fixed, r) + ',6),2))', M);
       setF(pcNow, 'IF(OR(' + C(profitNow, r) + '="",' + C(costI, r) + '="",' + C(costI, r) + '<=0),"",(' + C(priceU, r) + '*(1-' + SB.fee + ')-' + C(fixed, r) + ')/' + C(costI, r) + ')', PC);
       setF(floorPct, 'IF(' + C(chinaI, r) + '=1,' + SB.chinaFloor + ',IF(' + C(salesI, r) + '>=1,' + SB.ukSoldFloor + ',IF(' + C(costI, r) + '<' + SB.cost1 + ',' + SB.ukBand1 + ',IF(' + C(costI, r) + '<' + SB.cost5 + ',' + SB.ukBand5 + ',IF(' + C(costI, r) + '<' + SB.cost10 + ',' + SB.ukBand10 + ',' + SB.ukBandRest + ')))))', PC);
-      setF(floorP, 'IF(' + C(fixed, r) + '="","",IF(' + C(chinaI, r) + '=1,' + priceFor(r, C(floorPct, r)) + ',MIN(' + priceFor(r, C(floorPct, r)) + ',' + priceMaxF(r, SB.ukMax) + ')))', M);
+      setF(floorP, 'IF(' + C(fixed, r) + '="","",IF(OR(' + C(chinaI, r) + '=1,' + C(floorPct, r) + '>' + SB.ukMax + '),' + priceFor(r, C(floorPct, r)) + ',MIN(' + priceFor(r, C(floorPct, r)) + ',' + priceMaxF(r, SB.ukMax) + ')))', M);
       setF(capP, 'IF(OR(' + C(fixed, r) + '="",' + C(chinaI, r) + '=1),"",' + priceMaxF(r, SB.ukMax) + ')', M);
       setF(t5MinP, 'IF(OR(' + C(fixed, r) + '="",' + C(chinaI, r) + '=1),"",MIN(' + priceFor(r, SB.t5ukMin) + ',' + priceMaxF(r, SB.ukMax) + '))', M);
       setF(chinaMin, 'IF(OR(' + C(chinaI, r) + '<>1,' + C(fixed, r) + '=""),"",' + priceFor(r, '1.05') + ')', M);
@@ -520,6 +556,7 @@
       if (rec.engCheck === 'CHECK POSTAGE') counts.checkPost++;
     });
     counts.t7 = counts.t7uk + counts.t7cn;
+    eanInsert(list, T6, recs);
     return { list: list, counts: counts, cols: { showPost: showPost, showPrice: showPrice, showProfit: showProfit, showSugg: showSugg, showFinal: showFinal, showCheck: showCheck, showInc: showInc, upUK: upUK, upCN: upCN } };
 
 
