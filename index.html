@@ -913,7 +913,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
     ov = ov || {}; var h = (aoa[0] || []).map(function (x) { return x == null ? '' : String(x).trim(); }), ix = {}, miss = [];
     Object.keys(HDR).forEach(function (k) { var i = h.indexOf(HDR[k]); ix[k] = i; if (i < 0 && ['sku', 'cost', 'price', 'bb', 'seller', 'sup'].indexOf(k) >= 0) miss.push(HDR[k]); });
     if (miss.length) throw new Error('This is not the Access B&QBB3 file – missing column(s): ' + miss.join(', '));
-    var bbm = ov.bb || {}, imp = ov.imported || {}, nbb = 0, nimp = 0, nlive = 0, nsold = 0, ndiva = 0, rows = [];
+    var bbm = ov.bb || {}, imp = ov.imported || {}, nbb = 0, nimp = 0, nlive = 0, nsold = 0, rows = [];
     for (var j = 1; j < aoa.length; j++) {
       var x = aoa[j] || [], g = function (k) { return ix[k] >= 0 ? x[ix[k]] : null; };
       if (x.every(function (v) { return v == null || v === ''; })) continue;
@@ -932,22 +932,19 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
           r.accessPrice = ap; r.price = dOn ? dp : lp; r.srcPrice = (ov.offersLabel || 'Active offers') + (dOn ? ' (discount price)' : '');
         }
       }
-      /* 16 Nov 2026 Access-only pricing: price now = B&Q_BB.price when Diva Package holds the buy box below B&Q_INV.price, else B&Q_INV.price. */
-      if (ov.accessOnly && !ov.offers) {
-        var inv = num(r.price), bbp = num(r.bb);
-        r.accessPrice = inv;
-        if (/diva package/i.test(r.seller == null ? '' : String(r.seller)) && bbp > 0 && inv != null && bbp < inv) { r.price = bbp; r.srcPrice = 'Access (Diva buy-box price)'; ndiva++; }
-      }
+      /* 16 Nov 2026 (16:00) Access-only pricing: price now = B&Q_INV.price, always (selling price is the selling price). */
+      if (ov.accessOnly && !ov.offers) { r.accessPrice = num(r.price); r.srcPrice = 'Access B&Q_INV.price'; }
       if (!ov.offers && !ov.accessOnly && imp[r.sku] != null) { r.price = imp[r.sku]; r.srcPrice = ov.importedLabel || 'Imported'; nimp++; }
       var b = bbm[r.ean];
       if (b && (b.seller || num(b.price) != null)) {
         r.bb = num(b.price); r.seller = b.seller || ''; r.srcBB = ov.bbLabel || 'Buy box run'; nbb++;
         /* 4 Nov: Price now is ALWAYS the Access B&Q_INV.price. If the buy box run saw our own offer at a different price (> 1p), flag it – never use it */
-        if (/diva package/i.test(b.seller || '') && num(b.price) > 0 && !(Math.abs(num(b.price) - (num(r.price) || 0)) <= 0.0100001)) { r.liveSeen = num(b.price); nlive++; }
+        /* Access-only: Diva Package holding the buy box = we win; a different BB price is NOT a Price check (profit stays on INV). */
+        if (!ov.accessOnly && /diva package/i.test(b.seller || '') && num(b.price) > 0 && !(Math.abs(num(b.price) - (num(r.price) || 0)) <= 0.0100001)) { r.liveSeen = num(b.price); nlive++; }
       }
       rows.push(r);
     }
-    return { rows: rows, counts: { rows: rows.length, bbOverlay: nbb, importedOverlay: nimp, livePrice: nlive, divaBBPrice: ndiva, salesFromOrders: !!ov.sales30, soldSkus: nsold } };
+    return { rows: rows, counts: { rows: rows.length, bbOverlay: nbb, importedOverlay: nimp, livePrice: nlive, salesFromOrders: !!ov.sales30, soldSkus: nsold } };
   }
 
   /* units sold in the last 30 days per SKU from the Sales/Orders data (RAW = build.py raw json) – EXACTLY the Sales tab's U30:
@@ -1129,7 +1126,7 @@ function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.na
   }
   return { FEE: FEE, sales30: sales30, bbMap: bbMap, ukTime: ukTime, fromAccess: fromAccess, eanOf: eanOf, HDR: HDR, ASHIAN: ASHIAN, OTHER: OTHER, UK_MAX: UK_MAX, SAFE_MIN: SAFE_MIN, CHINA_FLOOR: CHINA_FLOOR, CHINA_CUT: CHINA_CUT, RAISE_AT: RAISE_AT, BANDS: BANDS, OVER: OVER,
     num: num, rnd: rnd, ceil2: ceil2, band: band, mapAccessPostage: mapAccessPostage, accessMapFrom: accessMapFrom, postage: postage, postageSrc: postageSrc, postInfo: postInfo, specialRule: specialRule, heavyCode: heavyCode, SPECIAL: SPECIAL, HEAVY: HEAVY, isChina: isChina, multOf: multOf, fixedCost: fixedCost,
-    TRIM: TRIM, end9: end9, DEFAULT_RULES: DEFAULT_RULES, rulesOf: rulesOf, rulesDiffer: rulesDiffer, useRules: useRules, clearRules: clearRules, feeOf: feeOf, ukMaxOf: ukMaxOf, safeOf: safeOf, chinaFloorOf: chinaFloorOf, packGramsOf: packGramsOf, floorLiftOf: floorLiftOf, t3UploadOn: t3UploadOn, newFloorUploadOn: newFloorUploadOn, OLD_NOSALES_COST: OLD_NOSALES_COST, withRules: withRules, calc: calc, priceFor: priceFor, priceMax: priceMax, floorPrice: floorPrice, floor2: floor2, floorOf: floorOf, isRival: isRival, packN: packN, checkPost: checkPost, decide: decide, decideAll: decideAll, buyBox: buyBox, buyBoxAll: buyBoxAll, bbFromScrape: bbFromScrape, accessScrape: accessScrape, BB_DEFAULT: BB_DEFAULT, isSeasonal: isSeasonal, isXmasTree: isXmasTree, bbStep: bbStep, CHECK_G: 14999, VERSION: 'bq_price v11 2026-11-16 Access-only, 100% under £1, competitor 60%' };
+    TRIM: TRIM, end9: end9, DEFAULT_RULES: DEFAULT_RULES, rulesOf: rulesOf, rulesDiffer: rulesDiffer, useRules: useRules, clearRules: clearRules, feeOf: feeOf, ukMaxOf: ukMaxOf, safeOf: safeOf, chinaFloorOf: chinaFloorOf, packGramsOf: packGramsOf, floorLiftOf: floorLiftOf, t3UploadOn: t3UploadOn, newFloorUploadOn: newFloorUploadOn, OLD_NOSALES_COST: OLD_NOSALES_COST, withRules: withRules, calc: calc, priceFor: priceFor, priceMax: priceMax, floorPrice: floorPrice, floor2: floor2, floorOf: floorOf, isRival: isRival, packN: packN, checkPost: checkPost, decide: decide, decideAll: decideAll, buyBox: buyBox, buyBoxAll: buyBoxAll, bbFromScrape: bbFromScrape, accessScrape: accessScrape, BB_DEFAULT: BB_DEFAULT, isSeasonal: isSeasonal, isXmasTree: isXmasTree, bbStep: bbStep, CHECK_G: 14999, VERSION: 'bq_price v12 2026-11-16 Access-only, price now = INV, 100% under £1, competitor 60%' };
 });
 </script>
 <script>
@@ -3232,7 +3229,7 @@ function render(body){
    st.aoa=doc.aoa;st.accessDate=doc.meta.access_date;st.file=doc.meta.access;compute();draw()})})}
 function showPub(){$("pzpub").classList.toggle("hide",!(st&&(st.src==="file"||st.userScrape)))}
 function compute(){
- /* 16 Nov 2026 (Karimulla): pricing comes ONLY from the Access file. Price now = B&Q_INV.price, or B&Q_BB.price when Diva Package holds the buy box below it.
+ /* 16 Nov 2026 (Karimulla): pricing comes ONLY from the Access file. Price now = B&Q_INV.price, always; Diva Package on the buy box = we win (no Price check).
     Buy box = Access B&Q_BB.price + seller. 30-day sales = Access "B n Q 30Days". No offers export, orders, imported prices, buy box files or rivals history. */
  var useS=false,ov={imported:{},importedLabel:"",accessOnly:true};
  var sc=P.accessScrape(st.aoa||[],st.accessDate,st.file),SC=P.bbFromScrape(sc,st.accessDate),fresh=SC.fresh||{};
@@ -3246,7 +3243,7 @@ function compute(){
  var run=!M.scrape&&st.bbDoc&&st.bbDoc.run||{},c=A.counts;
  $("pzsrc").innerHTML='<div><b>'+(st.src==="pub"?"Published Access file: ":"Your Access file: ")+esc(st.file)+'</b>'+(st.src==="pub"&&st.doc?' <span class="mut">(published '+K.uk(st.doc.meta.created)+')</span>':"")+'</div>'+
   '<div>Buy box: '+(M.n?'<b>'+esc(M.label)+'</b> for '+n0(c.bbOverlay)+' products'+(M.failed?' <span class="mut">('+n0(M.failed)+' rows with no buy box in Access)</span>':'')+(run.status&&run.status!=="complete"?' <span class="bad">(run '+esc(run.status)+')</span>':"")+'.':'<span class="bad">no buy box file newer than the Access file</span> – using the Access buy box.')+'</div>'+
-  '<div class="mut">Price now: Access (Diva buy-box price when below INV'+(c.divaBBPrice?', '+n0(c.divaBBPrice)+' products':'')+')'+(c.livePrice?', or our live B&amp;Q price where we win the buy box ('+n0(c.livePrice)+' products)':"")+'.</div>'+
+  '<div class="mut">Price now: Access B&amp;Q_INV.price'+(c.livePrice?', or our live B&amp;Q price where we win the buy box ('+n0(c.livePrice)+' products)':"")+'.</div>'+
   '<div class="mut">30-day sales: '+(useS?'B&amp;Q orders up to '+esc(dmy(st.doc.meta.sales_last))+' – same as the Sales page ('+n0(c.soldSkus)+' products sold).':'Access “B n Q 30Days” column.')+'</div>'+
   (st.res.dups?'<div class="bad">'+st.res.dups+' duplicate product code row(s) – only the first one is used.</div>':"")+(st.res.nosku?'<div class="mut">'+st.res.nosku+' row(s) with no product code skipped.</div>':"")}
 function checkRes(){var items=st.res.rows.filter(function(o){return o.changed}).map(function(o){return{o:o,x:{}}});
