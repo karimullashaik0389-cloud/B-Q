@@ -2871,9 +2871,11 @@ function publishDashSession(pw,listSalt,listRaw){if(!pw||haveDashKeys())return P
 function sessionListings(u){var o=null;try{o=JSON.parse(sessionStorage.getItem('bqDashSession.v1')||'null');}catch(e){}var L=o&&o.inner&&o.inner.listings;var salt=L&&(L.salt||L.s);if(!L||!L.key||salt!==b64(u.subarray(4,20)))return Promise.reject();
   return crypto.subtle.importKey('raw',u8(L.key),{name:'AES-GCM'},false,['decrypt']).then(function(k){return dec(k,u);});}
 getEnc().then(function(u){return sessionListings(u).then(start,function(){var o=null;try{o=JSON.parse(localStorage.getItem(LS)||'null');}catch(e){}
-  if(o&&o.k&&o.s===b64(u.subarray(4,20)))return crypto.subtle.importKey('raw',u8(o.k),{name:'AES-GCM'},false,['decrypt']).then(function(k){return dec(k,u);}).then(start,function(){window.__lockForget();goHubLogin();});
-  goHubLogin();});},function(){goHubLogin();});
-function goHubLogin(){try{sessionStorage.setItem('bqDashReturn','1');}catch(e){}
+  if(o&&o.k&&o.s===b64(u.subarray(4,20)))return crypto.subtle.importKey('raw',u8(o.k),{name:'AES-GCM'},false,['decrypt']).then(function(k){return dec(k,u);}).then(start,function(){window.__lockForget();goHubLogin(u);});
+  goHubLogin(u);});},function(){goHubLogin(null);});
+function goHubLogin(u){var bounced=false;try{var m=sessionStorage.getItem('bqListBounce.v1');if(m){var t=parseInt(m,10);if(t&&(Date.now()-t)<20000)bounced=true;}}catch(e){}
+  if(bounced){ui(u,u?'Enter the dashboard password to unlock Listings on this device.':'');return;}
+  try{sessionStorage.setItem('bqDashReturn','1');sessionStorage.setItem('bqListBounce.v1',String(Date.now()));}catch(e){}
   location.replace(dashRoot()+'index.html?next='+encodeURIComponent(location.pathname.indexOf('/phone/')>=0?'listings/phone/':'listings/'));}
 })();
 </script><script>/* Same tab bar on every dashboard section and on the Listings pages.
