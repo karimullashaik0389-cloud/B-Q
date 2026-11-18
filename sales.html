@@ -91,28 +91,16 @@ S.home=[
  "Tap a card to open that dashboard. Sales, Orders and Products selling open as their own pages; the others open here. Tap Home (or your phone\u2019s back gesture) to return. Tap Lock when you finish, or Forget this device to clear a remembered unlock."
 ];
 S.dups=function(tab){
- var search="Search by SKU, EAN or name, and use the filters if you want a shorter list. Tap a B&amp;Q link to open the product on diy.com. This page does not change or delete anything on B&amp;Q \u2014 you do that in the B&amp;Q portal yourself.";
- var noUp="There is no file upload on this tab. The list is the published duplicate check already on the site. Uploading files on Home does not refresh this list.";
- if(tab==="fix") return [
-  "The summary boxes show how many groups and listings are in each list. You are on Fix \u2014 these listings need a correction, not a delete.",
-  noUp, search,
-  "Read why a row was flagged, then make the change in the B&amp;Q portal yourself. Switch to Delete, Check or All groups with the buttons above."
- ];
- if(tab==="check") return [
-  "The summary boxes show how many groups and listings are in each list. You are on Check \u2014 review these groups before you decide. Offers in the same group are shown together so you can compare them.",
-  noUp, search,
-  "Switch to Delete, Fix or All groups with the buttons above."
- ];
- if(tab==="groups") return [
-  "You are on All groups. Every duplicate group is listed, with why it was flagged and the decision.",
-  noUp,
-  "Use the decision and group-size filters, or search by SKU, EAN or name. Open a B&amp;Q link to check the live page.",
-  "Switch to Delete, Fix or Check with the buttons above. You can download the Delete list as a CSV from the Delete view."
- ];
+ var view = tab==="fix"?"You are on Fix \u2014 keep these listings, but they need a correction (photos, title, description or key points). You make that change in the B&amp;Q portal yourself.":
+  tab==="check"?"You are on Check \u2014 a person should look at these groups before deciding. Offers in the same group are shown together so you can compare them.":
+  tab==="groups"?"You are on All groups \u2014 every duplicate group is listed, with why it was flagged and the decision.":
+  "You are on Delete \u2014 these are confirmed duplicates to remove yourself in the B&amp;Q portal. After a browser upload this list stays empty, because this page cannot open B&amp;Q product pages to confirm them (the same as the official tool without a live page check); those rows appear under Check instead. The published list (if you have not uploaded) may still show previously confirmed deletes.";
  return [
-  "The summary boxes show how many groups and listings are in each list. You are on Delete \u2014 these are verified duplicates to remove in the B&amp;Q portal yourself.",
-  noUp, search,
-  "Download Delete list (CSV) if you want the list in Excel. Nothing is deleted on B&amp;Q from this dashboard. Switch to Fix, Check or All groups with the buttons above."
+  "This tab finds the same product listed twice (or more) on B&amp;Q, and suggests what to keep, fix or remove. You make the changes yourself in the B&amp;Q portal. Nothing is ever deleted on B&amp;Q from this dashboard.",
+  view,
+  "Delete = confirmed duplicates to remove yourself in the B&amp;Q portal. Fix = keep the listing but correct it. Check = look before you decide. All groups = every group, with why it was flagged and the decision. Switch views with the buttons above. Search by SKU, EAN or name. Open a B&amp;Q link to check the live page. You can download the Delete list as a CSV from the Delete view.",
+  "To rebuild the list without waiting for the 2am job, use Upload files to rebuild the list at the top of this tab. You need four exports: (1) Offers \u2014 B&amp;Q/Mirakl \u2192 My Inventory \u2192 Offers \u2192 Export \u2192 all offers including inactive / 0 stock, as CSV (columns Offer SKU, Product SKU, Product, Activated, Quantity, Price); (2) Product export \u2014 Catalog \u2192 Products \u2192 Export, Excel with a Data sheet (Shop SKU and EAN); (3) Access file (Access_\u2026.xlsx) with columns sku and Variant code; (4) Orders export CSV (Date created, Order number, Quantity, Status, Amount, Product SKU, Offer SKU, Order line no.). Files stay in this browser only.",
+  "After a successful upload the lists update straight away on this tab. Use Clear my upload to go back to the published list already on the site. Nothing is sent to B&amp;Q, Mirakl or GitHub."
  ];
 };
 S.pricing=[
@@ -475,14 +463,72 @@ function offerHTML(o,kind){var h='<div class="h">'+chip(o.decision)+'<span class
 function hit(o,q){if(!q)return true;return String(o.sku||"").toLowerCase().indexOf(q)>=0||String(o.ean||"").indexOf(q)>=0||String(o.name||"").toLowerCase().indexOf(q)>=0||String(o.variant||"").toLowerCase().indexOf(q)>=0}
 function csv(rows,cols){var e=function(v){v=v==null?"":String(v);return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
  return "\ufeff"+[cols.map(function(c){return e(c[1])}).join(",")].concat(rows.map(function(r){return cols.map(function(c){return e(r[c[0]])}).join(",")})).join("\r\n")}
-function dups(){return getJSON("duplicates.enc").then(function(doc){
+
+var DUP_DB="bqDupsUpload.v1";
+function dupIdb(fn){return new Promise(function(res){try{var r=indexedDB.open(DUP_DB,1);r.onupgradeneeded=function(){r.result.createObjectStore("s")};r.onsuccess=function(){fn(r.result,res)};r.onerror=function(){res(null)};}catch(e){res(null)}})}
+function dupLoadSaved(){return dupIdb(function(db,res){if(!db){res(null);return}var t=db.transaction("s").objectStore("s").get("doc");t.onsuccess=function(){res(t.result||null)};t.onerror=function(){res(null)};})}
+function dupSave(doc){return dupIdb(function(db,res){if(!db){res(false);return}var t=db.transaction("s","readwrite").objectStore("s").put(doc,"doc");t.onsuccess=function(){res(true)};t.onerror=function(){res(false)};})}
+function dupClearSaved(){return dupIdb(function(db,res){if(!db){res(false);return}var t=db.transaction("s","readwrite").objectStore("s").delete("doc");t.onsuccess=function(){res(true)};t.onerror=function(){res(false)};})}
+function dupUpHTML(doc,saved){
+ var liveNote=(saved&&doc&&doc.data&&doc.data.summary&&!doc.data.summary.live_checked)?'<p class="note" id="duplive"><b>This browser cannot open B&amp;Q product pages</b> (or run the optional AI check), so nothing is marked Delete (verified) here \u2014 those rows are in Check, the same as the official tool without a live page check. Nothing is ever deleted on B&amp;Q from this dashboard.</p>':'';
+ var srcNote=saved?'<p class="ok" id="dupsrcnote">Showing the list you built in this browser'+(doc&&doc.source_time?(' on '+esc(doc.source_time)+' UK'):'')+(doc&&doc.source_file?(' \u00b7 '+esc(doc.source_file)):'')+'. It stays on this device only. <button type="button" class="btn l" id="dupclear">Clear my upload and use the published list</button></p>':'<p class="note" id="dupsrcnote">This is the published list already on the site. To rebuild it from your own files (no 2am wait), use the box below. Files stay in this browser only.</p>';
+ return liveNote+srcNote+
+  '<div class="box" id="dupup"><h3>Upload files to rebuild the list</h3>'+
+  '<p class="note">You need four exports. After they are chosen, the lists update straight away on this tab. Nothing is sent to B&amp;Q, Mirakl or GitHub, and nothing is deleted on B&amp;Q from this dashboard.</p>'+
+  '<ol class="dup-up-ol">'+
+  '<li><label class="btn l" for="dup_offers">1. Offers export (required)</label> <input type="file" id="dup_offers" class="hide" accept=".csv,.xlsx,.xls,.xlsm"><span class="note" id="dup_offers_n"></span><div class="mut">B&amp;Q / Mirakl \u2192 My Inventory \u2192 Offers \u2192 Export \u2192 <b>all offers, including inactive / 0 stock</b>, as CSV. It needs columns called Offer SKU, Product SKU, Product, Activated, Quantity and Price. An \u201cactive only\u201d export will miss 0-stock listings.</div></li>'+
+  '<li><label class="btn l" for="dup_products">2. Product export</label> <input type="file" id="dup_products" class="hide" accept=".xlsx,.xls,.xlsm"><span class="note" id="dup_products_n"></span><div class="mut">Mirakl \u2192 Catalog \u2192 Products \u2192 Export (Excel, a name like export-products-\u2026.xlsx) with a sheet called Data and columns Shop SKU and EAN. Used for photo / title / description scores.</div></li>'+
+  '<li><label class="btn l" for="dup_access">3. Access file</label> <input type="file" id="dup_access" class="hide" accept=".xlsx,.xls,.xlsm,.csv"><span class="note" id="dup_access_n"></span><div class="mut">Your Access Excel (Access_\u2026.xlsx) with columns called sku and Variant code. This links listings that share a variant code.</div></li>'+
+  '<li><label class="btn l" for="dup_orders">4. Orders export</label> <input type="file" id="dup_orders" class="hide" accept=".csv,.xlsx,.xls,.xlsm" multiple><span class="note" id="dup_orders_n"></span><div class="mut">B&amp;Q / Mirakl \u2192 Orders \u2192 Export (CSV). It needs columns called Date created, Order number, Quantity, Status, Amount, Product SKU, Offer SKU and Order line no. You can pick more than one file; the same order line is counted once.</div></li>'+
+  '</ol>'+
+  '<div class="pz-acts" style="margin-top:10px"><button class="btn o" type="button" id="duprun">Build the list in this browser</button></div>'+
+  '<div class="note" id="dupmsg" role="status"></div></div>';
+}
+function dupFile(inp){return inp&&inp.files&&inp.files[0]?inp.files[0]:null}
+function dupToBuf(file){return file.arrayBuffer().then(function(buf){return {name:file.name,buf:buf,text:/\\.csv$/i.test(file.name)?new TextDecoder("utf-8").decode(buf):null}})}
+function dupWire(reload){
+ if(!document.getElementById("dup-css")){var s=document.createElement("style");s.id="dup-css";s.textContent=".dup-up-ol{margin:8px 0 0;padding-left:20px;max-width:100%;box-sizing:border-box}.dup-up-ol li{margin:0 0 10px;overflow-wrap:anywhere;word-break:break-word}#dupup h3{margin:0 0 8px;font-size:18px}#dupup .btn{margin-right:8px}";document.head.appendChild(s)}
+ function lab(id,f){var n=$(id+"_n");if(n)n.textContent=f?(" \u00b7 "+f.name):""}
+ [["dup_offers",0],["dup_products",0],["dup_access",0],["dup_orders",1]].forEach(function(p){var el=$(p[0]);if(!el)return;el.onchange=function(){lab(p[0],p[1]?((this.files&&this.files[0])||null):dupFile(this));if(p[1]&&this.files&&this.files.length>1&&$(p[0]+"_n"))$(p[0]+"_n").textContent=" \u00b7 "+this.files.length+" files"};});
+ var clr=$("dupclear");if(clr)clr.onclick=function(){dupClearSaved().then(function(){reload()});};
+ var go=$("duprun");if(!go)return;
+ go.onclick=function(){
+  var msg=$("dupmsg");function say(t,ok){if(msg)msg.innerHTML=ok?'<span class="ok">'+t+'</span>':'<span class="bad">'+t+'</span>'}
+  if(!window.BQDupsBuild||!BQDupsBuild.build){say("The list builder did not load. Check your connection and open this tab again.");return}
+  var off=dupFile($("dup_offers"));if(!off){say("Please choose the Offers export first (all offers, including inactive).");return}
+  go.disabled=true;say("Reading your files and building the list\u2026 this stays in this browser.");
+  var prod=dupFile($("dup_products")),acc=dupFile($("dup_access")),ords=[].slice.call(($("dup_orders")&&$("dup_orders").files)||[]);
+  var jobs=[xlsx(),dupToBuf(off)];
+  if(prod)jobs.push(dupToBuf(prod));
+  if(acc)jobs.push(dupToBuf(acc));
+  ords.forEach(function(f){jobs.push(dupToBuf(f))});
+  Promise.all(jobs).then(function(a){
+    var X=a[0],i=1,offers=a[i++];offers.xlsx=X;
+    var products=prod?a[i++]:null;if(products)products.xlsx=X;
+    var access=acc?a[i++]:null;if(access)access.xlsx=X;
+    var orders=[];for(;i<a.length;i++){a[i].xlsx=X;orders.push(a[i])}
+    var today=new Date(),p=function(n){return(n<10?"0":"")+n},date=today.getFullYear()+"-"+p(today.getMonth()+1)+"-"+p(today.getDate());
+    var built=BQDupsBuild.build({offers:offers,products:products,access:access,orders:orders,date:date,xlsx:X});
+    var names=[off.name].concat(prod?[prod.name]:[]).concat(acc?[acc.name]:[]).concat(ords.map(function(f){return f.name}));
+    var stamp=date+" "+p(today.getHours())+":"+p(today.getMinutes());
+    var doc={data:built.data,label:"Built in this browser "+stamp,source:"browser",source_file:names.join(", "),source_time:stamp};
+    return dupSave(doc).then(function(){say("List updated. "+(built.data.summary.groups||0)+" groups found. Delete (verified) is 0 because this browser cannot check B&amp;Q pages \u2014 those rows are in Check.",true);reload();});
+  }).catch(function(e){go.disabled=false;say((e&&e.message)||"Could not build the list. Check you picked the right exports.");});
+ };
+}
+
+
+function dups(){return Promise.all([getJSON("duplicates.enc").then(function(d){return d},function(e){if(e&&e.message==="notyet")return null;throw e}),dupLoadSaved()]).then(function(parts){
+ var pub=parts[0],saved=parts[1],doc=saved||pub;
+ if(!doc||!doc.data){var empty=dupUpHTML(null,false);$("tbody").innerHTML=(window.BQHowTo?window.BQHowTo.wrap(empty,window.BQHowTo.steps.dups("delete"),"bq-howto-dups"):empty);dupWire(dups);return;}
  var D=doc.data,S=D.summary||{},old=doc.source==="29oct",st={tab:"delete",q:"",act:"",sales:"",dec:"",size:"",n:PAGE};
  var lists={delete:D.delete_list||[],fix:D.fix_list||[],check:D.check_list||[]};
  var nchk=lists.check.filter(function(o){return o.decision==="Check"}).length||lists.check.length;
  var cards=old?[["Groups",S.groups],["Offers in groups",S.offers_in_groups],["Candidates to delete",S.delete],["Keep",S.keep_no_fix],["Groups of 2",S.groups_of_2],["Groups of 3",S.groups_of_3],["Groups of 4+",S.groups_of_4_plus]]
   :[["Groups",S.groups],["Offers in groups",S.offers_in_groups],["Delete (verified)",S.delete],["Keep – fix",S.keep_fix],["Check",S.check],["Keep – no fix",S.keep_no_fix],["Groups of 2",S.groups_of_2],["Groups of 3",S.groups_of_3],["Groups of 4+",S.groups_of_4_plus],["New since 29 Oct",S.new_groups]];
  var h=(old?'<div class="src warn" id="dsrc"><b>From 29 Oct list</b> – the new duplicate check has not finished yet, so this shows the 29 Oct list. "Candidates to delete" were <b>not</b> live-checked: check before deleting.</div>'
-  :'<div class="src" id="dsrc"><b>Duplicate check of '+esc(D.run_date)+'</b>'+(D.order_range&&D.order_range[0]?' · sales from '+esc(D.order_range[0])+' to '+esc(D.order_range[1]):"")+(S.live_checked?' · B&amp;Q pages checked live':"")+' · built '+esc(doc.source_time)+' UK</div>')+
+  :'<div class="src" id="dsrc"><b>Duplicate check of '+esc(D.run_date)+'</b>'+(D.order_range&&D.order_range[0]?' · sales from '+esc(D.order_range[0])+' to '+esc(D.order_range[1]):"")+(S.live_checked?' · B&amp;Q pages checked live':"")+' · built '+esc(doc.source_time)+' UK'+(doc.source==="browser"?' · built in this browser':'')+'</div>')+
+  dupUpHTML(doc,!!saved)+
   '<div class="sumg" id="dsum">'+cards.filter(function(c){return c[1]!==undefined&&c[1]!==""}).map(function(c){return '<div class="sc"><b>'+num(c[1])+'</b><span>'+esc(c[0])+'</span></div>'}).join("")+'</div>'+
   ((D.notes||[]).length?'<div class="box note">'+D.notes.map(esc).join("<br>")+'</div>':"")+
   '<div class="seg" id="dseg">'+[["delete",(old?"Candidates to delete":"Delete")+" ("+lists.delete.length+")"],["fix","Fix ("+lists.fix.length+")"],["check","Check ("+nchk+")"],["groups","All groups ("+(D.groups||[]).length+")"]]
@@ -520,7 +566,7 @@ function dups(){return getJSON("duplicates.enc").then(function(doc){
  $("dcsv").onclick=function(){var cols=old?[["group","Group"],["sku","Offer SKU"],["ean","EAN"],["name","Name"],["link","B&Q link"],["variant","Variant code"],["our_price","Our price"],["bb_price","Buy box price"],["bb_seller","Buy box seller"],["winning","Winning?"],["reviews","Reviews"],["units","30-day sales"],["free_stock","Free stock"],["decision","Decision"]]
    :[["group","Group"],["sku","Offer SKU"],["ean","EAN"],["name","Name"],["link","B&Q link"],["active","Active"],["units","Units sold"],["reviews","Reviews"],["strength","Listing strength"],["live","Page check"],["decision","Decision"],["why","Why"],["kept_instead","Kept instead (SKU)"],["kept_units","Kept units"],["kept_reviews","Kept reviews"],["kept_strength","Kept strength"],["kept_live","Kept page check"]];
   save((old?"B&Q duplicates - candidates to delete (29 Oct list).csv":"B&Q duplicates - Delete list "+(D.run_date||"")+".csv"),new Blob([csv(lists.delete,cols)],{type:"text/csv;charset=utf-8"}))};
- draw()})}
+ dupWire(dups);draw()});}
 
 })();
 </script>
@@ -4080,6 +4126,7 @@ window.BQNav={tabs:T,current:function(){return cur},go:go};
 </script>
 <script src="entry_pages.js"></script>
 <script src="bqnav.js"></script>
+<script src="js/bq_dups_build.js"></script>
 <script src="js/bq_data_live.js"></script>
 <script src="js/bq_feed_live.js"></script>
 <script src="js/bq_selling_live.js"></script>
