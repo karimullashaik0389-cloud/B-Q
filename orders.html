@@ -160,11 +160,18 @@ function tryMain(pw){var nk={};
   return kdf(pw,p.salt,true,["decrypt"]).then(function(k){return decrypt(k,p).then(function(){nk.selling={key:k,salt:p.salt.slice()}})})})
   .catch(function(){delete nk.selling;return})})
  .then(function(){return kdf(pw,auxSalt(),true,["encrypt","decrypt"])}).then(function(k){nk.aux={key:k,salt:auxSalt()};return addListingsKey(pw,nk)})}
-function addListingsKey(pw,nk){if(!pw||(nk&&nk.listings))return Promise.resolve(nk);
+function persistListKey(L){if(!L||!L.key||!L.salt||!L.key.extractable)return Promise.resolve();
+ return crypto.subtle.exportKey("raw",L.key).then(function(raw){var u=new Uint8Array(raw);
+  try{localStorage.setItem("bqListKey.v1",JSON.stringify({s:b64(L.salt),k:b64(u)}))}catch(e){}
+  try{u.fill(0)}catch(e){}})}
+function addListingsKey(pw,nk){if(!pw||(nk&&nk.listings)){
+  if(nk&&nk.listings)return persistListKey(nk.listings).then(function(){return nk},function(){return nk});
+  return Promise.resolve(nk)}
  return fetch("listings/data.enc",{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error("net");return r.arrayBuffer()}).then(function(b){
   var u=new Uint8Array(b);if(u.length<48||String.fromCharCode(u[0],u[1],u[2],u[3])!=="BQE1")throw new Error("badfile");
   var salt=new Uint8Array(u.subarray(4,20));
-  return kdf(pw,salt,true,["decrypt"]).then(function(k){return crypto.subtle.decrypt({name:"AES-GCM",iv:u.subarray(20,32)},k,u.subarray(32)).then(function(){nk.listings={key:k,salt:salt};return nk})})
+  return kdf(pw,salt,true,["decrypt"]).then(function(k){return crypto.subtle.decrypt({name:"AES-GCM",iv:u.subarray(20,32)},k,u.subarray(32)).then(function(){
+   nk.listings={key:k,salt:salt};return persistListKey(nk.listings).then(function(){return nk},function(){return nk})})})
  }).catch(function(){return nk})}
 function wrapStore(pw,ks){var inner={},ds=Object.keys(FILES).filter(function(d){return ks[d]}).concat(ks.aux?["aux"]:[]).concat(ks.listings?["listings"]:[]),salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));
  return Promise.all(ds.map(function(d){return crypto.subtle.exportKey("raw",ks[d].key).then(function(raw){inner[d]={salt:b64(ks[d].salt),key:b64(new Uint8Array(raw))}})}))
@@ -194,7 +201,12 @@ function fail(e,txt){var net=e&&(e.message==="net"||e.name==="TypeError");
 function afterUnlock(nk){keys=nk;$("pw").value="";$("msg").textContent="";
  return stashSession().then(function(){
   var n=null;try{n=new URLSearchParams(location.search).get("next")}catch(e){}
-  if(n&&/^[\w./\-]+$/.test(n)&&n.indexOf("..")<0&&n.charAt(0)!=="/"&&n.indexOf(":")<0){location.href=n;return}
+  if(n&&/^[\w./\-]+$/.test(n)&&n.indexOf("..")<0&&n.charAt(0)!=="/"&&n.indexOf(":")<0){
+   var toList=/^listings(\/phone)?\/?$/.test(n);
+   if(toList){var bounced=false;try{var m=sessionStorage.getItem("bqListBounce.v1");if(m){var t=parseInt(m,10);if(t&&(Date.now()-t)<20000)bounced=true}}catch(e){}
+    if(bounced){show("menu");markOptional();if(OPEN)open(OPEN);return}
+    try{sessionStorage.setItem("bqListNext.v1",String(Date.now()))}catch(e){}}
+   location.href=n;return}
   show("menu");markOptional();if(OPEN)open(OPEN);
  })}
 /* An optional card whose nightly file is missing (or not unlocked) says so on that card only. */
