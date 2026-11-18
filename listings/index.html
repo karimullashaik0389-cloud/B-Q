@@ -2969,7 +2969,7 @@ function goHubLogin(u){var bounced=false;try{var m=sessionStorage.getItem('bqLis
    No keys and no catalogue data in this file. */
 (function(){
 "use strict";
-var T=[["home","Home"],["sales","Sales"],["orders","Orders"],["listings","Listings"],["dups","Duplicates"],["access","Access"],["pricing","Pricing"],["lookup","Individual sales"],["calc","Calculator"]];
+var T=[["home","Home"],["sales","Sales"],["orders","Orders"],["listings","Listings"],["dups","Duplicates"],["pricing","Pricing"],["lookup","Individual sales"],["calc","Calculator"]];
 if(document.getElementById("bqnav"))return;
 var CSS='#bqnav{position:fixed;top:0;left:0;right:0;width:100%;max-width:100%;box-sizing:border-box;z-index:80;background:#0F172A;border-bottom:1px solid #1E293B;padding:env(safe-area-inset-top) 0 0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;overflow:hidden}'+
  '#bqnav .bqn-s{display:flex;flex-wrap:wrap;align-items:center;gap:6px;width:100%;max-width:1400px;box-sizing:border-box;margin:0 auto;padding:7px 10px}'+
@@ -2994,7 +2994,7 @@ function base(){if(MAIN)return "";
 function href(v){if(MAIN){if(v==="listings")return"listings/";if(v==="sales")return"sales.html";if(v==="orders")return"orders.html";if(v==="home")return"index.html";return"#go="+v;}return v==="listings"?"./":base()+(v==="home"?"":v==="sales"?"sales.html":v==="orders"?"orders.html":"#go="+v)}
 function mark(v){if(v===cur)return;cur=v;Array.prototype.forEach.call(nav.querySelectorAll("a"),function(a){var on=a.getAttribute("data-bqn")===v;a.classList.toggle("on",on);if(on)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current")})}
 function toListings(){var p=window.BQ&&BQ.stashSession?BQ.stashSession():Promise.resolve();p.then(function(){location.href="listings/"})}
-var ALLOW={home:1,sales:1,orders:1,listings:1,dups:1,access:1,pricing:1,lookup:1,calc:1};
+var ALLOW={home:1,sales:1,orders:1,listings:1,dups:1,pricing:1,lookup:1,calc:1};
 function readGo(){var h=/[#&]go=([a-z]+)/.exec(location.hash||""),s=null;try{s=sessionStorage.getItem("bqDashGo")}catch(e){}
  var hv=h&&ALLOW[h[1]]?h[1]:"",sv=s&&ALLOW[s]?s:"";return hv||sv||""}
 function clearGo(){try{sessionStorage.removeItem("bqDashGo")}catch(e){}

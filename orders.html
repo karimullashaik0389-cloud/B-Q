@@ -115,13 +115,6 @@ S.dups=function(tab){
   "Download Delete list (CSV) if you want the list in Excel. Nothing is deleted on B&amp;Q from this dashboard. Switch to Fix, Check or All groups with the buttons above."
  ];
 };
-S.access=[
- "The Buy box box and the Results table show the published buy box run already on the site (when it finished, and how many EANs we win or lose). There is no button on this tab to upload a new results file, and a buy box file uploaded on Home is used by Pricing, not by this Results table.",
- "Use Losing / Winning / No winner found and the search box (EAN, SKU or seller) to review the table. Download Excel saves the results on this device.",
- "To update the variant codes the buy box uses: after you export All variant.xlsx from Access (table All_VAR), use Choose All variant.xlsx under Update All variant, save the locked file, then upload it on the GitHub page that opens. That does not refresh the Results table on its own.",
- "A new EAN list is optional \u2014 only if you want the buy box to check a different list than usual. Choose the Excel (it needs an EAN column), save the locked file, then upload it on GitHub the same way.",
- "If a Run buy box button is shown, it opens GitHub\u2019s own Run page. You never type a token into this dashboard."
-];
 S.pricing=[
  "Upload today\u2019s Access file on Home (Data upload) or with the 1. Upload Access file button on this tab. The Excel needs a sheet called B&amp;QBB3, or a sheet with a column called Estimated cost. You can also add a buy box file (Excel with columns called code, seller and price) on Home or with Upload buy box file (optional). Files are read only on this computer and the page updates straight away.",
  "Click 2. Download pricing workbook, or Download B&amp;Q upload (CSV). Nothing is sent to B&amp;Q from this page. Losses and under-floor rows never go into the CSV.",
@@ -176,7 +169,6 @@ return {hint:hint,box:box,wrap:wrap,steps:S};
  <button class="big hide" data-d="orders" type="button" aria-hidden="true"><b>Orders</b></button>
  <a class="big" id="listings" href="listings/"><b>Listings</b><span>Create and fix B&amp;Q listings · templates · download files</span></a>
  <button class="big" data-v="dups"><b>Duplicates</b><span>Same product listed twice · delete, fix and check lists</span></button>
- <button class="big" data-v="access"><b>Access</b><span>Buy box winners · run buy box · update All variant</span></button>
  <button class="big" data-v="pricing"><b>Pricing</b><span>New B&amp;Q prices · profit check · buy box · upload file</span></button>
  <button class="big" data-v="lookup"><b>Individual sales</b><span>Orders · units · sales £ by period · upload an Excel SKU list</span></button>
  <button class="big" data-v="calc"><b>Calculator</b><span>Cost · postage · fees · total cost · profit · safe prices</span></button>
@@ -366,7 +358,7 @@ function restoreSession(){
 window.BQ={aux:function(){return keys.aux?keys.aux.key:null},liveKeys:function(){var o={};Object.keys(keys).forEach(function(d){if(keys[d]&&keys[d].key)o[d]=keys[d].key});return o},remembered:function(){return DEVICE},lock:lock,busy:busy,back:back,stashSession:stashSession,forced:OPEN||null,openDash:open};
 window.addEventListener("message",function(e){var f=$("frame");
  if(!f||e.source!==f.contentWindow||!e.data||typeof e.data.bq!=="string")return;
- if(location.origin!=="null"&&e.origin!==location.origin)return;
+ if(location.origin!=="null"&&e.origin!==location.origin&&e.origin!=="null")return;
  var m=e.data,reply=function(o){o.re=m.id;try{e.source.postMessage(o,location.origin!=="null"?location.origin:"*")}catch(x){}};
  if(m.bq==="hello"){reply({ok:true,remembered:!!stored()||DEVICE});return}
  if(m.bq==="lock"){reply({ok:true});lock("Locked. This device no longer remembers you.");return}
@@ -375,7 +367,7 @@ window.addEventListener("message",function(e){var f=$("frame");
  if(m.bq==="open"){var v=String(m.v||"");reply({ok:true});
   if(v==="listings"){var goL=window.BQ&&BQ.stashSession?BQ.stashSession():Promise.resolve();goL.then(function(){location.href=$("listings").getAttribute("href")});return}
   if(v==="sales"||v==="orders"||v==="selling"){if(OPEN&&v!==OPEN){stashSession().then(function(){location.href=v+".html"});return}open(v);return}
-  if(window.BQTabs&&BQTabs.tabs[v]){back();BQTabs.open(v)}return}
+  if(window.BQTabs&&BQTabs.tabs[v]){if(OPEN){stashSession().then(function(){try{sessionStorage.setItem("bqDashGo",v)}catch(e){}location.href="index.html#go="+encodeURIComponent(v)});return}back();if($("viewer")&&!$("viewer").classList.contains("hide")){$("viewer").classList.add("hide");try{setFrame("about:blank")}catch(e){}if(typeof curUrl!=="undefined"&&curUrl){try{URL.revokeObjectURL(curUrl)}catch(e){}curUrl=null}}BQTabs.open(v)}return}
  if(m.bq==="rewrap"){var o=String(m.old||""),n=String(m.nw||"");
   if(n.length<8){reply({ok:false,err:"New password needs at least 8 characters"});return}
   if(DEVICE){reply({ok:false,err:"remembered"});return}   /* no separate device password on the remembered path */
@@ -400,7 +392,7 @@ else{var had1=false;try{had1=!!localStorage.getItem(LS1);localStorage.removeItem
 <script>
 (function(){
 "use strict";
-/* B&Q dashboard tabs: Duplicates and Access. Same page and same unlock as login_v5.js (uses its "aux" key).
+/* B&Q dashboard tabs: Duplicates. Same page and same unlock as login_v5.js (uses its "aux" key).
    Everything is decrypted in this browser. Uploads are encrypted here before they leave the device.
    No GitHub token anywhere: uploads go through GitHub's own upload page, runs through GitHub's own Run button. */
 var OWNER="karimullashaik0389-cloud",REPO="B-Q",API="https://api.github.com/repos/"+OWNER+"/"+REPO,GH="https://github.com/"+OWNER+"/"+REPO;
@@ -446,8 +438,8 @@ function gh(path){return fetch(API+path,{cache:"no-store",headers:{Accept:"appli
       either here in TABS or from a new script inlined after tabs_v1.js by build_site_v5.py.
    render() fills $("tbody") (passed as body); kit has getJSON/getEnc (decrypt BQE1 files), encrypt, esc, money, uk, ukt, save, xlsx, why, el, gh.
    ‹ Back, phone back gesture, Loading…, errors and "unlock again" are handled here for every tab. */
-var TABS={dups:{title:"Duplicates",render:function(){return dups()}},access:{title:"Access",render:function(){return access()}}};
-function openTab(v){var T=TABS[v];if(!T)return;cur=v;$("ttitle").textContent=T.title;$("tbody").innerHTML='<p class="note">Loading…</p>';
+var TABS={dups:{title:"Duplicates",render:function(){return dups()}}};
+function openTab(v){var T=TABS[v];if(!T)return;cur=v;$("ttitle").textContent=T.title;
  $("tabv").classList.remove("hide");$("tabv").scrollTop=0;document.title="B&Q "+T.title;
  Promise.resolve().then(function(){return T.render($("tbody"),KIT)}).catch(function(e){if(e&&e.message==="nokey"){close();BQ.lock("Please type the main password once more (new cards were added).");return}
   $("tbody").innerHTML='<div class="src warn">'+why(e)+'</div>'})}
@@ -530,111 +522,6 @@ function dups(){return getJSON("duplicates.enc").then(function(doc){
   save((old?"B&Q duplicates - candidates to delete (29 Oct list).csv":"B&Q duplicates - Delete list "+(D.run_date||"")+".csv"),new Blob([csv(lists.delete,cols)],{type:"text/csv;charset=utf-8"}))};
  draw()})}
 
-/* ---------- Access ---------- */
-function newest(list,prefix){return list.filter(function(f){return f.type==="file"&&f.name.indexOf(prefix)===0&&/\.enc$/.test(f.name)}).sort(function(a,b){return a.name<b.name?1:-1})}
-function metaOf(f,kind){return fetch(f.download_url,{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error("net");return r.arrayBuffer()}).then(decrypt).then(function(u){
- if(kind==="av"){var h=te.decode(u.subarray(0,6));if(h!=="BQAV1\n")throw new Error("badfile");var nl=u.indexOf(10,6);return JSON.parse(te.decode(u.subarray(6,nl)))}
- return JSON.parse(te.decode(u)).meta})}
-function bestMeta(files,kind){var c=files.slice(0,3);return Promise.all(c.map(function(f){return metaOf(f,kind).then(function(m){m._file=f.name;return m},function(){return null})}))
- .then(function(ms){ms=ms.filter(Boolean);ms.sort(function(a,b){return(a.created||"")<(b.created||"")?1:-1});return ms[0]||null})}
-function access(){
- var h='<h2>Buy box</h2><div class="box" id="arun">Checking the last run…</div><div class="box" id="ago"></div>'+
-  '<h2>Results</h2><div class="ctl"><input type="search" id="aq" placeholder="Search EAN, SKU or seller" autocomplete="off" autocapitalize="off" spellcheck="false">'+
-  '<select id="af" aria-label="Filter"><option value="">All</option><option value="No">Losing</option><option value="Yes">Winning</option><option value="none">No winner found</option></select>'+
-  '<button class="btn o" type="button" id="axl" disabled>⬇ Download Excel</button></div><div class="cnt" id="acnt"></div><div id="atab"></div>'+
-  '<h2>Update All variant</h2><div class="box" id="aav"><div id="avlast" class="note">Checking…</div>'+
-   '<p class="note">Do this after you export <b>All variant.xlsx</b> from Access (table All_VAR). It replaces the file the buy box uses for Variant codes.</p>'+
-   '<ol><li><label class="btn o" for="avfile">1. Choose All variant.xlsx</label><input type="file" id="avfile" accept=".xlsx,.xls,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" class="hide"></li>'+
-   '<li id="avstep2" class="hide"></li><li id="avstep3" class="hide"></li></ol><div id="avmsg" class="note"></div></div>'+
-  '<h2>Use a new EAN list (optional)</h2><div class="box" id="acodes"><div id="cdlast" class="note">Checking…</div>'+
-   '<p class="note">Normally the buy box uses the newest offers export on Dora’s computer. To check a different list, pick an Excel with an EAN column (offers export or a codes list).</p>'+
-   '<ol><li><label class="btn l" for="cdfile">1. Choose the Excel</label><input type="file" id="cdfile" accept=".xlsx,.xls,.xlsm,.csv" class="hide"></li><li id="cdstep2" class="hide"></li><li id="cdstep3" class="hide"></li></ol><div id="cdmsg" class="note"></div></div>';
- $("tbody").innerHTML=window.BQHowTo.wrap(h,window.BQHowTo.steps.access,"bq-howto-access");
- $("avfile").onchange=function(){if(this.files[0])pickAV(this.files[0]);this.value=""};
- $("cdfile").onchange=function(){if(this.files[0])pickCodes(this.files[0]);this.value=""};
- var dataList=gh("/contents/data").catch(function(e){return e.message==="gh404"?[]:null});
- dataList.then(function(list){
-  if(list===null){$("avlast").textContent="Couldn’t check GitHub right now (try again in a minute).";$("cdlast").textContent="";return}
-  bestMeta(newest(list,"all_variant_"),"av").then(function(m){$("avlast").innerHTML=m?'<b>Last updated '+uk(m.created)+', '+num(m.rows)+' rows</b> <span class="mut">('+esc(m.name)+')</span>':'<b>Not uploaded yet.</b>'});
-  bestMeta(newest(list,"codes_"),"codes").then(function(m){$("cdlast").innerHTML=m?'Newest list: <b>'+esc(m.source)+'</b>, '+num(m.rows)+' EANs, from '+uk(m.created):'No list uploaded yet – the buy box uses the offers export on Dora’s computer.'})});
- runBox();
- return getJSON("buybox.enc").then(results,function(e){
-  $("arun").innerHTML=e.message==="notyet"?"No buy box result yet.":why(e);$("atab").innerHTML="";}).then(function(){})}
-function runBox(){var box=$("ago");
- gh("/actions/workflows").then(function(j){var w=(j.workflows||[]).filter(function(w){return /buybox\.yml$/.test(w.path)&&w.state==="active"})[0];if(!w)throw new Error("nowf");return w})
- .then(function(w){var url=GH+"/actions/workflows/"+WF;
-  box.innerHTML='<a class="btn o" id="arunbtn" href="'+url+'" target="_blank" rel="noopener">▶ Run buy box now</a>'+
-   '<ol class="note"><li>On GitHub tap <b>Run workflow</b>, then the green <b>Run workflow</b>.</li><li>Come back here. It takes about 1–2 hours for every EAN; this page shows the progress.</li></ol><div id="aprog" class="note"></div>';
-  var poll=function(){gh("/actions/workflows/"+w.id+"/runs?per_page=1").then(function(r){var x=(r.workflow_runs||[])[0],p=$("aprog");if(!p)return;
-   if(!x){p.textContent="No GitHub run yet.";return}
-   if(x.status!=="completed")p.innerHTML='<span class="ok">Running now</span> – started '+uk(x.run_started_at||x.created_at)+'. <a href="'+esc(x.html_url)+'" target="_blank" rel="noopener">See it on GitHub ↗</a> (updates every 30 s)';
-   else p.innerHTML='Last GitHub run: '+(x.conclusion==="success"?'<span class="ok">finished OK</span>':'<span class="bad">'+esc(x.conclusion)+'</span>')+' at '+uk(x.updated_at)+'. <a href="'+esc(x.html_url)+'" target="_blank" rel="noopener">Details ↗</a>';
-   if(x.status==="completed"&&timer){clearInterval(timer);timer=null;if(cur==="access")getJSON("buybox.enc").then(results,function(){})}
-   else if(x.status!=="completed"&&!timer)timer=setInterval(poll,30000)},function(){})};poll()})
- .catch(function(){box.innerHTML='<b>Runs on Dora’s computer – Ask Dora to run it.</b><p class="note">The GitHub run button is not switched on yet. Results appear here as soon as Dora’s run finishes.</p>'})}
-function results(doc){var R=doc.run||{},rows=doc.rows||[],st={q:"",f:"",n:100};
- var s=R.status==="complete"?'<span class="ok">Complete</span>':R.status==="blocked"?'<span class="bad">Stopped – diy.com blocked the run</span>':'<span class="bad">Stopped early'+(R.stop_reason?" ("+esc(R.stop_reason)+")":"")+'</span>';
- $("arun").innerHTML='<div><b>Last run: '+uk(R.finished)+'</b> · '+s+' · on '+(R.runner==="github"?"GitHub":"Dora’s computer")+(R.minutes!=null?' · took '+esc(R.minutes)+' min':"")+'</div>'+
-  '<div>'+num(R.checked)+' of '+num(R.total)+' EANs checked · <span class="ok">winning '+num(R.winning)+'</span> · <span class="bad">losing '+num(R.losing)+'</span> · no winner found '+num((R.checked||0)-(R.with_seller||0))+'</div>'+
-  (R.codes_source?'<div class="mut">EAN list: '+esc(R.codes_source)+'</div>':"");
- function draw(){var q=st.q.trim().toLowerCase();
-  var out=rows.filter(function(r){return(!q||r.ean.indexOf(q)>=0||String(r.sku).toLowerCase().indexOf(q)>=0||String(r.seller).toLowerCase().indexOf(q)>=0||String(r.variant||"").toLowerCase().indexOf(q)>=0)&&
-   (!st.f||(st.f==="none"?!r.seller:r.winning===st.f))});
-  var h='<div class="tw"><table class="bt"><thead><tr><th>EAN</th><th>Link</th><th>Winner seller</th><th>Winner price</th><th>Our price</th><th>Winning?</th><th>Fetched at (UK)</th></tr></thead><tbody>'+
-   out.slice(0,st.n).map(function(r){return '<tr><td><span class="mono">'+esc(r.ean)+'</span>'+(r.sku?'<br><span class="mut mono">'+esc(r.sku)+'</span>':"")+'</td><td>'+(r.url?link(r.url,"B&amp;Q ↗"):'<span class="mut">–</span>')+'</td><td>'+(r.seller?esc(r.seller):'<span class="mut">'+esc(r.status)+'</span>')+
-    '</td><td class="n">'+money(r.price)+'</td><td class="n">'+money(r.our_price)+'</td><td>'+(r.winning==="Yes"?'<span class="chip keep">Yes</span>':r.winning==="No"?'<span class="chip del">No</span>':'<span class="mut">–</span>')+'</td><td class="mut" style="white-space:nowrap">'+(r.fetched?esc(ukt(r.fetched)):'–')+'</td></tr>'}).join("")+'</tbody></table></div>';
-  if(!out.length)h='<div class="box note">Nothing matches – clear the search or filter.</div>';
-  if(out.length>st.n)h+='<button class="more" type="button" id="amore">Show more ('+(out.length-st.n)+' left)</button>';
-  $("acnt").textContent=out.length?"Showing "+Math.min(st.n,out.length)+" of "+out.length:"";$("atab").innerHTML=h;var m=$("amore");if(m)m.onclick=function(){st.n+=200;draw()}}
- $("aq").oninput=function(){st.q=this.value;st.n=100;draw()};$("af").onchange=function(){st.f=this.value;st.n=100;draw()};
- var b=$("axl");b.disabled=false;b.onclick=function(){b.disabled=true;b.textContent="Preparing…";xlsx().then(function(X){
-  var aoa=[["EAN","Offer SKU","Variant code","B&Q link","Winner seller","Winner price","Our price","Winning?","Reviews","Status","Fetched at (UK)"]].concat(rows.map(function(r){
-   return[String(r.ean),String(r.sku||""),String(r.variant||""),r.url||"",r.seller||"",r.price==null||r.price===""?"":+r.price,r.our_price==null||r.our_price===""?"":+r.our_price,r.winning||"",r.reviews===""||r.reviews==null?"":+r.reviews,r.status||"",ukt(r.fetched,true)]}));
-  var wb=X.utils.book_new(),ws=X.utils.aoa_to_sheet(aoa);ws["!cols"]=[{wch:15},{wch:16},{wch:14},{wch:40},{wch:24},{wch:11},{wch:10},{wch:9},{wch:8},{wch:22},{wch:20}];X.utils.book_append_sheet(wb,ws,"Buy box");
-  X.utils.book_append_sheet(wb,X.utils.aoa_to_sheet([["Run finished",uk(R.finished)],["Status",R.status],["Ran on",R.runner==="github"?"GitHub":"Dora's computer"],["EANs",R.total],["Checked",R.checked],["Winning",R.winning],["Losing",R.losing],["EAN list",R.codes_source||""]]),"Run");
-  X.writeFile(wb,"B&Q buy box "+String(R.finished||"").slice(0,10)+".xlsx")}).catch(function(e){alert(why(e))}).then(function(){b.disabled=false;b.textContent="⬇ Download Excel"})};
- draw()}
-
-/* ---------- uploads (encrypted here, then GitHub's own upload page) ---------- */
-function findHeader(X,wb,want){/* -> {sheet, hdr row index, rows (array of arrays), col index map} for the first sheet having a header cell in want[] */
- for(var s=0;s<wb.SheetNames.length;s++){var a=X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[s]],{header:1,raw:true,defval:""});
-  for(var i=0;i<Math.min(a.length,10);i++){var m={};a[i].forEach(function(c,j){var n=norm(c);if(n&&!(n in m))m[n]=j});
-   if(want.some(function(w){return w in m}))return{sheet:wb.SheetNames[s],hi:i,rows:a,map:m,head:a[i]}}}return null}
-function col(m){for(var i=1;i<arguments.length;i++)if(arguments[i] in m)return m[arguments[i]];return -1}
-function readBook(file){return xlsx().then(function(X){return file.arrayBuffer().then(function(buf){var wb;
- try{wb=X.read(new Uint8Array(buf),{type:"array",dense:false})}catch(e){throw new Error("notexcel")}return{X:X,wb:wb,buf:new Uint8Array(buf)}})})}
-function steps(prefix,name,blob,what){var s2=$(prefix+"step2"),s3=$(prefix+"step3");
- s2.innerHTML='<button class="btn o" type="button" id="'+prefix+'save">2. Save the locked file</button> <span class="mut mono">'+esc(name)+'</span>';s2.classList.remove("hide");s3.classList.add("hide");
- $(prefix+"save").onclick=function(){save(name,blob);
-  s3.innerHTML='<a class="btn o" href="'+UPLOAD+'" target="_blank" rel="noopener">3. Open GitHub upload</a><div class="note">On GitHub tap <b>choose your files</b>, pick <b>'+esc(name)+'</b> (in Downloads), then tap the green <b>Commit changes</b>. Done – '+what+'</div>';
-  s3.classList.remove("hide")}}
-function pickAV(file){var msg=$("avmsg");msg.innerHTML="Reading "+esc(file.name)+"…";$("avstep2").classList.add("hide");$("avstep3").classList.add("hide");
- readBook(file).then(function(b){var f=findHeader(b.X,b.wb,["variantcode"]);
-  if(!f)throw new Error("novar");var vc=f.map.variantcode,n=0;
-  for(var i=f.hi+1;i<f.rows.length;i++)if(String(f.rows[i][vc]).trim()!=="")n++;
-  if(!n)throw new Error("empty");
-  return crypto.subtle.digest("SHA-256",b.buf).then(function(d){var meta={name:file.name,rows:n,created:new Date().toISOString().replace(/\.\d+Z$/,"Z"),col:String(f.head[vc]),sheet:f.sheet,size:b.buf.length,sha256:hex(new Uint8Array(d))};
-   var head=tenc.encode("BQAV1\n"+JSON.stringify(meta)+"\n"),all=new Uint8Array(head.length+b.buf.length);all.set(head,0);all.set(b.buf,head.length);
-   return encrypt(all).then(function(enc){var name="all_variant_"+stamp()+".enc";
-    msg.innerHTML='<span class="ok">✓ Looks right:</span> <b>'+num(n)+' rows</b> with a Variant code (sheet “'+esc(f.sheet)+'”, '+f.head.filter(function(x){return x!==""}).length+' columns). This will replace the current All variant file.';
-    steps("av",name,new Blob([enc],{type:"application/octet-stream"}),"the buy box uses it from the next run.")})})})
- .catch(function(e){var m=e&&e.message;msg.innerHTML='<span class="bad">'+(m==="novar"?"That doesn’t look like the All variant file – it has no “Variant code” column. Please pick the All variant.xlsx you exported from Access.":
-  m==="empty"?"That file has a Variant code column but no rows in it. Please export All variant again.":m==="notexcel"?"That isn’t an Excel file. Please pick All variant.xlsx.":why(e))+'</span>'})}
-function pickCodes(file){var msg=$("cdmsg");msg.innerHTML="Reading "+esc(file.name)+"…";$("cdstep2").classList.add("hide");$("cdstep3").classList.add("hide");
- readBook(file).then(function(b){var f=findHeader(b.X,b.wb,["productid","ean","ean13","barcode","productsku","code","codes"]);
-  if(!f)throw new Error("noean");var m=f.map,ce=col(m,"productid","ean","ean13","barcode","productsku","code","codes"),cs=col(m,"sku","offersku","shopsku"),cp=col(m,"b&qinvprice","price","ourprice","offerprice"),
-  cv=col(m,"variantcode"),cu=col(m,"producturl","url","link"),ca=col(m,"activated"),seen={},rows=[];
-  for(var i=f.hi+1;i<f.rows.length;i++){var r=f.rows[i],e=String(r[ce]).trim().replace(/\.0$/,"");
-   if(/^\d+(\.\d+)?e\+?\d+$/i.test(e))e=Number(e).toFixed(0);if(!/^\d{8,14}$/.test(e)||seen[e])continue;
-   if(ca>=0&&["true","yes","1"].indexOf(String(r[ca]).trim().toLowerCase())<0)continue;seen[e]=1;
-   var p=cp>=0?parseFloat(String(r[cp]).replace(/[£,]/g,"")):NaN;
-   rows.push([e,cs>=0?String(r[cs]).trim():"",isNaN(p)||p<=0?null:Math.round(p*100)/100,cv>=0?String(r[cv]).trim():"",cu>=0&&/_BQ\.prd/.test(r[cu])?String(r[cu]).trim():""])}
-  if(!rows.length)throw new Error("noean");
-  var meta={source:file.name,created:new Date().toISOString().replace(/\.\d+Z$/,"Z"),rows:rows.length,active_only:ca>=0,by:"page"};
-  return encrypt(tenc.encode(JSON.stringify({meta:meta,rows:rows}))).then(function(enc){var name="codes_"+stamp()+".enc";
-   msg.innerHTML='<span class="ok">✓ '+num(rows.length)+' EANs found</span>'+(ca>=0?' (active offers only)':"")+'.';
-   steps("cd",name,new Blob([enc],{type:"application/octet-stream"}),"the next buy box run uses this list.")})})
- .catch(function(e){var m=e&&e.message;msg.innerHTML='<span class="bad">'+(m==="noean"?"No EAN codes found in that file. It needs a column called EAN, product-id or Product SKU with 13-digit codes.":m==="notexcel"?"That isn’t an Excel file.":why(e))+'</span>'})}
 })();
 </script>
 <script>
@@ -3357,15 +3244,15 @@ function spCfg(){return P.specialConfig()}
 function spDraw(){var el=$("pzspin");if(!el)return;var C=spCfg(),cnt=st&&st.aoa?P.countSpecial(st.aoa):null,saved=!!spSaved();
  var e=function(v){return esc(v==null?"":String(v))},packSel=function(i,v,dis){return '<select data-sp="pack" data-i="'+i+'"'+(dis?' disabled':'')+'>'+[["","any"],["1","single"],["2","pack of 2"],["3+","pack of 3+"]].map(function(o){return '<option value="'+o[0]+'"'+(o[0]===(v||"")?' selected':'')+'>'+o[1]+'</option>'}).join("")+'</select>'};
  var h='<p class="note">Used before the Access postage and the weight bands (postage you type for a product still wins). First matching row wins, top to bottom; new rows go at the top. Match words are checked in the Access Variant description (all words; use | between alternatives); SKU / code prefix is a comma list. Built-in rows keep their exact match – you can change their name and £ or delete them.</p>'+
-  '<div class="pz-sptw"><table class="pz-spt"><thead><tr><th>Name</th><th>Match words (Variant description)</th><th>SKU / code prefix</th><th>Pack</th><th>Postage £</th><th>Products'+(cnt?'':' <span class="mut">(upload Access)</span>')+'</th><th></th></tr></thead><tbody>'+
+  '<div class="pz-sptw"><table class="pz-spt"><thead><tr><th>Name</th><th>Match words (Variant description)</th><th>SKU / code prefix</th><th>Pack</th><th class="pz-post-h">Postage £</th><th>Products'+(cnt?'':' <span class="mut">(upload Access)</span>')+'</th><th></th></tr></thead><tbody>'+
   C.rules.map(function(r,i){var b=!!r.builtin;return '<tr><td><input data-sp="name" data-i="'+i+'" value="'+e(r.name)+'"></td>'+
    (b?'<td class="mut">'+e(r.words||"–")+' <i>(built-in match)</i></td><td class="mut">'+e(r.prefixes||"–")+'</td><td>'+packSel(i,r.pack,true)+'</td>'
      :'<td><input data-sp="words" data-i="'+i+'" value="'+e(r.words)+'"></td><td><input data-sp="prefixes" data-i="'+i+'" value="'+e(r.prefixes)+'"></td><td>'+packSel(i,r.pack,false)+'</td>')+
    '<td><input data-sp="postage" data-i="'+i+'" type="number" step="0.01" min="0" value="'+e(r.postage)+'"></td><td>'+(cnt?(cnt[r.id]||0):"")+'</td><td><button class="btn l" type="button" data-spdel="'+i+'">Delete</button></td></tr>'}).join("")+
   '</tbody></table></div><div class="pz-acts"><button class="btn l" type="button" id="pzspadd">Add row</button></div>'+
-  '<p class="note" style="margin-top:10px"><b>Heavy items (DPD)</b> – description ends in one of these codes and weight is over the start weight.</p>'+
+  '<p class="note pz-edit-h" style="margin-top:10px"><b>Heavy items (DPD)</b> – description ends in one of these codes and weight is over the start weight.</p>'+
   '<div class="grid"><label>Codes (comma list)<input data-sph="codes" value="'+e(C.heavy.codes)+'"></label><label>Start weight over (g)<input data-sph="from" type="number" step="1" value="'+e(C.heavy.from)+'"></label></div>'+
-  '<table class="pz-spt"><thead><tr><th>Up to (g)</th><th>Postage £</th><th>Label</th><th></th></tr></thead><tbody>'+
+  '<table class="pz-spt"><thead><tr><th>Up to (g)</th><th class="pz-post-h">Postage £</th><th>Label</th><th></th></tr></thead><tbody>'+
   C.heavy.rates.map(function(x,i){return '<tr><td><input data-spr="upTo" data-i="'+i+'" type="number" step="1" value="'+e(x.upTo)+'"></td><td><input data-spr="postage" data-i="'+i+'" type="number" step="0.01" value="'+e(x.postage)+'"></td><td><input data-spr="label" data-i="'+i+'" value="'+e(x.label)+'"></td><td><button class="btn l" type="button" data-sprdel="'+i+'">Delete</button></td></tr>'}).join("")+
   '</tbody></table><div class="pz-acts"><button class="btn l" type="button" id="pzspradd">Add heavy rate</button></div>'+
   '<div class="pz-acts"><button class="btn o" type="button" id="pzspexp">Export special postage</button> <button class="btn l" type="button" id="pzspreset">Back to the saved list</button></div>'+
@@ -3415,7 +3302,7 @@ var CSS='.pz-b7g{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 10px}.pz-b7t{d
  '.pz-need .tone-under{background:#FFC107;color:#111;font-weight:700}.pz-need .tone-blue{background:#90CAF9;font-weight:700}.pz-need .tone-ok{background:#C8E6C9;font-weight:700}'+
  '.pz-need .big{outline:3px solid #DC2626}.pz-set{margin-top:16px}.pz-set h3{margin:0 0 8px;font-size:18px}'+
  '.pz-set .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px 14px}.pz-set label{font-size:13px;color:#334155;display:flex;flex-direction:column;gap:3px}'+
- '.pz-set input{font-size:15px;padding:5px 7px;border:1px solid #CBD5E1;border-radius:6px}.pz-hist{margin-top:12px}'+
+ '.pz-set input{font-size:15px;padding:5px 7px;border:1px solid #CBD5E1;border-radius:6px}#pzsp,#pzset{border-left:4px solid #FF6600}.pz-set h3,.pz-need h3,p.pz-edit-h,#pzrules>summary{font-weight:800;color:#FF6600}.pz-spt th.pz-post-h,table.pz-t th.pz-post-h{font-weight:800;color:#FF6600}.pz-spt input[data-sp="postage"],.pz-spt input[data-spr="postage"],#pzr_overBand,input[id^="pzr_bp"]{font-weight:700;color:#C2410C;border-color:#FF6600}.pz-need td.pz-post,.pz-need td.pz-post input{font-weight:700;color:#C2410C}.pz-hist{margin-top:12px}'+
  '.pz-sptw{overflow-x:auto}.pz-spt{border-collapse:collapse;width:100%;font-size:13px;margin-top:6px}.pz-spt th,.pz-spt td{border-bottom:1px solid #E2E8F0;padding:4px 6px;text-align:left;vertical-align:middle}.pz-spt input{width:100%;min-width:70px;box-sizing:border-box}';
 var st=null;
 var HOW='<div class="pz-how" id="pzhow"><h2>How to make today\'s prices</h2>'+
@@ -3614,7 +3501,7 @@ function showPreview(wb){K.xlsx().then(function(X){var prev=BQBook.parseChecks(X
  var s=$("pzchksave");if(s)s.onclick=savePreview;var n=$("pzchkcan");if(n)n.onclick=function(){st._chkWb=null;st._chkPrev=null;$("pzchkprev").innerHTML="";};});}
 function savePreview(){if(!st._chkPrev||!st._chkPrev.ok)return;var next=BQBook.applyPreview(st.checks,st._chkPrev);var r=persistChecks(next);$("pzchkmsg").textContent=r.ok?"Saved in this browser. Postage and selling-price corrections will be used on the next Access file and the next workbook.":r.error;if(r.ok){st._chkWb=null;$("pzchkprev").innerHTML="";compute();draw();}}
 function chkDraw(){var box=$("pzchkrev");if(!box||!st.checks)return;var items=st.checks.items||{},keys=Object.keys(items).sort();
- box.innerHTML='<p><b>'+keys.length+'</b> saved check'+(keys.length===1?"":"s")+' in this browser.'+(keys.length?" ":" None yet.")+'</p>'+(keys.length?'<div class="tw"><table class="bt pz-t"><thead><tr><th>SKU</th><th>Postage</th><th>Selling price</th><th>Include</th><th>Your price</th><th></th></tr></thead><tbody>'+keys.slice(0,40).map(function(sku){var c=items[sku];return '<tr><td class="mono">'+esc(sku)+'</td><td>'+(c.post!=null?money(c.post):"")+'</td><td>'+(c.priceNow!=null?money(c.priceNow):"")+'</td><td>'+esc(c.inc||"")+'</td><td>'+(c.your!=null?money(c.your):"")+'</td><td><button type="button" class="btn l" data-rm="'+esc(sku)+'">Remove</button></td></tr>';}).join("")+'</tbody></table></div>'+(keys.length>40?'<p class="mut">Showing 40 of '+keys.length+'. Export a backup for the full list.</p>':""):"");
+ box.innerHTML='<p><b>'+keys.length+'</b> saved check'+(keys.length===1?"":"s")+' in this browser.'+(keys.length?" ":" None yet.")+'</p>'+(keys.length?'<div class="tw"><table class="bt pz-t"><thead><tr><th>SKU</th><th class="pz-post-h">Postage</th><th>Selling price</th><th>Include</th><th>Your price</th><th></th></tr></thead><tbody>'+keys.slice(0,40).map(function(sku){var c=items[sku];return '<tr><td class="mono">'+esc(sku)+'</td><td>'+(c.post!=null?money(c.post):"")+'</td><td>'+(c.priceNow!=null?money(c.priceNow):"")+'</td><td>'+esc(c.inc||"")+'</td><td>'+(c.your!=null?money(c.your):"")+'</td><td><button type="button" class="btn l" data-rm="'+esc(sku)+'">Remove</button></td></tr>';}).join("")+'</tbody></table></div>'+(keys.length>40?'<p class="mut">Showing 40 of '+keys.length+'. Export a backup for the full list.</p>':""):"");
  Array.prototype.forEach.call(box.querySelectorAll("[data-rm]"),function(b){b.onclick=function(){var k=b.getAttribute("data-rm"),s=BQBook.normStore(st.checks);delete s.items[k];var r=persistChecks(s);if(r.ok){compute();draw();}}});}
 function exportChecks(){var blob=new Blob([JSON.stringify(BQBook.backup(st.checks),null,2)],{type:"application/json"}),u=URL.createObjectURL(blob),a=document.createElement("a");a.href=u;a.download="BQ checked backup "+today()+".json";document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(u);a.remove();},1000);$("pzchkmsg").textContent="Backup downloaded. It only works as a checks backup, in a browser, and it is not synced for you.";}
 function importBackup(file){file.text().then(function(t){var obj;try{obj=JSON.parse(t);}catch(e){$("pzchkmsg").textContent="That file is not a checks backup.";return;}
@@ -3652,9 +3539,9 @@ function setBox(){
   field("packGrams","Check-postage weight (g)",numv("packGrams",D.packGrams),"g")+
   field("overBand","Postage over last band £",numv("overBand",D.overBand),"£")+
   '</div>'+
-  '<p class="note" style="margin-top:10px">Weight bands (grams, then postage £)</p>'+
+  '<p class="note pz-edit-h" style="margin-top:10px">Weight bands (grams, then postage £)</p>'+
   '<div class="grid" id="pzbands">'+bandFields()+'</div>'+
-  '<p class="note" style="margin-top:10px">If Access postage equals an old band rate (within 0.5p), use the new rate. Other Access amounts stay as they are.</p>'+
+  '<p class="note pz-edit-h" style="margin-top:10px">If Access postage equals an old band rate (within 0.5p), use the new rate. Other Access amounts stay as they are.</p>'+
   '<div class="grid">'+field("accessMap1old","Access map 1 old £",mapv(0,0),"£")+field("accessMap1new","Access map 1 new £",mapv(0,1),"£")+field("accessMap2old","Access map 2 old £",mapv(1,0),"£")+field("accessMap2new","Access map 2 new £",mapv(1,1),"£")+field("accessMapTol","Match within £",numv("accessMapTol",D.accessMapTol!=null?D.accessMapTol:0.005),"£")+'</div>'+
   '<div class="pz-acts"><button class="btn l" type="button" id="pzsetapply">Apply settings</button> <button class="btn l" type="button" id="pzsetreset">Reset to normal</button></div>'+
   '<div class="note" id="pzsetmsg"></div></div>';
@@ -3702,7 +3589,7 @@ function needYouDraw(){
  var html='<h3>Rows that need you</h3><p class="note">CHECK POSTAGE first, then losses and under-floor. Type postage, Your price, or Include here – the same rules as the workbook. Edits stay in this browser. Search any SKU below.</p>'+
   '<input type="search" id="pzneedq" placeholder="Search SKU or title" value="'+esc(q)+'">';
  if(!rows.length){html+='<p class="ok">Nothing waiting – no CHECK POSTAGE, loss, or under-floor rows'+(q?" matching that search":"")+'.</p>';box.innerHTML=html;wireNeed();return}
- html+='<div class="tw"><table class="bt pz-t" id="pzneedt"><thead><tr><th>SKU</th><th>Product</th><th>Check</th><th>Postage</th><th>Your price</th><th>Include</th><th>Profit %</th><th>Selling price</th></tr></thead><tbody>';
+ html+='<div class="tw"><table class="bt pz-t" id="pzneedt"><thead><tr><th>SKU</th><th>Product</th><th>Check</th><th class="pz-post-h">Postage</th><th>Your price</th><th>Include</th><th>Profit %</th><th>Selling price</th></tr></thead><tbody>';
  rows.slice(0,200).forEach(function(r){
   var o=r._live||liveOf(r),ed=recEdit(r.sku);
   var price=o.price!=null?o.price:r.basePrice, fl=o.floor!=null?o.floor:r.engFloor, cap=r.engCap;
@@ -3713,7 +3600,7 @@ function needYouDraw(){
   var tone=(window.BQBook.profitTone||function(){return ""})(pc, (ed.your!=null?ed.your:price), fl, cap);
   var big=price>0&&o.final!=null&&Math.abs(o.final-price)/price>0.2;
   html+='<tr data-sku="'+esc(r.sku)+'" class="'+(big?"big":"")+'"><td class="mono">'+esc(r.sku)+'</td><td>'+esc((r.title||"").slice(0,60))+'</td><td>'+esc(o.check||"")+'</td>'+
-   '<td><input type="number" step="0.01" min="0" data-f="post" value="'+(ed.post!=null?ed.post:(r.basePost!=null?r.basePost:""))+'"></td>'+
+   '<td class="pz-post"><input type="number" step="0.01" min="0" data-f="post" value="'+(ed.post!=null?ed.post:(r.basePost!=null?r.basePost:""))+'"></td>'+
    '<td><input type="number" step="0.01" min="0" data-f="your" value="'+(ed.your!=null?ed.your:"")+'" placeholder="optional"></td>'+
    '<td><select data-f="inc"><option value="">Auto</option><option value="Yes"'+(ed.inc==="Yes"?" selected":"")+'>Yes</option><option value="No"'+(ed.inc==="No"?" selected":"")+'>No</option></select></td>'+
    '<td class="tone-'+(tone||"ok")+'">'+(pc==null?"":(Math.round(pc*1000)/10).toFixed(1)+"%")+'</td>'+
@@ -3866,7 +3753,7 @@ function render(body){
   draw()})}
 /* safety net: the shared tab bar (bq_nav.js) should sit on top; if this browser did not show it, draw the same 9 tabs inline here */
 function ensureNav(body){setTimeout(function(){var n=document.getElementById("bqnav");if(n&&n.offsetHeight>10&&getComputedStyle(n).display!=="none")return;if($("lkinav"))return;
- var T=(window.BQNav&&BQNav.tabs)||[["home","Home"],["sales","Sales"],["orders","Orders"],["selling","Products selling"],["listings","Listings"],["dups","Duplicates"],["access","Access file"],["pricing","Pricing"],["lookup","Individual sales"],["calc","Calculator"]];
+ var T=(window.BQNav&&BQNav.tabs)||[["home","Home"],["sales","Sales"],["orders","Orders"],["selling","Products selling"],["listings","Listings"],["dups","Duplicates"],["pricing","Pricing"],["lookup","Individual sales"],["calc","Calculator"]];
  var d=document.createElement("div");d.id="lkinav";d.className="lk-chips";d.innerHTML=T.map(function(t){return '<button type="button" data-g="'+t[0]+'"'+(t[0]==="lookup"?' class="on"':'')+'>'+esc(t[1])+'</button>'}).join("");
  body.insertBefore(d,body.firstChild);
  d.onclick=function(e){var b=e.target.closest&&e.target.closest("[data-g]");if(!b)return;var v=b.getAttribute("data-g");
@@ -4131,7 +4018,7 @@ window.BQCalc={state:function(){return st},compute:compute,csv:csvText,saved:loa
    No keys and no catalogue data in this file. */
 (function(){
 "use strict";
-var T=[["home","Home"],["sales","Sales"],["orders","Orders"],["selling","Products selling"],["listings","Listings"],["dups","Duplicates"],["access","Access"],["pricing","Pricing"],["lookup","Individual sales"],["calc","Calculator"]];
+var T=[["home","Home"],["sales","Sales"],["orders","Orders"],["selling","Products selling"],["listings","Listings"],["dups","Duplicates"],["pricing","Pricing"],["lookup","Individual sales"],["calc","Calculator"]];
 if(document.getElementById("bqnav"))return;
 var CSS='#bqnav{position:fixed;top:0;left:0;right:0;width:100%;max-width:100%;box-sizing:border-box;z-index:80;background:#0F172A;border-bottom:1px solid #1E293B;padding:env(safe-area-inset-top) 0 0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;overflow:hidden}'+
  '#bqnav .bqn-s{display:flex;flex-wrap:wrap;align-items:center;gap:6px;width:100%;max-width:1400px;box-sizing:border-box;margin:0 auto;padding:7px 10px}'+
@@ -4156,7 +4043,7 @@ function base(){if(MAIN)return "";
 function href(v){if(MAIN){if(v==="listings")return"listings/";if(v==="sales")return"sales.html";if(v==="orders")return"orders.html";if(v==="selling")return"productselling.html";if(v==="home")return"index.html";return"#go="+v;}return v==="listings"?"./":base()+(v==="home"?"":v==="sales"?"sales.html":v==="orders"?"orders.html":v==="selling"?"productselling.html":"#go="+v)}
 function mark(v){if(v===cur)return;cur=v;Array.prototype.forEach.call(nav.querySelectorAll("a"),function(a){var on=a.getAttribute("data-bqn")===v;a.classList.toggle("on",on);if(on)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current")})}
 function toListings(){var p=window.BQ&&BQ.stashSession?BQ.stashSession():Promise.resolve();p.then(function(){location.href="listings/"})}
-var ALLOW={home:1,sales:1,orders:1,selling:1,listings:1,dups:1,access:1,pricing:1,lookup:1,calc:1};
+var ALLOW={home:1,sales:1,orders:1,selling:1,listings:1,dups:1,pricing:1,lookup:1,calc:1};
 function readGo(){var h=/[#&]go=([a-z]+)/.exec(location.hash||""),s=null;try{s=sessionStorage.getItem("bqDashGo")}catch(e){}
  var hv=h&&ALLOW[h[1]]?h[1]:"",sv=s&&ALLOW[s]?s:"";return hv||sv||""}
 function clearGo(){try{sessionStorage.removeItem("bqDashGo")}catch(e){}
@@ -4176,6 +4063,7 @@ function card(v){return document.querySelector('#menu [data-d="'+v+'"],#menu [da
 function go(v){if(v==="listings"){toListings();return}
  if(v==="sales"||v==="orders"||v==="selling"){var p=window.BQ&&BQ.stashSession?BQ.stashSession():Promise.resolve();p.then(function(){location.href=v==="selling"?"productselling.html":v+".html"});return}
  if(v==="home"){var p2=window.BQ&&BQ.stashSession?BQ.stashSession():Promise.resolve();p2.then(function(){location.href="index.html"});return}
+ if(window.BQ&&BQ.forced){var p3=window.BQ.stashSession?BQ.stashSession():Promise.resolve();p3.then(function(){try{sessionStorage.setItem("bqDashGo",v)}catch(e){}location.href="index.html#go="+encodeURIComponent(v)});return}
  if(window.BQTabs&&BQTabs.close&&!hidden("tabv"))BQTabs.close();
  if(!hidden("viewer")&&window.BQ&&BQ.back)BQ.back();
  var c=card(v);if(c)c.click();sync()}
