@@ -273,6 +273,25 @@ header .av{border:1px solid #334155}
 
 #nojs{margin:12px;padding:16px 18px;border:3px solid #f60;border-radius:12px;background:#fff4e5;color:#111;font:16px/1.5 -apple-system,Segoe UI,Arial,sans-serif}
 #nojs b{font-size:18px}#nojs ul{margin:8px 0 0 0;padding-left:20px}
+/* How to use (added 18 Nov 2026) - hint at top, collapsible box at bottom. Phone-safe. */
+.bq-howto-hint{margin:8px 0 12px;font-size:14px;font-weight:600;line-height:1.4;max-width:100%;overflow-wrap:anywhere;word-break:break-word}
+.bq-howto-hint a{color:#C2410C;text-decoration:underline;font-weight:600}
+#menu .bq-howto-hint,#menu .bq-howto-hint a{color:#FDBA74}
+.bq-howto{margin:16px 0 8px;background:#fff;border:1px solid #E2E8F0;border-radius:12px;max-width:100%;box-sizing:border-box;overflow:hidden;color:#0F172A}
+#menu .bq-howto{background:#F8FAFC;border-color:#334155}
+.bq-howto>summary{cursor:pointer;padding:12px 14px;font-weight:700;font-size:15px;color:#0F172A;list-style:none}
+.bq-howto>summary::-webkit-details-marker{display:none}
+.bq-howto>summary::after{content:" ▾";color:#FF6600;font-weight:700}
+.bq-howto[open]>summary::after{content:" ▴"}
+.bq-howto ol{margin:0;padding:0 16px 14px 36px;max-width:100%;box-sizing:border-box}
+.bq-howto li{margin:0 0 8px;font-size:14px;line-height:1.45;color:#0F172A;overflow-wrap:anywhere;word-break:break-word}
+.dark .bq-howto{background:var(--card,#151D2B);border-color:var(--line,#253045);color:var(--ink,#F1F5F9)}
+.dark .bq-howto>summary,.dark .bq-howto li{color:var(--ink,#F1F5F9)}
+.dark .bq-howto-hint,.dark .bq-howto-hint a{color:#FDBA74}
+
+.bq-howto{background:var(--card,#fff);border-color:var(--line,#E2E8F0);color:var(--ink,#0F172A)}
+.bq-howto>summary,.bq-howto li{color:var(--ink,#0F172A)}
+
 #errbox{display:none;position:fixed;left:10px;right:10px;top:10px;z-index:9999;padding:14px 16px;border:3px solid #c00;border-radius:12px;background:#fff0f0;color:#111;font:15px/1.45 -apple-system,Segoe UI,Arial,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.25)}
 #errbox button{margin-top:8px;padding:8px 14px;border:0;border-radius:8px;background:#c00;color:#fff;font-weight:600}
 </style></head><body><div id="nojs"><b>If you can see this, the tool isn’t running.</b> This preview shows the page but doesn’t run it. Open the file in a full browser:
@@ -1253,8 +1272,75 @@ function topBack(){return '<div class="topback"><button class="btn back" data-to
 /* v3.5.18/v3.5.19: clear only this flow's work; keeps export, unlock, variant data, settings */
 function startFresh(){var m=S.mode;if(!m)return;if(!confirm('Start fresh? This clears everything in '+({new:'New listings',fix:'Fix existing',fam:'Product family'}[m]||'this flow')+' (fields, rows, photos, saved draft). Your product export, variant data and settings stay.'))return;
   var o=freshMode();MKEYS.forEach(function(k){S[k]=o[k];});delete S.saved[m];S.famBuilt=false;S.jump=null;S.view='main';if(m==='fam'||m==='ffix')famInit();saveMode();try{Object.keys(localStorage).forEach(function(k){if(/^bqDraft\./.test(k)&&k.indexOf(m)>=0)localStorage.removeItem(k);});}catch(e){}sessSave();render();window.scrollTo(0,0);toast('Cleared – starting fresh');}
+function howtoHint(id){return '<p class="bq-howto-hint"><a href="#'+id+'">Scroll down to see how to use \u2193</a></p>'}
+function howtoBox(steps,id){return '<details class="bq-howto" id="'+id+'"><summary>How to use</summary><ol>'+steps.map(function(s){return '<li>'+s+'</li>'}).join('')+'</ol></details>'}
+function howtoId(){if(S.view==='settings')return 'bq-howto-lset';if(S.view==='home')return 'bq-howto-lhome';var m=FM()?'fam':(S.mode||'new');return 'bq-howto-l-'+m+'-'+S.step}
+function howtoSteps(){
+  if(S.view==='settings') return [
+    'Load variant file (under Variant groups) is how you give this tool a fresh All variant.xlsx or a CSV with a SKU column and a group column. It is kept on this device until you remove it, and it is used at once. On Chrome or Edge you can instead choose your B&amp;Q folder once so All variant.xlsx is read automatically.',
+    'Set brand, guarantee and other defaults once per supplier. They fill every page for that supplier. Brand names are never put in the title, bullets or description.',
+    'If a category needs a B&amp;Q upload template, use Choose templates and pick the original .xlsx template files. They stay on this device.',
+    'The B&amp;Q product export is uploaded on the Product family first step (Upload product export), not on this Settings screen. Once uploaded, Fix existing and the rest of Listings use it too. Open the step-by-step guide if you want the full numbered instructions. Tap Done when you finish.'
+  ];
+  if(S.view==='home') return [
+    'Pick New listings (not on B&amp;Q yet), Fix existing (already on B&amp;Q), or Product family (colours, sizes or pack sizes together). New listings and Fix existing use the same four steps: Add, Sort, Fill gaps, Check and download.',
+    'To refresh the live B&amp;Q catalogue this tool uses, open Product family and use Upload product export. Download that Excel from B&amp;Q (Mirakl) \u203a Products \u203a Export (a file like export-products-\u2026.xlsx, with a shop_sku column). It is saved in this browser only and is then used by Fix existing and Product family straight away. Until you upload one, the built-in export is used.',
+    'Price and stock are not asked for here \u2014 you send those in your own pricing file.',
+    'A longer step-by-step guide is linked on this page. Settings (the gear) is where you load a variant file (All variant.xlsx) and set supplier defaults.'
+  ];
+  if(FM()){
+    if(S.step===1) return [
+      'Upload product export (on this screen) is how you load a fresh B&amp;Q catalogue. Download it from B&amp;Q (Mirakl) \u203a Products \u203a Export (export-products-\u2026.xlsx). It must have a shop_sku column. The file is saved in this browser only, and Listings updates straight away. You can switch back to the built-in export if you need to.',
+      'Enter the shared product name without the colour, size or pack. Add live products from the export, or type new rows in the Variants step. Each row is tagged Existing \u2013 fix or New \u2013 add.',
+      'Shared details here fill only unlocked rows; edited existing rows keep their own text and images.',
+      'When the required fields are filled, tap Next: base text.'
+    ];
+    if(S.step===2) return [
+      'Review the shared title, bullets and description (no brand name in the text). Change anything that looks wrong.',
+      'In the next step, unlocked rows pick this up; rows you already edited keep their own text until you apply the shared text on that row.',
+      'There is no file upload on this step. Tap Next: variants when you are happy with it.'
+    ];
+    if(S.step===3) return [
+      'Add one row per colour, size, pack size, or mix. Type a live SKU or EAN to load the current page from the product export for correction, or leave fields blank for a new product.',
+      'Every variant field can be edited on its own. Pack-of-N titles and scaled weights apply automatically unless you override them. A variant group ID can come from Settings \u2192 Load variant file.',
+      'Fix any rows marked in red, then tap Next: check and download. There is no separate catalogue upload on this step \u2014 use Upload product export on the first Product family step if the live pages look out of date.'
+    ];
+    return [
+      'Read each family page (title, bullets, description, photos and details). Confirm any remaining category guesses.',
+      'When the summary says they are ready, tap Download all files. If it says Needs: confirm category, go back and confirm first.',
+      'The files are built on this device. You import them in the B&amp;Q portal yourself. Price and stock are not in these files.'
+    ];
+  }
+  if(S.step===1) return [
+    'Type or paste SKU, EAN and product name, or drop an Excel or CSV file (columns SKU, EAN, Product name; photo link columns are optional). You can add a row or paste from Excel.',
+    (S.mode==='fix'
+      ? 'We load the live page from your B&amp;Q product export. If that export needs updating, open Product family and use Upload product export (saved in this browser, then used here too).'
+      : 'For new products, every size, colour and pack needs its own EAN. The product name is the starting point for the title, bullets and description.'),
+    'Repeated SKUs are marked in red \u2014 change or remove them before you continue.',
+    'Tap Next: sort them when the list is ready, or Start fresh to clear only this flow.'
+  ];
+  if(S.step===2) return [
+    'Open each group to see how we matched the EAN against B&amp;Q and your files.',
+    'Move a product to New listings or Fix existing if it is in the wrong flow.',
+    'Check any \u201cNeeds\u201d tags, then tap Next: fill gaps. There is no file upload on this step.'
+  ];
+  if(S.step===3) return [
+    'Answer the remaining questions on each product, including category. Use the category check list at the top to confirm or change a guess.',
+    'Until every category is confirmed, download stays blocked.',
+    'Watch for amber warnings (pack size, weight units, category vs name) and fix or accept them.',
+    'Use Next to fill to jump to the next product that still needs an answer, then Next: check and download. There is no catalogue upload on this step.'
+  ];
+  return [
+    'Read each page (title, bullets, description, photos and details). Confirm any remaining category guesses.',
+    'When the summary says they are ready, tap Download all files. If it says Needs: confirm category, go back and confirm first. If a category template is missing, use Choose template and pick B&amp;Q\u2019s original .xlsx.',
+    'The files are built on this device. You import them in the B&amp;Q portal yourself. Price and stock are not in these files.'
+  ];
+}
+
 function render(){var h=header()+varBanner();
+  var hid=howtoId();h+=howtoHint(hid);
   if(S.view==='settings')h+=viewSettings();else if(S.view==='home')h+=viewHome();else{h+=stepBar();h+=topBack();if(FM()&&S.step===4&&!S.famBuilt)famBuild();h+=(FM()?[0,famView1,famView2,famView3,viewCheck]:[0,viewAdd,viewSort,viewFill,viewCheck])[S.step]();}
+  h+=howtoBox(howtoSteps(),hid);
   $('app').innerHTML=h;$('foot').innerHTML=footer();window.scrollTo(0,0);if(S.jump)setTimeout(doJump,30);if(S.view==='main'&&S.step===4)prefetchTpl();}
 function footer(){if(S.view==='settings')return '<div class="in"><button class="btn p" data-act="closeset">Done</button></div>';
   if(S.view==='home')return '';

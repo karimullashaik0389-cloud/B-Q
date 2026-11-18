@@ -57,7 +57,101 @@ table.bt{border-collapse:collapse;width:100%;font-size:14px}.bt th,.bt td{paddin
 .box ol{margin:8px 0 0;padding-left:22px}.box li{margin-bottom:8px}.ok{color:#166534;font-weight:700}.bad{color:#991B1B;font-weight:700}
 .note{font-size:14px;color:#475569}
 #busy{position:fixed;inset:0;z-index:7;background:rgba(15,23,42,.88);display:flex;align-items:center;justify-content:center;font-size:16px;color:#F8FAFC}
-</style></head><body data-open="sales">
+
+/* How to use (added 18 Nov 2026) - hint at top, collapsible box at bottom. Phone-safe. */
+.bq-howto-hint{margin:8px 0 12px;font-size:14px;font-weight:600;line-height:1.4;max-width:100%;overflow-wrap:anywhere;word-break:break-word}
+.bq-howto-hint a{color:#C2410C;text-decoration:underline;font-weight:600}
+#menu .bq-howto-hint,#menu .bq-howto-hint a{color:#FDBA74}
+.bq-howto{margin:16px 0 8px;background:#fff;border:1px solid #E2E8F0;border-radius:12px;max-width:100%;box-sizing:border-box;overflow:hidden;color:#0F172A}
+#menu .bq-howto{background:#F8FAFC;border-color:#334155}
+.bq-howto>summary{cursor:pointer;padding:12px 14px;font-weight:700;font-size:15px;color:#0F172A;list-style:none}
+.bq-howto>summary::-webkit-details-marker{display:none}
+.bq-howto>summary::after{content:" ▾";color:#FF6600;font-weight:700}
+.bq-howto[open]>summary::after{content:" ▴"}
+.bq-howto ol{margin:0;padding:0 16px 14px 36px;max-width:100%;box-sizing:border-box}
+.bq-howto li{margin:0 0 8px;font-size:14px;line-height:1.45;color:#0F172A;overflow-wrap:anywhere;word-break:break-word}
+.dark .bq-howto{background:var(--card,#151D2B);border-color:var(--line,#253045);color:var(--ink,#F1F5F9)}
+.dark .bq-howto>summary,.dark .bq-howto li{color:var(--ink,#F1F5F9)}
+.dark .bq-howto-hint,.dark .bq-howto-hint a{color:#FDBA74}
+
+</style>
+<script>
+/* How to use boxes (18 Nov 2026). Generic steps only; no catalogue data, no keys. */
+window.BQHowTo=(function(){
+function hint(id){id=id||"bq-howto";return '<p class="bq-howto-hint"><a href="#'+id+'">Scroll down to see how to use \u2193</a></p>'}
+function box(steps,id){id=id||"bq-howto";return '<details class="bq-howto" id="'+id+'"><summary>How to use</summary><ol>'+(steps||[]).map(function(s){return '<li>'+s+'</li>'}).join("")+'</ol></details>'}
+function wrap(html,steps,id){return hint(id)+html+box(steps,id)}
+var S={};
+S.home=[
+ "Under Data upload, choose today\u2019s files. They stay in this browser only \u2014 nothing is sent to B&amp;Q, Mirakl or GitHub. A green badge means the file is in use (1 day old or less). A red badge means it is too old and the tabs will not use it. After a successful upload, the tab you open updates in this browser straight away; there is no overnight wait.",
+ "Access file: the Excel from Access (the name usually looks like Access_2026-11-18.xlsx). It needs a sheet called B&amp;QBB3, or a sheet with a column called Estimated cost. Used by Sales, Orders, Products selling, Pricing, Individual sales and Calculator.",
+ "Orders export: the B&amp;Q orders CSV. It needs columns called Date created, Order number, Offer SKU and Status. Used by Sales, Orders, Products selling, Individual sales and Calculator.",
+ "Buy box results (optional, for Pricing): an Excel file with columns called code, seller and price.",
+ "After you save a pricing workbook in Excel, use Clean 7a / 7b CSV to pick that file and download a clean B&amp;Q upload. That tool does not use the Data upload slots above, and nothing is sent to B&amp;Q.",
+ "Tap a card to open that dashboard. Sales, Orders and Products selling open as their own pages; the others open here. Tap Home (or your phone\u2019s back gesture) to return. Tap Lock when you finish, or Forget this device to clear a remembered unlock."
+];
+S.dups=function(tab){
+ var search="Search by SKU, EAN or name, and use the filters if you want a shorter list. Tap a B&amp;Q link to open the product on diy.com. This page does not change or delete anything on B&amp;Q \u2014 you do that in the B&amp;Q portal yourself.";
+ var noUp="There is no file upload on this tab. The list is the published duplicate check already on the site. Uploading files on Home does not refresh this list.";
+ if(tab==="fix") return [
+  "The summary boxes show how many groups and listings are in each list. You are on Fix \u2014 these listings need a correction, not a delete.",
+  noUp, search,
+  "Read why a row was flagged, then make the change in the B&amp;Q portal yourself. Switch to Delete, Check or All groups with the buttons above."
+ ];
+ if(tab==="check") return [
+  "The summary boxes show how many groups and listings are in each list. You are on Check \u2014 review these groups before you decide. Offers in the same group are shown together so you can compare them.",
+  noUp, search,
+  "Switch to Delete, Fix or All groups with the buttons above."
+ ];
+ if(tab==="groups") return [
+  "You are on All groups. Every duplicate group is listed, with why it was flagged and the decision.",
+  noUp,
+  "Use the decision and group-size filters, or search by SKU, EAN or name. Open a B&amp;Q link to check the live page.",
+  "Switch to Delete, Fix or Check with the buttons above. You can download the Delete list as a CSV from the Delete view."
+ ];
+ return [
+  "The summary boxes show how many groups and listings are in each list. You are on Delete \u2014 these are verified duplicates to remove in the B&amp;Q portal yourself.",
+  noUp, search,
+  "Download Delete list (CSV) if you want the list in Excel. Nothing is deleted on B&amp;Q from this dashboard. Switch to Fix, Check or All groups with the buttons above."
+ ];
+};
+S.access=[
+ "The Buy box box and the Results table show the published buy box run already on the site (when it finished, and how many EANs we win or lose). There is no button on this tab to upload a new results file, and a buy box file uploaded on Home is used by Pricing, not by this Results table.",
+ "Use Losing / Winning / No winner found and the search box (EAN, SKU or seller) to review the table. Download Excel saves the results on this device.",
+ "To update the variant codes the buy box uses: after you export All variant.xlsx from Access (table All_VAR), use Choose All variant.xlsx under Update All variant, save the locked file, then upload it on the GitHub page that opens. That does not refresh the Results table on its own.",
+ "A new EAN list is optional \u2014 only if you want the buy box to check a different list than usual. Choose the Excel (it needs an EAN column), save the locked file, then upload it on GitHub the same way.",
+ "If a Run buy box button is shown, it opens GitHub\u2019s own Run page. You never type a token into this dashboard."
+];
+S.pricing=[
+ "Upload today\u2019s Access file on Home (Data upload) or with the 1. Upload Access file button on this tab. The Excel needs a sheet called B&amp;QBB3, or a sheet with a column called Estimated cost. You can also add a buy box file (Excel with columns called code, seller and price) on Home or with Upload buy box file (optional). Files are read only on this computer and the page updates straight away.",
+ "Click 2. Download pricing workbook, or Download B&amp;Q upload (CSV). Nothing is sent to B&amp;Q from this page. Losses and under-floor rows never go into the CSV.",
+ "In the workbook, use 6 Combined upload for postage checks (yellow cells only). Open \u201cWhat each tab does\u201d above for the other sheets, including 7a Final upload UK and 7b Final upload China.",
+ "Upload the 7a file (and 7b if it has a price) to B&amp;Q yourself. Then come back and use 3. Import checked workbook so the postage you typed is remembered tomorrow. You can also make a B&amp;Q upload from that same edited workbook.",
+ "Special postage: edit the list in the Special postage box on this tab. Changes are saved in this browser at once and used immediately. Export special postage downloads a file to this device (this page does not write it to GitHub, and there is no import button). Until you edit it, the site\u2019s default list is used.",
+ "Leave Pricing settings on the normal values unless you are testing."
+];
+S.lookup=[
+ "The orders and product figures come from today\u2019s Access file and Orders export on Home (Data upload) \u2014 both must have a green badge (1 day old or less). The page then updates in this browser straight away. If those files are missing or too old, this tab uses the published order data on the site.",
+ "Pick a period at the top (Today, or Pick dates). With the search box empty, you see all orders in that period. Cancelled orders are not counted.",
+ "Type a SKU or EAN to filter to that product. You can include related SKUs with the same base code or EAN.",
+ "To check many codes at once, tap Upload SKU list (Excel) and pick your own spreadsheet, check the SKU or EAN column, then download the file with Total orders and Total units added. That file stays on this device and is not the Access or orders export."
+];
+S.calcChoose=[
+ "Pick UK or China \u2014 each uses a different cost and floor rule, the same engine as the Pricing tab.",
+ "SKU look-up (on the next screen) uses today\u2019s Access file and Orders export from Home, if both have a green badge; otherwise it uses the published data on the site. You can also type cost, weight and price yourself, with no file.",
+ "Nothing is sent anywhere from this tab. You can switch later with Switch to UK / China."
+];
+S.calc=[
+ "Optionally type an offer SKU, EAN or OrderWise code to fill cost, weight and postage from Access (from Home Data upload if those files are fresh, otherwise from the published data).",
+ "Enter or check: base cost, weight, postage (leave blank to use our rules, or pick a special postage category) and the selling price. There is no file upload on this screen.",
+ "The right-hand side shows total cost, profit, and the floor / cap for this origin. You can save a postage override for a SKU on this device and export those as a CSV. Saved postage stays in this browser only.",
+ "Use \u2190 UK / China to start again, or Switch to change origin."
+];
+return {hint:hint,box:box,wrap:wrap,steps:S};
+})();
+
+</script>
+</head><body data-open="sales">
 <div class="wrap" id="login">
  <div class="logo">B&amp;Q</div><h1 id="lh">B&amp;Q Dashboards</h1><p class="sub" id="lsub">Enter the password once. Sales, Orders, Listings and the other tabs stay unlocked in this browser tab.</p>
  <form id="lf" autocomplete="on">
@@ -72,6 +166,8 @@ table.bt{border-collapse:collapse;width:100%;font-size:14px}.bt th,.bt td{paddin
 </div>
 <div class="wrap hide" id="menu">
  <div class="logo">B&amp;Q</div><h1>Choose a dashboard</h1><p class="sub">Sales, Orders and Products selling open as their own pages. Tap Home to see all dashboards here again. Your phone’s back gesture also returns here.</p>
+<p class="bq-howto-hint"><a href="#bq-howto-home">Scroll down to see how to use ↓</a></p>
+
 
  <a class="big" href="sales.html"><b>Sales</b><span>Revenue, units and profit · All / B&amp;Q GMV / B&amp;Q cash · calculator</span></a>
  <a class="big" href="orders.html"><b>Orders</b><span>Order count and details · status filters · search</span></a>
@@ -86,6 +182,7 @@ table.bt{border-collapse:collapse;width:100%;font-size:14px}.bt th,.bt td{paddin
  <button class="big" data-v="calc"><b>Calculator</b><span>Cost · postage · fees · total cost · profit · safe prices</span></button>
  <div id="hdata"></div>
  <div id="hclean"></div>
+<details class="bq-howto" id="bq-howto-home"><summary>How to use</summary><ol><li>Under Data upload, choose today’s files. They stay in this browser only — nothing is sent to B&amp;Q, Mirakl or GitHub. A green badge means the file is in use (1 day old or less). A red badge means it is too old and the tabs will not use it. After a successful upload, the tab you open updates in this browser straight away; there is no overnight wait.</li><li>Access file: the Excel from Access (the name usually looks like Access_2026-11-18.xlsx). It needs a sheet called B&amp;QBB3, or a sheet with a column called Estimated cost. Used by Sales, Orders, Products selling, Pricing, Individual sales and Calculator.</li><li>Orders export: the B&amp;Q orders CSV. It needs columns called Date created, Order number, Offer SKU and Status. Used by Sales, Orders, Products selling, Individual sales and Calculator.</li><li>Buy box results (optional, for Pricing): an Excel file with columns called code, seller and price.</li><li>After you save a pricing workbook in Excel, use Clean 7a / 7b CSV to pick that file and download a clean B&amp;Q upload. That tool does not use the Data upload slots above, and nothing is sent to B&amp;Q.</li><li>Tap a card to open that dashboard. Sales, Orders and Products selling open as their own pages; the others open here. Tap Home (or your phone’s back gesture) to return. Tap Lock when you finish, or Forget this device to clear a remembered unlock.</li></ol></details>
  <button class="ghost" id="lock">🔒 Lock</button> <button class="ghost" id="forget2" type="button">Forget this device</button>
 </div>
 <div id="viewer" class="hide"><iframe id="frame" title="Dashboard" allow="clipboard-write"></iframe></div>
@@ -405,7 +502,7 @@ function dups(){return getJSON("duplicates.enc").then(function(doc){
   '<select id="dsize" aria-label="Group size"><option value="">Any group size</option><option>2</option><option>3</option><option value="4">4+</option></select></div>'+
   '<div class="ctl"><button class="btn o" type="button" id="dcsv">⬇ Download '+(old?"candidates":"Delete list")+' (CSV, '+lists.delete.length+')</button></div>'+
   '<div class="cnt" id="dcnt"></div><div id="dlist"></div>';
- $("tbody").innerHTML=h;
+ $("tbody").innerHTML=window.BQHowTo.wrap(h,window.BQHowTo.steps.dups(st.tab),"bq-howto-dups");
  var decs={};(D.groups||[]).forEach(function(g){(g.offers||[]).forEach(function(o){if(o.decision)decs[o.decision]=1})});
  Object.keys(decs).sort().forEach(function(d){$("ddec").appendChild(new Option(d,d))});
  if(!Object.keys(lists).some(function(k){return lists[k].some(function(o){return o.active})})&&!(D.groups||[]).some(function(g){return(g.offers||[]).some(function(o){return o.active})}))$("dact").classList.add("hide");
@@ -423,7 +520,8 @@ function dups(){return getJSON("duplicates.enc").then(function(doc){
   $("dcnt").textContent=out.length?"Showing "+Math.min(st.n,out.length)+" of "+out.length+(st.tab==="groups"?" groups":" offers")+(st.tab==="check"&&nchk<lists.check.length?" · "+nchk+" marked Check, the others are the rest of the same groups, shown to compare":""):"";
   if(!out.length)html='<div class="box note">'+(q||st.act||st.sales||st.dec||st.size?"Nothing matches – clear the search or filters.":st.tab==="fix"?"No listings to fix in this list.":st.tab==="check"?"Nothing to check in this list.":"Nothing in this list.")+'</div>';
   if(out.length>st.n)html+='<button class="more" type="button" id="dmore">Show more ('+(out.length-st.n)+' left)</button>';
-  $("dlist").innerHTML=html;var m=$("dmore");if(m)m.onclick=function(){st.n+=PAGE*2;draw()}}
+  $("dlist").innerHTML=html;var m=$("dmore");if(m)m.onclick=function(){st.n+=PAGE*2;draw()};
+ if(window.BQHowTo){var hb=$("bq-howto-dups");if(hb)hb.outerHTML=window.BQHowTo.box(window.BQHowTo.steps.dups(st.tab),"bq-howto-dups")}}
  document.querySelectorAll("#dseg button").forEach(function(b){b.onclick=function(){st.tab=b.getAttribute("data-t");st.n=PAGE;draw()}});
  $("dq").oninput=function(){st.q=this.value;st.n=PAGE;draw()};
  [["dact","act"],["dsales","sales"],["ddec","dec"],["dsize","size"]].forEach(function(p){$(p[0]).onchange=function(){st[p[1]]=this.value;st.n=PAGE;draw()}});
@@ -451,7 +549,7 @@ function access(){
   '<h2>Use a new EAN list (optional)</h2><div class="box" id="acodes"><div id="cdlast" class="note">Checking…</div>'+
    '<p class="note">Normally the buy box uses the newest offers export on Dora’s computer. To check a different list, pick an Excel with an EAN column (offers export or a codes list).</p>'+
    '<ol><li><label class="btn l" for="cdfile">1. Choose the Excel</label><input type="file" id="cdfile" accept=".xlsx,.xls,.xlsm,.csv" class="hide"></li><li id="cdstep2" class="hide"></li><li id="cdstep3" class="hide"></li></ol><div id="cdmsg" class="note"></div></div>';
- $("tbody").innerHTML=h;
+ $("tbody").innerHTML=window.BQHowTo.wrap(h,window.BQHowTo.steps.access,"bq-howto-access");
  $("avfile").onchange=function(){if(this.files[0])pickAV(this.files[0]);this.value=""};
  $("cdfile").onchange=function(){if(this.files[0])pickCodes(this.files[0]);this.value=""};
  var dataList=gh("/contents/data").catch(function(e){return e.message==="gh404"?[]:null});
@@ -3350,7 +3448,7 @@ function guideBox(){
 function render(body){
  if(!document.getElementById("pz-css")){var s=document.createElement("style");s.id="pz-css";s.textContent=CSS;document.head.appendChild(s)}
  st={doc:null,bbDoc:null,src:"pub",file:"",aoa:null,accessDate:"",your:ls(LSY,{}),opt:ls(LSO,{raise100:false,checkPost:false,pennyTrims:false,chinaRaise:false}),checks:window.BQBook?BQBook.normStore(ls(LSC,{v:1,items:{}})):{v:1,items:{}},checkYour:false,bbo:Object.assign({},P.BB_DEFAULT,{checkPost:false},ls(LSB,{})),rules:ls(LSR,{}),hist:ls(LSH,[]),userScrape:null};
- body.innerHTML=HOW+guideBox()+
+ body.innerHTML=window.BQHowTo.hint("bq-howto-pricing")+HOW+guideBox()+
   '<div class="src" id="pzsrc">Reading the prices…</div>'+
   '<div class="box" id="pzup"><div class="pz-acts">'+
   '<button class="btn o pz-big" type="button" id="pzfilebtn">1. Upload Access file</button>'+
@@ -3372,7 +3470,8 @@ function render(body){
   '<div class="pz-hist note" id="pzhist"></div>'+
   '</div>'+
   setBox()+spBox()+
-  CHKHTML;
+  CHKHTML+
+  window.BQHowTo.box(window.BQHowTo.steps.pricing,"bq-howto-pricing");
  $("pzfilebtn").onclick=function(){$("pzfile").click()};
  $("pzbbbtn").onclick=function(){$("pzbbfile").click()};
  $("pzfile").onchange=function(){if(this.files[0])pick(this.files[0]);this.value=""};
@@ -3749,11 +3848,11 @@ function linesFor(ids,a,b){var L=st.D.L,out=[];
 function render(body){
  if(!document.getElementById("lk-css")){var s=document.createElement("style");s.id="lk-css";s.textContent=CSS;document.head.appendChild(s)}
  st={q:"",sel:null,grp:false,per:"today",cf:"",ct:"",calOpen:false,n:PAGE,bulk:null};
- body.innerHTML='<div class="lk-fr" id="lksrc">Loading orders…</div>'+
+ body.innerHTML=window.BQHowTo.hint("bq-howto-lookup")+'<div class="lk-fr" id="lksrc">Loading orders…</div>'+
   '<div class="lk-pills" id="lkper" role="tablist" aria-label="Period"></div><div id="lkcalp"></div>'+
   '<div class="lk-row"><input type="search" id="lkq" placeholder="All products · type a SKU or EAN to filter" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" aria-label="SKU or EAN">'+
   '<button type="button" class="lk-up" id="lkup">Upload SKU list (Excel)</button><input type="file" id="lkfile" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" hidden></div>'+
-  '<div id="lkbulk"></div><div id="lkres"></div><div id="lkdet"></div>';
+  '<div id="lkbulk"></div><div id="lkres"></div><div id="lkdet"></div>'+window.BQHowTo.box(window.BQHowTo.steps.lookup,"bq-howto-lookup");
  ensureNav(body);
  $("lkup").onclick=function(){$("lkfile").value="";$("lkfile").click()};
  $("lkfile").onchange=function(){var f=this.files&&this.files[0];if(f)loadBulk(f)};
@@ -3941,12 +4040,12 @@ function render(body){
   function(e){st.Derr=(e&&e.message==="notyet"?"not published yet":"could not load")})}
 function hint(){return st.D?"Type an offer SKU, EAN or OrderWise code to fill cost, weight and postage from Access ("+(st.D.meta.access||"–")+").":st.Derr?"SKU look-up not available ("+st.Derr+") – type the cost and weight yourself.":"Loading the SKU list…"}
 /* first screen: two big cards, UK or China – each opens its own calculator with the origin fixed */
-function choose(){st.screen="";st.body.innerHTML='<div class="ckhd"><b>Which product?</b><div class="ckm">Pick where the product comes from. Same price engine as the Pricing tab ('+esc(E.VERSION)+').</div></div>'+
- '<div class="ckch"><button type="button" id="ckgo-uk"><b>UK</b><span>Company cost ×0.5 on cost<br>Floor 50% · cap 80%</span></button><button type="button" id="ckgo-cn"><b>China</b><span>Ashian Homeware<br>Company cost ×1 on cost<br>Floor 100% · no cap</span></button></div>';
+function choose(){st.screen="";st.body.innerHTML=window.BQHowTo.wrap('<div class="ckhd"><b>Which product?</b><div class="ckm">Pick where the product comes from. Same price engine as the Pricing tab ('+esc(E.VERSION)+').</div></div>'+
+ '<div class="ckch"><button type="button" id="ckgo-uk"><b>UK</b><span>Company cost ×0.5 on cost<br>Floor 50% · cap 80%</span></button><button type="button" id="ckgo-cn"><b>China</b><span>Ashian Homeware<br>Company cost ×1 on cost<br>Floor 100% · no cap</span></button></div>',window.BQHowTo.steps.calcChoose,"bq-howto-calc");
  $("ckgo-uk").onclick=function(){open(false)};$("ckgo-cn").onclick=function(){open(true)}}
 function open(china,carry){st.china=!!china;st.screen=china?"cn":"uk";st.prod=null;st.ovSrc="";st.lastSku="";st.unit="g";
  var spec=Object.keys(E.SPECIAL).map(function(k){return '<option value="'+k+'">'+esc(E.SPECIAL[k][0])+' – £'+E.SPECIAL[k][1].toFixed(2)+'</option>'}).join("");
- st.body.innerHTML='<div class="ckhd"><b id="ckttl">'+(china?"China (Ashian) calculator":"UK calculator")+'</b><button type="button" id="ckback">← UK / China</button><button type="button" id="ckswap">Switch to '+(china?"UK":"China")+'</button>'+
+ st.body.innerHTML=window.BQHowTo.hint("bq-howto-calc")+'<div class="ckhd"><b id="ckttl">'+(china?"China (Ashian) calculator":"UK calculator")+'</b><button type="button" id="ckback">← UK / China</button><button type="button" id="ckswap">Switch to '+(china?"UK":"China")+'</button>'+
   '<div class="ckm">'+(china?"Company cost ×1 on cost · floor 100% on cost · no cap":"Company cost ×0.5 on cost · floor 50% on cost · cap 80%")+' · 15% B&amp;Q fee on the selling price · profit % is on cost · no separate VAT line.</div></div>'+
   '<div id="ckw"><div class="ckcol">'+
   '<div class="ckf"><label class="ckl" for="cksku">SKU <span>(optional – fills cost, weight and postage from Access; needed to save postage)</span></label><input type="text" id="cksku" placeholder="e.g. XMA-GAR-GRE-1 or an EAN" autocomplete="off" autocapitalize="characters" spellcheck="false"><div class="ckm" id="ckskui">'+esc(hint())+'</div></div>'+
@@ -3961,7 +4060,7 @@ function open(china,carry){st.china=!!china;st.screen=china?"cn":"uk";st.prod=nu
   '<div class="ckf"><div class="ckl">Profit at your selling price</div><div id="ckres"></div></div>'+
   '<div class="ckf" id="ckfl"></div>'+
   '<div class="ckf"><div class="ckl">Postage you saved on this device</div><div id="cksv"></div><div class="ckb"><button type="button" id="ckexp">Export saved postage (CSV)</button></div><div class="ckm">Saved only in this browser on this device. Order used: your saved postage → special list → Access postage → weight bands.</div></div>'+
-  '</div></div>';
+  '</div></div>'+window.BQHowTo.box(window.BQHowTo.steps.calc,"bq-howto-calc");
  var on=function(id,ev,f){$(id).addEventListener(ev,f)};
  on("ckback","click",choose);on("ckswap","click",function(){open(!st.china,{sku:val("cksku"),cost:val("ckcost"),wt:val("ckwt"),unit:st.unit,price:val("ckprice")})});
  on("cksku","input",function(){skuChanged(false)});on("cksku","change",function(){skuChanged(false)});
