@@ -99,7 +99,7 @@ S.dups=function(tab){
   "This tab finds the same product listed twice (or more) on B&amp;Q, and suggests what to keep, fix or remove. You make the changes yourself in the B&amp;Q portal. Nothing is ever deleted on B&amp;Q from this dashboard.",
   view,
   "Delete = confirmed duplicates to remove yourself in the B&amp;Q portal. Fix = keep the listing but correct it. Check = look before you decide. All groups = every group, with why it was flagged and the decision. Switch views with the buttons above. Search by SKU, EAN or name. Open a B&amp;Q link to check the live page. You can download the Delete list as a CSV from the Delete view.",
-  "To rebuild the list without waiting for the 2am job, use Upload files to rebuild the list at the top of this tab. You need four exports: (1) Offers \u2014 B&amp;Q/Mirakl \u2192 My Inventory \u2192 Offers \u2192 Export \u2192 all offers including inactive / 0 stock, as CSV (columns Offer SKU, Product SKU, Product, Activated, Quantity, Price); (2) Product export \u2014 Catalog \u2192 Products \u2192 Export, Excel with a Data sheet (Shop SKU and EAN); (3) Access file (Access_\u2026.xlsx) with columns sku and Variant code; (4) Orders export CSV (Date created, Order number, Quantity, Status, Amount, Product SKU, Offer SKU, Order line no.). Files stay in this browser only.",
+  "To rebuild the list from new files, use Upload files to rebuild the list at the top of this tab. You need four exports: (1) Offers \u2014 B&amp;Q/Mirakl \u2192 My Inventory \u2192 Offers \u2192 Export \u2192 all offers including inactive / 0 stock, as CSV (columns Offer SKU, Product SKU, Product, Activated, Quantity, Price); (2) Product export \u2014 Catalog \u2192 Products \u2192 Export, Excel with a Data sheet (Shop SKU and EAN); (3) Access file (Access_\u2026.xlsx) with columns sku and Variant code; (4) Orders export CSV (Date created, Order number, Quantity, Status, Amount, Product SKU, Offer SKU, Order line no.). Files stay in this browser only.",
   "After a successful upload the lists update straight away on this tab. Use Clear my upload to go back to the published list already on the site. Nothing is sent to B&amp;Q, Mirakl or GitHub."
  ];
 };
@@ -132,6 +132,7 @@ return {hint:hint,box:box,wrap:wrap,steps:S};
 })();
 
 </script>
+<style id="bq-bugpass-1">#menu .box{color:#0F172A}#menu #hdata>.note,#menu #hclean>.note{color:#94A3B8}</style>
 </head><body data-open="sales">
 <div class="wrap" id="login">
  <div class="logo">B&amp;Q</div><h1 id="lh">B&amp;Q Dashboards</h1><p class="sub" id="lsub">Enter the password once. Sales, Orders, Listings and the other tabs stay unlocked in this browser tab.</p>
@@ -288,7 +289,7 @@ function afterUnlock(nk){keys=nk;$("pw").value="";$("msg").textContent="";
  })}
 /* An optional card whose nightly file is missing (or not unlocked) says so on that card only. */
 function markOptional(){Object.keys(OPT_NAME).forEach(function(d){var a=document.querySelector('a.big[href="productselling.html"]');if(!a)return;
-  var set=function(miss){var s=a.querySelector("span");if(!s)return;if(!s.getAttribute("data-t"))s.setAttribute("data-t",s.textContent);s.textContent=miss?"Nightly file missing – the next nightly build adds it":s.getAttribute("data-t");a.classList.toggle("miss",!!miss)};
+  var set=function(miss){var s=a.querySelector("span");if(!s)return;if(!s.getAttribute("data-t"))s.setAttribute("data-t",s.textContent);s.textContent=miss?"Not published yet – the other dashboards still work":s.getAttribute("data-t");a.classList.toggle("miss",!!miss)};
   if(keys[d]){set(false);return}getBuf(d).then(function(){set(false)},function(){set(true)})})}
 
 $("lf").addEventListener("submit",function(ev){ev.preventDefault();
@@ -318,7 +319,7 @@ function open(d){busy(true);
   setFrame(curUrl);$("viewer").classList.remove("hide");
   document.title=d==="sales"?"B&Q Sales":d==="orders"?"B&Q Orders":"B&Q Products selling";busy(false)})
  .catch(function(e){busy(false);
-  if(e&&e.message==="missing"){markOptional();if(window.__bqMiss)return;window.__bqMiss=1;alert((OPT_NAME[d]||"This dashboard")+": nightly file missing. The next nightly build publishes it. Sales and Orders still work.");return}
+  if(e&&e.message==="missing"){markOptional();if(window.__bqMiss)return;window.__bqMiss=1;alert((OPT_NAME[d]||"This dashboard")+" is not published yet. Sales and Orders still work.");return}
   if(e&&e.message==="optstale"){alert((OPT_NAME[d]||"This dashboard")+" was updated after you unlocked. Lock and type the password again to open it. Sales and Orders still work.");return}
   if(e&&e.message==="net"){alert("Couldn’t load the dashboard. Check your connection.");return}
   lock("Please enter the main password again (the dashboards were updated).")})}
@@ -471,7 +472,7 @@ function dupSave(doc){return dupIdb(function(db,res){if(!db){res(false);return}v
 function dupClearSaved(){return dupIdb(function(db,res){if(!db){res(false);return}var t=db.transaction("s","readwrite").objectStore("s").delete("doc");t.onsuccess=function(){res(true)};t.onerror=function(){res(false)};})}
 function dupUpHTML(doc,saved){
  var liveNote=(saved&&doc&&doc.data&&doc.data.summary&&!doc.data.summary.live_checked)?'<p class="note" id="duplive"><b>This browser cannot open B&amp;Q product pages</b> (or run the optional AI check), so nothing is marked Delete (verified) here \u2014 those rows are in Check, the same as the official tool without a live page check. Nothing is ever deleted on B&amp;Q from this dashboard.</p>':'';
- var srcNote=saved?'<p class="ok" id="dupsrcnote">Showing the list you built in this browser'+(doc&&doc.source_time?(' on '+esc(doc.source_time)+' UK'):'')+(doc&&doc.source_file?(' \u00b7 '+esc(doc.source_file)):'')+'. It stays on this device only. <button type="button" class="btn l" id="dupclear">Clear my upload and use the published list</button></p>':'<p class="note" id="dupsrcnote">This is the published list already on the site. To rebuild it from your own files (no 2am wait), use the box below. Files stay in this browser only.</p>';
+ var srcNote=saved?'<p class="ok" id="dupsrcnote">Showing the list you built in this browser'+(doc&&doc.source_time?(' on '+esc(doc.source_time)+' UK'):'')+(doc&&doc.source_file?(' \u00b7 '+esc(doc.source_file)):'')+'. It stays on this device only. <button type="button" class="btn l" id="dupclear">Clear my upload and use the published list</button></p>':'<p class="note" id="dupsrcnote">This is the published list already on the site. To rebuild it from your own files, use the box below. Files stay in this browser only.</p>';
  return liveNote+srcNote+
   '<div class="box" id="dupup"><h3>Upload files to rebuild the list</h3>'+
   '<p class="note">You need four exports. After they are chosen, the lists update straight away on this tab. Nothing is sent to B&amp;Q, Mirakl or GitHub, and nothing is deleted on B&amp;Q from this dashboard.</p>'+
@@ -3302,8 +3303,8 @@ function spDraw(){var el=$("pzspin");if(!el)return;var C=spCfg(),cnt=st&&st.aoa?
   C.heavy.rates.map(function(x,i){return '<tr><td><input data-spr="upTo" data-i="'+i+'" type="number" step="1" value="'+e(x.upTo)+'"></td><td><input data-spr="postage" data-i="'+i+'" type="number" step="0.01" value="'+e(x.postage)+'"></td><td><input data-spr="label" data-i="'+i+'" value="'+e(x.label)+'"></td><td><button class="btn l" type="button" data-sprdel="'+i+'">Delete</button></td></tr>'}).join("")+
   '</tbody></table><div class="pz-acts"><button class="btn l" type="button" id="pzspradd">Add heavy rate</button></div>'+
   '<div class="pz-acts"><button class="btn o" type="button" id="pzspexp">Export special postage</button> <button class="btn l" type="button" id="pzspreset">Back to the saved list</button></div>'+
-  '<p class="note">Changes are used here at once and kept in this browser. To make the 2am run use them, click Export special postage and send that file (special_postage.json) to your assistant.</p>'+
-  '<div class="note" id="pzspmsg">'+(saved?(P.specialDiffers(C)||(window.__bqSpRepo&&JSON.stringify(P.cleanSpecial(C))!==JSON.stringify(P.cleanSpecial(window.__bqSpRepo)))?'<b>Using your browser copy</b> – not yet in the 2am run.':'Using your browser copy (same as the saved list).'):'Using the saved list (same as the 2am run).')+'</div>';
+  '<p class="note">Changes are used here at once and kept in this browser. Click Export special postage to keep a copy of your list (special_postage.json).</p>'+
+  '<div class="note" id="pzspmsg">'+(saved?(P.specialDiffers(C)||(window.__bqSpRepo&&JSON.stringify(P.cleanSpecial(C))!==JSON.stringify(P.cleanSpecial(window.__bqSpRepo)))?'<b>Using your browser copy</b> – saved in this browser only.':'Using your browser copy (same as the saved list).'):'Using the saved list published on the site.')+'</div>';
  el.innerHTML=h;spWire()}
 function spRead(){var C=spCfg();
  Array.prototype.forEach.call(document.querySelectorAll("#pzspin [data-sp]"),function(inp){var r=C.rules[+inp.getAttribute("data-i")],f=inp.getAttribute("data-sp");if(!r)return;
@@ -3320,7 +3321,7 @@ function spWire(){var el=$("pzspin");if(!el)return;
   C.rules.unshift({id:"own"+Date.now(),name:(w||px).trim(),words:w.trim(),prefixes:(px||"").trim(),pack:"",postage:Number(p),builtin:""});spSet(C)};
  $("pzspradd").onclick=function(){var C=spRead();C.heavy.rates.push({upTo:"",postage:"",label:""});lss(LSSP,C);P.useSpecial(C);spDraw()};
  $("pzspexp").onclick=function(){saveText(JSON.stringify(P.cleanSpecial(spCfg()),null,1)+"\n","special_postage.json","application/json")};
- $("pzspreset").onclick=function(){if(!confirm("Forget your browser copy and use the saved list (the one the 2am run uses)?"))return;try{localStorage.removeItem(LSSP)}catch(e){}spApply();if(st&&st.aoa){compute();draw()}spDraw()}}
+ $("pzspreset").onclick=function(){if(!confirm("Forget your browser copy and use the saved list published on the site?"))return;try{localStorage.removeItem(LSSP)}catch(e){}spApply();if(st&&st.aoa){compute();draw()}spDraw()}}
 var TPL={Data:[["Offer SKU","Offer price","Discount price","Discount start date","Discount end date"],["offer-sku","price","discount-price","discount-start-date","discount-end-date"]]};
 function ls(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}}
 function lss(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
@@ -3501,8 +3502,8 @@ function b7draw(){var B=window.BQBook,R=st.bbr||[];if(!$("pzb7"))return;if(!B||!
  lossBanner();needYouDraw();histDraw();ruleBanner()}
 function b7input(){var doc=st.doc||{},meta=doc.meta||{};return{bbr:st.bbr,aoa:st.aoa,settings:b7opt(),template:doc.template||TPL,checks:st.checks&&st.checks.items||{},rivals:{},fresh:st.fresh||{},priceChanges:doc.priceChanges||meta.priceChanges||null,asOf:asOfD(),offers:{}}}
 function saveBytes(bytes,name){var bl=new Blob([bytes],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),u=URL.createObjectURL(bl),a=document.createElement("a");a.href=u;a.download=name;document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(u);a.remove()},4000)}
-function book7(){var b=$("pzb7dl");if(!window.BQBook||!st.bbr)return;b.disabled=true;var old=b.innerHTML;b.textContent="Preparing…";
- K.xlsx().then(function(X){var out=window.BQBook.build(X,P,b7input());st.b7=out.counts;saveBytes(out.bytes,"B&Q Pricing 7a/7b "+(st.accessDate||"")+" made "+today()+".xlsx");
+function book7(){var b=$("pzb7dl");if(!window.BQBook||!st.bbr)return;b.disabled=true;var old=b.innerHTML;b.textContent="Making the workbook… up to a minute";if($("pzb7n"))$("pzb7n").textContent=" Making the workbook – the page pauses while it works. Please wait.";
+ K.xlsx().then(function(X){return new Promise(function(r){requestAnimationFrame(function(){setTimeout(function(){r(X)},50)})})}).then(function(X){var out=window.BQBook.build(X,P,b7input());st.b7=out.counts;saveBytes(out.bytes,"B&Q Pricing 7a/7b "+(st.accessDate||"")+" made "+today()+".xlsx");
   $("pzb7n").textContent=" Saved – 7a UK "+(out.counts.t7uk||0)+", 7b China "+(out.counts.t7cn||0)+" (China raises review "+(out.counts.chinaRaiseReview||0)+").";}).catch(function(e){alert(K.why(e))}).then(function(){b.disabled=false;b.innerHTML=old})}
 function fromEdited(f){var n=$("pzb7n");n.textContent=" Reading "+f.name+"…";
  Promise.all([K.xlsx(),f.arrayBuffer()]).then(function(a){var X=a[0],wb=X.read(new Uint8Array(a[1]),{type:"array"}),by={};(window.BQBook.classify(P,st.bbr||[],b7opt())||[]).forEach(function(x){if(x.o&&!x.o.dup&&!by[x.o.sku]){if(x.t5Min!=null)x.o.t5Min=x.t5Min;by[x.o.sku]=x.o}});
@@ -3749,7 +3750,9 @@ function ukToday(){try{var f=new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/L
 function base(s){s=String(s||"").toUpperCase();return(s.match(/-/g)||[]).length>=2?s.replace(/-[^-]*$/,""):""}
 function norm(s){return String(s==null?"":s).toLowerCase()}
 var PER=[["today","Today"],["yday","Yesterday"],["7","7 days"],["15","15 days"],["30","30 days"]];
-function range(){var T=ukToday();switch(st.per){case"today":return[T,T];case"yday":return[T-1,T-1];case"7":return[T-6,T];case"15":return[T-14,T];case"30":return[T-29,T];
+function refDay(){var T=ukToday();if(st&&st.last!=null){var L=Math.floor(st.last/DAYM);if(L<T-1)return L}return T}
+function isOld(){return !!(st&&st.last!=null&&Math.floor(st.last/DAYM)<ukToday()-1)}
+function range(){var T=refDay();switch(st.per){case"today":return[T,T];case"yday":return[T-1,T-1];case"7":return[T-6,T];case"15":return[T-14,T];case"30":return[T-29,T];
  default:var a=fromIso(st.cf),b=fromIso(st.ct);if(a==null)a=T;if(b==null)b=a;return a<=b?[a,b]:[b,a]}}
 function perTag(){var R=range(),a=iso(R[0]),b=iso(R[1]);return({today:"Today_",yday:"Yesterday_","7":"7days_","15":"15days_","30":"30days_"}[st.per]||"")+(a===b?a:a+"_to_"+b)}
 function perText(){var R=range();return R[0]===R[1]?dstr(R[0]):dstr(R[0])+" – "+dstr(R[1])}
@@ -3790,9 +3793,9 @@ function render(body){
  $("lkup").onclick=function(){$("lkfile").value="";$("lkfile").click()};
  $("lkfile").onchange=function(){var f=this.files&&this.files[0];if(f)loadBulk(f)};
  return K.getJSON("lookup.enc").then(function(D){return D},function(e){if(e&&e.message==="notyet")return null;throw e}).then(function(D){
-  if(!D){$("lksrc").innerHTML="The order data is not published yet – it is added by the morning refresh.";return}
+  if(!D){$("lksrc").innerHTML="No order data yet – upload the Access file and Orders export under Data upload on Home.";return}
   prep(D);
-  $("lksrc").innerHTML='Orders up to '+esc(tstr(st.last))+' UK';
+  $("lksrc").innerHTML=isOld()?'Data as of '+esc(tstr(st.last))+' UK · upload new files on Home to refresh. Today, Yesterday and the day counts end on that day.':'Orders up to '+esc(tstr(st.last))+' UK';
   $("lksrc").title="Cancelled orders are not counted. Days = UK date the order was created. History from "+tstr(st.first,1)+".";
   var q=$("lkq");q.oninput=function(){st.q=q.value;st.sel=null;st.n=PAGE;draw()};
   q.onkeydown=function(e){if(e.key==="Enter"){e.preventDefault();var r=searchS(q.value);if(r.length){st.sel=r[0][0];st.grp=false;st.n=PAGE;draw();q.blur()}}};

@@ -120,12 +120,12 @@ function feed(){if(!D)return;var fr=document.getElementById("frame"),doc;try{doc
       d.className="bq-feed";d.innerHTML=html;m.insertBefore(d,m.firstChild)}
     function e(s){return String(s).replace(/[&<>"']/g,function(c){return({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])})}
     if(!o){doc.documentElement.setAttribute("data-bqsel","none");return}
-    if(!fresh(o)){doc.documentElement.setAttribute("data-bqsel","old");mark(e(o.name)+" in Data upload is "+D.ageDays(o.date)+" days old, so it is not used here. Showing the 2am build.","old");return}
+    if(!fresh(o)){doc.documentElement.setAttribute("data-bqsel","old");mark(e(o.name)+" in Data upload is "+D.ageDays(o.date)+" days old, so it is not used here. Showing the published data.","old");return}
     var af=fresh(a)?D.fileFromRec(a):null;
     return build(D.fileFromRec(o),af,pub).then(function(res){
-      if(pubAsOf&&res.summary.asOf<pubAsOf){doc.documentElement.setAttribute("data-bqsel","older");mark("The orders file in Data upload ends "+e(res.summary.asOf)+", before this page ("+e(pubAsOf)+"), so the 2am build is shown.","old");return}
+      if(pubAsOf&&res.summary.asOf<pubAsOf){doc.documentElement.setAttribute("data-bqsel","older");mark("The orders file in Data upload ends "+e(res.summary.asOf)+", before this page ("+e(pubAsOf)+"), so the published data is shown.","old");return}
       doc.open();doc.write(res.html);doc.close();doc.documentElement.setAttribute("data-bqsel","fed");
-      mark("Using from Data upload \u2014 orders: "+e(o.name)+(af?" \u00b7 Access: "+e(a.name):"")+". Earlier days in the chart come from the 2am build."+
+      mark("Using from Data upload \u2014 orders: "+e(o.name)+(af?" \u00b7 Access: "+e(a.name):"")+". Earlier days in the chart come from the published data."+
         (af?"":"<br>Upload today\u2019s Access file on Home to update the UK / China split and the no-sales count."),af?"":"old")})
   }).catch(function(err){try{doc.documentElement.setAttribute("data-bqsel","error")}catch(x){}if(window.console)console.warn("Products selling from Data upload:",err&&err.message)})}
 if(D)setInterval(feed,1000);

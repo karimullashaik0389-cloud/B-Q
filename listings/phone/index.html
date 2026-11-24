@@ -883,7 +883,7 @@ return {Pool:Pool,gQual:gQual,usWord:usWord,catWords:catWords,gCfg:gCfg,gCfgSave
 })();
 if(typeof module!=='undefined')module.exports=WR;
 
-window.__BQXDATE='export of 4 Nov 2026';
+window.__BQXDATE='export of 11 Nov 2026';
 (function(){
 'use strict';
 var NJ=document.getElementById('nojs');if(NJ)NJ.style.display='none';
@@ -2414,11 +2414,13 @@ function famFillLive(r,force){var U=famLive(r);if(!U)return false;var R=bqRowAll
   if(force||!r.tMine){r.title=famNoBrand(String(T.name||'')).t;r.tMine=!!r.title;r.tLive=r.title;}
   else if(!r.tLive&&T.name)r.tLive=famNoBrand(String(T.name)).t;
   if(force||!r.txtMine){var b=[];for(var i=1;i<=8;i++){var x=T['Unique Selling Point 0'+i];if(x)b.push(famNoBrand(String(x)).t);}
-    r.bul=b;r.desc=famNoBrand(String(T['Body Copy']||'')).t;r.kf=String(T.Key_Feature||'');r.txtMine=true;}
-  if(force||!String(r.w||'').trim())r.w=String(R.Product_weight||'');
+    r.bul=b;r.desc=famNoBrand(String(T['Body Copy']||'')).t;r.kf=String(T.Key_Feature||'');r.txtMine=true;r.txtFromLive=true;}
+  if(force||!String(r.w||'').trim()){r.w=String(R.Product_weight||'');r.wLive=r.w;}
+  if(force||!r.tMine||r.title===r.tLive)r.tFromLive=true;
   /* per-row dimensions from live product when present */
   if(force||!r.dimMine){var dL=R.Product_length||R['Product_length (mm)']||'',dW=R.Product_width||R['Product_width (mm)']||'',dH=R.Product_height||R['Product_height (mm)']||'';
-    if(dL||dW||dH){r.dim={L:String(dL||''),W:String(dW||''),H:String(dH||'')};r.dimMine=true;}}
+    var dc=catOf(R),cv=function(v,code){if(!v||!(parseFloat(v)>0))return '';var c=dc?dimCol(dc,code):null;return c&&c.mm?num(parseFloat(v)/10):num(v);};
+    if(dL||dW||dH){r.dim={L:cv(dL,'Product_length'),W:cv(dW,'Product_width'),H:cv(dH,'Product_height')};r.dimMine=true;}}
   if(force||!String(r.pm||'').trim()){r.pm=I[0]||'';r.po=I.slice(1).filter(Boolean).join('\n');}
   var F=famSt();F.axes[r.type]=1;
   /* seed shared base from first live product if empty / not yet fromLive */
@@ -2559,7 +2561,7 @@ function famMake(B,r,G,o){var q=JSON.parse(JSON.stringify(B)),t=r.type,v=famVal(
   /* v3.5.19: per-row owned title/text/images/dims win; shared base never silently overwrites an edited existing row */
   var tx=famTextOf(r);q.title=famTitleOf(r).trim();q.bul=(tx.bul||[]).slice();q.desc=tx.desc;q.kf=tx.kf;
   famQualityPad(q,B,r);
-  var dm=famDimOf(r);if(dm){q.dim=q.dim||{};['L','W','H'].forEach(function(k){if(dm[k])q.dim[k]={v:dm[k],src:'variant'};});}
+  var dm=famDimOf(r);if(dm){q.dim=q.dim||{};[['L','pl'],['W','pw'],['H','ph']].forEach(function(k){var v=normDim(dm[k[0]]);if(v)q.dim[k[1]]={v:v,src:'variant'};});}
   q.how='fam';q.merged=true;q.edited=!!(r.tMine||r.txtMine);q.fh=null;q.fromLive=false;q.gFail=false;q.gCache=null;
   /* brand always from brandFor (OVOVO when allowed) – never leave a stale live brand */
   if(q.f)q.f['Acquisition brand']={v:brandFor(B.cat),src:'family'};
@@ -2580,12 +2582,12 @@ function famBaseP(){var F=famSt(),p=S.P[FB],nm=String(F.name||'').trim();if(!nm)
   else if(p.r.name!==nm){p.r.name=nm;p.fh=null;if(!p.catMine&&!p.catConf)autoPick(p);}
   if(S.order.indexOf(FB)<0&&S.step<4)S.order=[FB];return p;}
 function famView1(){var F=famSt(),p=famBaseP(),nm=String(F.name||'').trim(),e=famGate(1),on=famAxOn();
-  var h='<h1>Product family</h1><p class="lead">One family for any mix of existing and new SKUs (e.g. packs of 1, 2, 3 already live, plus a new pack of 4). Add live products from the export below, or type rows in step 3 – each row is tagged <b>Existing – fix</b> or <b>New – add</b>. Shared details here fill unlocked rows only; edited existing rows keep their own title, text and images.</p>';
+  var h='<h1>Product family</h1><p class="lead">One family for any mix of existing and new SKUs (e.g. packs of 1, 2, 3 already live, plus a new pack of 4). Add live products from the export below, or type rows in step 3 (Variants) – each row is tagged <b>Existing – fix</b> or <b>New – add</b>. Shared details here fill unlocked rows only; edited existing rows keep their own title, text and images.</p>';
   h+=bqxCard()+ffPickHtml(F);
   h+='<div class="note" data-nextup><b>What to do next:</b> '+esc(e||'All filled – tap “Next: base text”.')+'</div>';
   h+='<div class="card" data-fambox><div class="fld'+(nm?'':' nf')+'" data-fld="famname"><label>1. Product name – without the colour, size or pack'+(nm?'':' <span class="need">Needs</span>')+'</label><input type="text" data-famname value="'+esc(F.name)+'" placeholder="e.g. Wooden coat hangers with trouser bar and notches"><span class="src">Don’t type the brand – B&amp;Q adds it on its own (OVOVO, or SuperGift.com if the category doesn’t allow OVOVO).</span>'+(F.bnote?'<div class="note a" data-fambrand style="margin-top:6px">'+esc(F.bnote)+'</div>':'')+'</div>';
   h+='<div class="fld'+(Object.keys(on).length?'':' nf')+'" data-fld="famaxes"><label>2. What changes between the variants? <span class="tiny">tick one or more</span>'+(Object.keys(on).length?'':' <span class="need">Needs</span>')+'</label><div class="opts">'+FTYPES.map(function(t){return '<button class="opt'+(on[t]?' on':'')+'" data-act="famax" data-v="'+t+'">'+(on[t]?'✓ ':'')+FTL[t]+'</button>';}).join('')+'</div><span class="src">Colour, size, material and style variants are grouped on B&amp;Q under one Variant Group ID. Pack sizes (1, 10, 50…) go as separate products with no group ID. Dimensions stay editable per row.</span></div></div>';
-  if(p){h+='<h2 style="margin:18px 0 6px">3. Base product details</h2><p class="tiny" style="margin:0 0 8px">Category, attributes, weight of one item and the shared photos. Fields that change per variant (marked “set on each variant”) are filled in step 3.</p>'+fillCard(FB);}
+  if(p){h+='<h2 style="margin:18px 0 6px">3. Base product details</h2><p class="tiny" style="margin:0 0 8px">Category, attributes, weight of one item and the shared photos. Fields that change per variant (marked “set on each variant”) are filled in step 3 (Variants).</p>'+fillCard(FB);}
   return h;}
 function famTxtCard(){var B=famB(),tn=textNeeds(B).filter(function(x){return !/different title|title length/.test(x);}),tl=String(B.title||'').trim().length,F=famSt();
   var h='<div class="card" id="ft-base"><div class="fld" data-fld="title"><label>Base title <span class="tiny" data-fbc="title">'+tl+' characters</span></label><textarea rows="2" data-fbt="title">'+esc(B.title)+'</textarea><span class="src">Aim for '+TMIN+'–'+TMAX+' characters (B&amp;Q limit 130). Each variant’s colour, size or “Pack of N” is added in step 3 and the title is shortened to fit.</span></div>';
@@ -2606,22 +2608,22 @@ function famRowHtml(r,i,B,G){var c=famChk(i),t=r.type,u=unit(B.cat),F=fInfo(B.ca
   h+=cell('Shop SKU <b class="need">*</b>','<input type="text" required aria-required="true" class="'+(String(r.sku||'').trim()?'':'nfi')+'" data-fr="'+i+'" data-ff="sku" value="'+esc(r.sku)+'" placeholder="'+(live?'live SKU from export':'this variant’s own SKU')+'">');
   h+=cell('EAN','<input type="text" inputmode="numeric" data-fr="'+i+'" data-ff="ean" value="'+esc(r.ean)+'" placeholder="13 digits">');
   h+=cell('Weight ('+u+')','<input type="text" inputmode="decimal" data-fr="'+i+'" data-ff="w" value="'+esc(r.w)+'" placeholder="'+esc(famWAuto(r))+'">');
-  h+='</div><div class="tiny" style="margin:2px 0 6px">'+(String(r.w||'').trim()?'Weight: you typed it':famWAuto(r)?'Weight: '+esc(famWAuto(r))+' '+u+(t==='Multipack'&&famQty(r)>=2?' = base weight × '+famQty(r)+' (whole pack) – type over it to change':' = base weight – type over it to change'):'Weight: none yet – type it here or in step 1 (Base)')+' · Acquisition brand: <b>'+esc(brandFor(B.cat))+'</b> (set on every row – never in the title or text)</div>';
+  h+='</div><div class="tiny" style="margin:2px 0 6px">'+(String(r.w||'').trim()?(live&&r.wLive!=null&&String(r.w)===String(r.wLive)?'Weight: from the live page – type over it to change':'Weight: you typed it'):famWAuto(r)?'Weight: '+esc(famWAuto(r))+' '+u+(t==='Multipack'&&famQty(r)>=2?' = base weight × '+famQty(r)+' (whole pack) – type over it to change':' = base weight – type over it to change'):'Weight: none yet – type it here or in step 1 (Base)')+' · Acquisition brand: <b>'+esc(brandFor(B.cat))+'</b> (set on every row – never in the title or text)</div>';
   if(t!=='Multipack'&&F){famCodes(B.cat,t).forEach(function(cd){var L=F.lists[cd];if(!L)return;var m=famVal(r)?famBqVal(r,cd,L,t):'';
     h+='<div class="fld'+(famVal(r)&&!m?' nf':'')+'" style="margin:0 0 8px"><label>B&amp;Q “'+esc(labF(cd,B.cat))+'” <span class="tiny">'+(m?(r.bq&&r.bq[cd]===m?'you chose it':'matched to “'+esc(famVal(r))+'”'):famVal(r)?'not in B&amp;Q’s list – choose the nearest':'')+'</span></label><select data-fr="'+i+'" data-ff="bq" data-c="'+esc(cd)+'"><option value="">— choose —</option>'+L.map(function(x){return '<option'+(x===m?' selected':'')+'>'+esc(x)+'</option>';}).join('')+'</select></div>';});}
   if(t!=='Multipack'&&F)famAxX(B.cat,t).forEach(function(cd){var L=F.lists[cd],cur=(r.bq||{})[cd]||'';
     h+='<div class="fld'+(cur?'':' nf')+'" style="margin:0 0 8px"><label>B&amp;Q “'+esc(labF(cd,B.cat))+'” <span class="tiny">B&amp;Q groups this category by '+esc(labF(cd,B.cat))+' – each variant needs a different one</span></label>'+(L?'<select data-fr="'+i+'" data-ff="bq" data-c="'+esc(cd)+'"><option value="">— choose —</option>'+L.map(function(x){return '<option'+(x===cur?' selected':'')+'>'+esc(x)+'</option>';}).join('')+'</select>':'<input type="text" data-fr="'+i+'" data-ff="bqt" data-c="'+esc(cd)+'" value="'+esc(cur)+'" placeholder="this variant’s '+esc(labF(cd,B.cat))+'">')+'</div>';});
-  h+='<div class="fld" style="margin:0 0 8px"><label>Title <span class="tiny" data-ftc="'+i+'">'+tt.trim().length+' characters</span> '+(r.tMine?'<span class="opt-l">you edited · </span><button class="lnk" data-act="famtauto" data-i="'+i+'">Use shared / automatic title</button>':'<span class="opt-l">from '+(live?'export / shared':'shared base')+'</span>')+'</label><textarea rows="2" data-fr="'+i+'" data-ff="title">'+esc(tt)+'</textarea></div>';
+  h+='<div class="fld" style="margin:0 0 8px"><label>Title <span class="tiny" data-ftc="'+i+'">'+tt.trim().length+' characters</span> '+(r.tMine?'<span class="opt-l">'+(live&&r.tFromLive&&r.title===r.tLive?'from the live page':'you edited')+' · </span><button class="lnk" data-act="famtauto" data-i="'+i+'">Use shared / automatic title</button>':'<span class="opt-l">from '+(live?'export / shared':'shared base')+'</span>')+'</label><textarea rows="2" data-fr="'+i+'" data-ff="title">'+esc(tt)+'</textarea></div>';
   h+='<div class="fld" style="margin:0 0 8px"><label>Key feature <span class="tiny" data-fkc="'+i+'">'+String(tx.kf||'').length+'/30</span></label><input type="text" data-fr="'+i+'" data-ff="kf" value="'+esc(tx.kf)+'"></div>';
-  h+='<div class="fld" style="margin:0 0 8px"><label>Bullets (8) <span class="tiny">'+(r.txtMine?'you edited this row':'from '+(live?'export':'shared base')+' – edit to lock this row')+'</span></label>';
+  h+='<div class="fld" style="margin:0 0 8px"><label>Bullets (8) <span class="tiny">'+(r.txtMine?(live&&r.txtFromLive?'from the live page – edit to change this row':'you edited this row'):'from '+(live?'export':'shared base')+' – edit to lock this row')+'</span></label>';
   for(var bi=0;bi<8;bi++)h+='<input type="text" data-fr="'+i+'" data-ff="bul" data-i="'+bi+'" value="'+esc((tx.bul||[])[bi]||'')+'" style="margin-bottom:6px">';
   h+='</div><div class="fld" style="margin:0 0 8px"><label>Description <span class="tiny" data-fdc="'+i+'">'+words(tx.desc)+' words</span></label><textarea rows="5" data-fr="'+i+'" data-ff="desc">'+esc(tx.desc)+'</textarea></div>';
   h+='<div class="btns" style="margin:0 0 8px"><button class="btn sm" data-act="famtapply" data-i="'+i+'" title="Replace this row’s title and text with the shared base (plus pack/colour/size)">Apply shared text to this row</button>'+(live?' <button class="btn sm" data-act="famreload" data-i="'+i+'" title="Reload title, text, weight, dimensions and photos from the product export">Reload from export</button>':'')+'</div>';
   var dm=r.dim||{};
   h+='<details class="opt0"'+(r.dimMine?' open':'')+'><summary>Product size (L × W × H) – '+(r.dimMine?'this row’s own size':'uses the shared base size until you type here')+'</summary><div class="fgrid" style="margin-top:6px">';
-  h+=cell('Length','<input type="text" inputmode="decimal" data-fr="'+i+'" data-ff="dimL" value="'+esc(dm.L||'')+'" placeholder="from base">');
-  h+=cell('Width','<input type="text" inputmode="decimal" data-fr="'+i+'" data-ff="dimW" value="'+esc(dm.W||'')+'" placeholder="from base">');
-  h+=cell('Height','<input type="text" inputmode="decimal" data-fr="'+i+'" data-ff="dimH" value="'+esc(dm.H||'')+'" placeholder="from base">');
+  h+=cell('Length (cm)','<input type="text" inputmode="decimal" data-fr="'+i+'" data-ff="dimL" value="'+esc(dm.L||'')+'" placeholder="from base">');
+  h+=cell('Width (cm)','<input type="text" inputmode="decimal" data-fr="'+i+'" data-ff="dimW" value="'+esc(dm.W||'')+'" placeholder="from base">');
+  h+=cell('Height (cm)','<input type="text" inputmode="decimal" data-fr="'+i+'" data-ff="dimH" value="'+esc(dm.H||'')+'" placeholder="from base">');
   h+='</div><span class="src tiny">For size / colour / style variants that differ in dimensions. Leave blank to keep the shared base size. Multipack rows usually keep the single-item size.</span></details>';
   h+='<details class="opt0" open><summary>Photos – '+(r.pm?'own main photo set':'uses the base photos until you paste links')+(live?' · loaded from export':'')+'</summary><div class="fld" style="margin-top:6px"><label>Main photo link</label><input type="text" data-fr="'+i+'" data-ff="pm" value="'+esc(r.pm)+'" placeholder="https://… .jpg of this '+(t==='Multipack'?'pack':t.toLowerCase())+'"></div><div class="fld"><label>Other photo links <span class="tiny">one per line – secondary images</span></label><textarea rows="3" data-fr="'+i+'" data-ff="po">'+esc(r.po)+'</textarea></div></details>';
   if(c.err.length)h+='<div class="msg err" data-ferr style="margin-top:8px">'+c.err.map(esc).join('<br>')+(c.fix?' <button class="btn sm" data-act="famfixean" data-i="'+i+'">Use correct check digit ('+esc(c.fix)+')</button>':'')+'</div>';
@@ -2678,9 +2680,9 @@ function famInput(e,chg){var t=e.target,d=t.dataset,F=famSt();
     if(f==='bq'||f==='bqt'){r.bq=r.bq||{};if(t.value)r.bq[d.c]=t.value;else delete r.bq[d.c];}
     else if(f==='type'){r.type=t.value;r.bq={};F.axes[r.type]=1;}
     else if(f==='title'){r.title=t.value;r.tMine=true;var tc=document.querySelector('[data-ftc="'+d.fr+'"]');if(tc)tc.textContent=String(t.value).trim().length+' characters';}
-    else if(f==='bul'){r.txtMine=true;if(!Array.isArray(r.bul))r.bul=(famTextOf(r).bul||[]).slice();while(r.bul.length<8)r.bul.push('');r.bul[+d.i]=t.value;}
-    else if(f==='desc'){r.txtMine=true;r.desc=t.value;var dc=document.querySelector('[data-fdc="'+d.fr+'"]');if(dc)dc.textContent=words(t.value)+' words';}
-    else if(f==='kf'){r.txtMine=true;r.kf=t.value;var kc2=document.querySelector('[data-fkc="'+d.fr+'"]');if(kc2)kc2.textContent=String(t.value).length+'/30';}
+    else if(f==='bul'){r.txtMine=true;r.txtFromLive=false;if(!Array.isArray(r.bul))r.bul=(famTextOf(r).bul||[]).slice();while(r.bul.length<8)r.bul.push('');r.bul[+d.i]=t.value;}
+    else if(f==='desc'){r.txtMine=true;r.txtFromLive=false;r.desc=t.value;var dc=document.querySelector('[data-fdc="'+d.fr+'"]');if(dc)dc.textContent=words(t.value)+' words';}
+    else if(f==='kf'){r.txtMine=true;r.txtFromLive=false;r.kf=t.value;var kc2=document.querySelector('[data-fkc="'+d.fr+'"]');if(kc2)kc2.textContent=String(t.value).length+'/30';}
     else if(f==='dimL'||f==='dimW'||f==='dimH'){r.dim=r.dim||{L:'',W:'',H:''};r.dim[f.slice(3)]=t.value;r.dimMine=true;}
     else{r[f]=f==='ean'?t.value.replace(/\s/g,''):t.value;if(f==='val'){var Bv=famB(),kc=Bv&&Bv.cat?famCodes(Bv.cat,r.type):[];r.bq=r.bq||{};kc.forEach(function(c){delete r.bq[c];});}}
     if(chg){if(f==='val'||f==='title'||f==='desc'||f==='kf'||f==='bul'){var raw=f==='bul'?r.bul[+d.i]:r[f];var nb3=famNoBrand(raw);if(nb3.cut){if(f==='bul'){r.bul[+d.i]=nb3.t;t.value=nb3.t;}else{r[f]=nb3.t;}toast(famBrandNote(nb3.cut,'row '+(+d.fr+1)+' '+(f==='val'?'value':f==='bul'?'bullet':f)),7000);}
@@ -2874,7 +2876,7 @@ async function bqxLoad(file){var o=bqxParse(await readXlsx(await file.arrayBuffe
 function KNOWNX(){Object.keys(S.P||{}).forEach(function(k){var p=S.P[k];if(p&&!p.famBase&&p.r){p.bqRow=null;}});}
 setTimeout(function(){idbGet('bqx').then(function(o){if(bqxApply(o)&&S.view)render();});},0);
 function bqxCard(){var n=Object.keys(bqRowAll()).length;return '<div class="card" data-bqx><b>B&amp;Q product export</b> <span class="tiny" data-bqxst>'+(BQX?'Using <b>'+esc(BQX.name)+'</b> · uploaded '+esc(BQX.date)+' · '+BQX.n+' products':'Using the built-in export ('+(window.__BQXDATE||'')+') · '+n+' products')+'</span><div class="btns" style="margin-top:6px"><label class="btn ghost">Upload product export<input type="file" id="bqxf" accept=".xlsx" class="hide"></label>'+(BQX?'<button class="btn" data-act="bqxclear">Use the built-in export</button>':'')+'</div><span class="src">Download it from B&amp;Q (Mirakl) › Products › Export (export-products-….xlsx). Saved in this browser only – upload a fresh one any time.</span></div>';}
-function ffStrip(t){return famNoBrand(String(t||'').replace(/,?\s*\(?\s*(pack|set)\s+of\s+\d+\s*\)?/ig,'').replace(/\b\d+\s*(pack|pk|x)\b/ig,'').replace(/\s{2,}/g,' ').replace(/[\s,–-]+$/,'')).t.trim();}
+function ffStrip(t){return famNoBrand(String(t||'').replace(/,?\s*\(?\s*(pack|set)\s+of\s+\d+\s*\)?/ig,' ').replace(/\b\d+\s*(pack|pk|x)\b/ig,' ').replace(/\s+([,.;:])/g,'$1').replace(/\s{2,}/g,' ').replace(/[\s,–-]+$/,'')).t.trim();}
 function ffQty(sku){var R=bqRowAll()[sku]||{},T=bqTxtAll()[sku]||{},q=parseInt(R['Core_Pack quantity'],10);if(q>0)return q;var m=String(T.name||'').match(/pack\s+of\s+(\d+)/i);return m?+m[1]:1;}
 function ffFind(q){q=String(q||'').trim().toUpperCase();if(q.length<3)return [];var R=bqRowAll(),T=bqTxtAll(),o=[];
   for(var k in R){var e=String(R[k].ean||'');if(k.indexOf(q)>=0||e.indexOf(q)>=0||(q.length>4&&String((T[k]||{}).name||'').toUpperCase().indexOf(q)>=0)){o.push(k);if(o.length>=20)break;}}return o;}
@@ -2898,7 +2900,7 @@ function ffView1(F,p,nm,e,on){var q=F.q||'',L=ffFind(q);
 window.__ffPick=function(k){return ffPick(k);};window.__BQX=function(){return BQX;};window.__famFillLive=function(i,f){return famFillLive(S.rows[i],!!f);};window.__famTextOf=function(i){return famTextOf(S.rows[i]);};window.__famTitleOf=function(i){return famTitleOf(S.rows[i]);};window.__famMake=famMake;window.__famLive=famLive;window.__famApplyShared=function(i){famApplyShared(S.rows[i]);};
 /* v3.5.16: one smart family – a row whose SKU (else EAN) is in the loaded export is an existing product (fix, all live values kept); otherwise new (add) */
 function famLive(r){var U=String(r&&r.sku||'').trim().toUpperCase(),R=bqRowAll();if(U&&R[U])return U;var e=String(r&&r.ean||'').replace(/\s/g,''),m=/^\d{13}$/.test(e)?eanX()[e]:null;return m&&R[String(m[0]).toUpperCase()]?String(m[0]).toUpperCase():'';}
-function ffPickHtml(F){var q=F.q||'',L=ffFind(q),h='<div class="card" data-ffpick><label><b>Add live products from the export</b> <span class="tiny">optional – SKU, EAN or part of the name. Rows you type in step 3 with a live SKU or EAN are matched too.</span></label><input type="text" data-ffq value="'+esc(q)+'" placeholder="e.g. ABC-GAR-1 or 5056…">';
+function ffPickHtml(F){var q=F.q||'',L=ffFind(q),h='<div class="card" data-ffpick><label><b>Add live products from the export</b> <span class="tiny">optional – SKU, EAN or part of the name. Rows you type in step 3 (Variants) with a live SKU or EAN are matched too.</span></label><input type="text" data-ffq value="'+esc(q)+'" placeholder="e.g. ABC-GAR-1 or 5056…">';
   if(q&&!L.length)h+='<div class="tiny" style="margin-top:6px">Nothing in the export matches “'+esc(q)+'”.</div>';
   L.forEach(function(k){var T=bqTxtAll()[k]||{},R=bqRowAll()[k]||{},have=S.rows.some(function(r){return famLive(r)===k;});h+='<div class="it" data-ffres="'+esc(k)+'" style="display:flex;gap:8px;align-items:center;margin-top:6px"><button class="btn sm'+(have?'':' p')+'" data-act="ffpick" data-sku="'+esc(k)+'"'+(have?' disabled':'')+'>'+(have?'Added':'Add')+'</button><span><b>'+esc(k)+'</b> · EAN '+esc(R.ean||'–')+' · '+esc(String(T.name||'').slice(0,90))+'</span></div>';});
   var lv=S.rows.filter(famLive).length;return h+'<p class="tiny" style="margin:8px 0 0">'+S.rows.length+' row'+(S.rows.length===1?'':'s')+' so far ('+lv+' existing – fix, '+(S.rows.length-lv)+' new – add).</p></div>';}

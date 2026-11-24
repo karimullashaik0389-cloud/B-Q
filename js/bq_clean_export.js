@@ -15,6 +15,7 @@ var CODE_HEADER_LINE=CODE_HEADER.join(",");
 var NO_CACHE_MSG="This file has no stored prices. Open it in Excel, wait for it to finish calculating, save it, and choose it again.";
 var WORK_SHEETS=[["7a UK upload","7a_UK_upload.csv"],["7b China upload","7b_China_upload.csv"]];
 var DETAIL_SHEETS=[["UK upload","full_detail_UK_upload.csv"],["China upload","full_detail_China_upload.csv"]];
+var BOOK_SHEETS=[["7a Final upload UK","7a_UK_upload.csv"],["7b Final upload China","7b_China_upload.csv"]]; /* the Pricing tab's "2. Download pricing workbook" */
 
 function $(id){return document.getElementById(id)}
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])})}
@@ -35,6 +36,7 @@ function sheetsFor(wb){
   var names=wb.SheetNames||[];
   function has(n){return names.indexOf(n)>=0}
   if(has("7a UK upload")&&has("7b China upload"))return WORK_SHEETS;
+  if(has("7a Final upload UK")&&has("7b Final upload China"))return BOOK_SHEETS;
   if(has("UK upload")&&has("China upload"))return DETAIL_SHEETS;
   throw new Error("That is not a work file or full-detail file. It needs 7a / 7b, or UK upload / China upload, sheets.");
 }
@@ -42,6 +44,7 @@ function sheetsFor(wb){
 function ukSheetName(wb){
   var names=wb.SheetNames||[];
   if(names.indexOf("7a UK upload")>=0)return "7a UK upload";
+  if(names.indexOf("7a Final upload UK")>=0)return "7a Final upload UK";
   if(names.indexOf("UK upload")>=0)return "UK upload";
   return "";
 }
@@ -67,8 +70,10 @@ function hasCachedPrices(wb){
   /* Combined Check (C3) must be a stored non-empty result. 7a / UK A3 must
      not still be a bare formula. A blank A3 is allowed (0 UK). 7b is ignored,
      because a real default China day has 0 rows. */
-  if(!wb||!wb.Sheets||!wb.Sheets.Combined)return false;
-  var check=cachedCell(wb.Sheets.Combined,"C3");
+  if(!wb||!wb.Sheets)return false;
+  var comb=wb.Sheets.Combined?[wb.Sheets.Combined,"C3"]:wb.Sheets["6 Combined upload"]?[wb.Sheets["6 Combined upload"],"E3"]:null;
+  if(!comb)return false;
+  var check=cachedCell(comb[0],comb[1]);
   if(!check.ok||check.empty)return false;
   var uk=ukSheetName(wb);
   if(!uk||!wb.Sheets[uk])return false;
